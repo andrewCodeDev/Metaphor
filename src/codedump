@@ -1,0 +1,1283 @@
+fn __ArgType(comptime T: type) type {
+    // we need to convert pointer types
+    switch (@typeInfo(T)) {
+        .Pointer => |p| {
+            switch (p.size) {
+                .One, .Many => return if (p.is_const) [*c]const p.child else [*c]p.child,
+                else => @compileError("Requres one or many ptr type."),
+            }
+        }, else => return T,
+    }
+}
+
+const StructField = std.builtin.Type.StructField;
+
+fn __ArgTupleType(comptime T: type) type {
+    const info = @typeInfo(T);
+
+    const inp_fields = info.Struct.fields;
+
+    comptime var out_fields: [inp_fields.len]StructField = undefined;
+
+    inline for (inp_fields, 0..) |field, i| {
+        out_fields[i] = StructField {
+            .name = field.name,
+            .type = __ArgType(field.type),
+            .default_value = null,
+            .is_comptime = false,
+            .alignment = field.alignment
+        };
+    }
+    return @Type(.{
+        .Struct = .{
+            .layout = .Auto,
+            .fields = out_fields[0..],
+            .decls = &.{},
+            .is_tuple = true,
+            .backing_integer = null
+        },
+    });
+}
+
+inline fn __argTuple(x: anytype) __ArgTupleType(@TypeOf(x)) {
+    const T = @TypeOf(x);
+    const U = __ArgTupleType(T);
+    var u: U = undefined;
+    inline for (0..comptime UT.tupleSize(T)) |i| {
+        u[i] = if (comptime UT.isPointer(T)) @ptrCast(@alignCast(x[i])) else x[i];
+    }
+    return u;
+}
+
+pub fn iota(
+    X: anytype, 
+    init: anytype,
+    step: anytype) Contract(
+        isScalar(@TypeOf(init)) and
+        isScalar(@TypeOf(step)) and
+        (isGraphTensor(@TypeOf(X)) or isSlice(@TypeOf(X))),
+    Returns(void)) {    
+        if (comptime isGraphTensor(@TypeOf(X))) {
+            return iota(X.values(), init, step);
+        } else {
+            const T = Child(@TypeOf(X));
+        
+            var _init = SC.castScalar(T, init);
+            const _step = SC.castScalar(T, step);
+
+            for (0..X.len) |i| {
+                X[i] = _init; 
+                _init = SC.add(_init, _step);
+            }
+        }
+    }
+
+pub const c16 = struct { r: f16, i: f16, pub usingnamespace SC.ComplexImpl(@This()); };
+pub const c32 = struct { r: f32, i: f32, pub usingnamespace SC.ComplexImpl(@This()); };
+pub const c64 = struct { r: f64, i: f64, pub usingnamespace SC.ComplexImpl(@This()); };
+
+fn ComplexImpl(comptime SelfType: type) type {
+    return struct {
+        const Self = SelfType;
+        pub fn format(self: Self, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = try writer.print("({d:.3} + {d:.3}i)", .{self.r, self.i});
+        }
+        pub fn add(self: Self, y: anytype) SC.ScalarResult(Self, @TypeOf(y)) {
+            return SC.add(self, y);
+        }
+        pub fn sub(self: Self, y: anytype) SC.ScalarResult(Self, @TypeOf(y)) {
+            return SC.sub(self, y);
+        }
+        pub fn mul(self: Self, y: anytype) SC.ScalarResult(Self, @TypeOf(y)) {
+            return SC.mul(self, y);
+        }
+        pub fn div(self: Self, y: anytype) SC.ScalarResult(Self, @TypeOf(y)) {
+            return SC.div(self, y);
+        }
+        pub fn pow(self: Self, n: SC.DemoteComplex(Self)) Self {
+            return SC.pow(self, n);
+        }
+        pub fn conj(self: Self) Self {
+            return SC.conj(self);
+        }
+        pub fn mod(self: Self) SC.DemoteComplex(Self) {
+            return SC.mod(self);
+        }
+        pub fn arg(self: Self) SC.DemoteComplex(Self) {
+            return SC.arg(self);
+        }
+        pub fn exp(self: Self) Self {
+            return SC.exp(self);
+        }
+        pub fn neg(self: Self) Self {
+            return SC.neg(self);
+        }
+    };
+}
+
+  ////////////////////////////////////////////////
+ ///// Scalar-Ops Implementation ////////////////
+////////////////////////////////////////////////
+
+pub fn mod(x: anytype) DemoteComplex(@TypeOf(x)) {
+    if (comptime isComplex(@TypeOf(x))) {
+        return std.math.sqrt(x.r * x.r + x.i * x.i);     
+    } else {
+        return @abs(x);
+    }
+}
+
+pub inline fn arg(x: anytype) DemoteComplex(@TypeOf(x)) {
+    if (comptime isComplex(@TypeOf(x))) {
+
+        if (x.r == 0.0) {
+            std.debug.assert(x.i != 0.0);
+            return if (x.i > 0.0) (0.5 * pi) else (1.5 * pi);
+        }
+
+        // There is probably a better way to do this.
+        
+        // Arctan returns interior args to the triarg it's
+        // concerned with. We need the arg from 0 up to 2pi.
+        // This approach uses the sin/cos values to deduce the
+        // quadrant and then supplements with a multiple of pi.
+        
+        if (x.i > 0) {
+            if (x.r > 0.0) {
+                return atan(@abs(x.i / x.r));
+            } else {
+                return pi - atan(@abs(x.i / x.r));
+            }
+        } else {
+            if (x.r > 0.0) {
+                return 2.0 * pi - atan(@abs(x.i / x.r));
+            } else {
+                return pi + atan(@abs(x.i / x.r));
+            }
+        }
+    } else {
+        return if (x < 0.0) (pi / 2.0) else 0.0;
+    }
+}
+
+pub inline fn conj(x: anytype) @TypeOf(x) {
+    const T = @TypeOf(x);
+    if (comptime isComplex(T)) {
+        return T{ .r = x.r, .i = -x.i };     
+    } else {
+        return x;
+    }
+}
+
+pub inline fn conjmul(x: anytype) DemoteComplex(@TypeOf(x)) {
+    if (comptime isComplex(@TypeOf(x))) {
+        return x.r * x.r + x.i * x.i;
+    } else {
+        return x * x;
+    }
+}
+
+pub inline fn neg(x: anytype) @TypeOf(x) {
+    const T = @TypeOf(x);
+    if (comptime isComplex(T)) {
+        return T{ .r = -x.r, .i = -x.i };     
+    }
+    else {
+        return -x;
+    }
+}
+
+pub fn add(x: anytype, y: anytype) ScalarResult(@TypeOf(x), @TypeOf(y)) {
+    const T = ScalarResult(@TypeOf(x), @TypeOf(y));
+    
+    if (comptime isComplex(@TypeOf(x)) and isComplex(@TypeOf(y))) {
+        return T { .r = x.r + y.r, .i = x.i + y.i };
+    }
+    else if (comptime isComplex(@TypeOf(x)) and isFloat(@TypeOf(y))) {
+        return T { .r = x.r + y, .i = x.i };
+    }
+    else if (comptime isFloat(@TypeOf(x)) and isComplex(@TypeOf(y))) {
+        return T { .r = x + y.r, .i = y.i };
+    }
+    else {
+        return x + y;
+    }
+}
+
+pub fn sub(x: anytype, y: anytype) ScalarResult(@TypeOf(x), @TypeOf(y)) {
+    return @call(.always_inline, SC.add, .{ x, SC.neg(y) });
+}
+
+pub fn mul(x: anytype, y: anytype) ScalarResult(@TypeOf(x), @TypeOf(y)) {
+    const T = ScalarResult(@TypeOf(x), @TypeOf(y));
+    
+    if (comptime isComplex(@TypeOf(x)) and isComplex(@TypeOf(y))) {
+        return T {  .r = (x.r * y.r - x.i * y.i), .i = (x.r * y.i + x.i * y.r) };
+    }
+    else if (comptime isComplex(@TypeOf(x)) and isFloat(@TypeOf(y))) {
+        return T { .r = x.r * y, .i = x.i * y };
+    }
+    else if (comptime isFloat(@TypeOf(x)) and isComplex(@TypeOf(y))) {
+        return T { .r = x * y.r, .i = x * y.i };
+    }
+    else {
+        return x * y;
+    }
+}
+
+pub fn div(x: anytype, y: anytype) ScalarResult(@TypeOf(x), @TypeOf(y)) {
+    const T = ScalarResult(@TypeOf(x), @TypeOf(y));
+    
+    if (comptime isComplex(@TypeOf(x)) and isComplex(@TypeOf(y))) {
+        return @call(.always_inline, SC.div, .{ SC.mul(x, SC.conj(y)), SC.conjmul(y) });
+    }
+    else if (comptime isComplex(@TypeOf(x)) and isFloat(@TypeOf(y))) {
+        return T { .r = x.r / y, .i = x.i / y };
+    }
+    else if (comptime isFloat(@TypeOf(x)) and isComplex(@TypeOf(y))) {
+        return @call(.always_inline, SC.div, .{ T{ .r = x, .i = 0 }, y });
+    }
+    else {
+        return x / y;
+    }
+}
+
+pub fn pow(x: anytype, n: DemoteComplex(@TypeOf(x))) @TypeOf(x) {
+    if (comptime isComplex(@TypeOf(x))) {
+        const m = std.math.pow(@TypeOf(n), x.mod(), n);
+        const a = n * x.arg();
+        return @TypeOf(x) {
+            .r = m * cos(a),
+            .i = m * sin(a),
+        };
+    }
+    else {
+        return std.math.pow(@TypeOf(n), x, n);
+    }
+}
+
+pub fn exp(x: anytype) @TypeOf(x) {
+    if (comptime isComplex(@TypeOf(x))) {
+        const m = std.math.exp(x.r);
+        return @TypeOf(x) {
+            .r = m * cos(x.i),
+            .i = m * sin(x.i),
+        };
+    }
+    else {
+        return std.math.exp(x);
+    }
+}
+
+pub fn degrees(rads: f64) f64 {
+    return 180.0 * (rads / pi);
+}
+
+test "Complex Addition" {
+    const x = c32{ .r = 2, .i = 5 };
+    const y = c32{ .r = 1, .i = 6 };
+    {
+        const z = SC.add(x, y);
+        std.debug.assert(z.r == 3 and z.i == 11);
+    }
+    {
+        const z = x.add(y);
+        std.debug.assert(z.r == 3 and z.i == 11);
+    }
+}
+
+test "Complex Subtraction" {
+    const x = c32{ .r = 2, .i = 5 };
+    const y = c32{ .r = 1, .i = 6 };
+    {
+        const z = SC.sub(x, y);
+        std.debug.assert(z.r == 1 and z.i == -1);
+    }
+    {
+        const z = x.sub(y);
+        std.debug.assert(z.r == 1 and z.i == -1);
+    }
+}
+
+test "Complex Multiplication" {
+    const x = c32{ .r = 2, .i = 5 };
+    const y = c32{ .r = 1, .i = 6 };
+    {
+        const z = SC.mul(x, y);
+        std.debug.assert(z.r == -28 and z.i == 17);
+    }
+    {
+        const z = x.mul(y);
+        std.debug.assert(z.r == -28 and z.i == 17);
+    }
+}
+
+test "Complex Division" {
+    const x = c32{ .r = 2, .i = 5 };
+    const y = c32{ .r = 2, .i = 5 };
+    {
+        const z = SC.div(x, y);
+        std.debug.assert(z.r == 1 and z.i == 0);
+    }
+    {
+        const z = x.div(y);
+        std.debug.assert(z.r == 1 and z.i == 0);
+    }
+}
+
+/////////////////////////////////////////////////////////////
+// This is the naive version of a general tensor contraction.
+// In the future, I plan on making more optimal versions of
+// this, but it's reliable baseline for future work.
+//
+// If all goes well, it will unroll to something like this:
+//
+//    for i..I
+//        x_indices[0] = i
+//        y_indices[0] = i
+//        for j..J
+//            x_indices[1] = j
+//            y_indices[1] = j
+//                ...
+//                for n..N
+//                    x_indices[I] = n;
+//                    y[y_indices] += x.getValue(x_indices);
+
+//pub fn contraction(comptime expression: [] const u8, x: anytype, y: anytype) !void {
+//
+//    if(!x.isValid() or !y.isValid()) {
+//        return TensorError.InvalidTensorLayout;
+//    }
+//
+//    const XT = @TypeOf(x.*);
+//    const YT = @TypeOf(y.*);
+//    const ip = comptime contractionParse(XT.Rank, YT.Rank, expression);
+//
+//    const xs = x.getSizes();
+//    const ys = y.getSizes();
+//
+//    var i: usize = 1; 
+//    while(i < YT.Rank) : (i += 1) {
+//        if(xs[ip.lhs[i]] != ys[ip.rhs[i]]) {
+//            return OpsError.InvalidSizes;
+//        }
+//    }
+//    var xc: [XT.Rank]XT.SizesType = undefined;
+//    var yc: [YT.Rank]YT.SizesType = undefined;
+//    
+//    @memset(y.values, 0);
+//    
+//    @call(.always_inline, recursiveContraction, .{
+//        XT.ValueType, XT.SizesType, XT.Rank, YT.Rank, ip.lhs, ip.rhs, 0, x, y, &xc, &yc
+//    });
+//}
+
+//pub fn contractionUnchecked(comptime expression: [] const u8, x: anytype, y: anytype) !void {
+//
+//    const XT = @TypeOf(x.*);
+//    const YT = @TypeOf(y.*);
+//    const ip = contractionParse(XT.Rank, YT.Rank, expression);
+//
+//    var xc: [XT.Rank]XT.SizesType = undefined;
+//    var yc: [YT.Rank]YT.SizesType = undefined;
+//    
+//    @memset(y.values, 0);
+//    
+//    @call(.always_inline, recursiveContraction, .{
+//        XT.ValueType, XT.SizesType, XT.Rank, YT.Rank, ip.lhs, ip.rhs, 0, x, y, &xc, &yc
+//    });
+//}
+
+//pub inline fn recursiveContraction(
+//    comptime VT: type, // value type
+//    comptime IT: type, // int type
+//    comptime XR: usize, // tensor x rank
+//    comptime YR: usize, // tensor y rank
+//    comptime xp: [XR]IT, // x permutation
+//    comptime yp: [YR]IT, // y permutation
+//    comptime I: usize, // starting index
+//    x: anytype, // source tensor
+//    y: anytype, // destination memory
+//    xc: *[XR]IT, // index container
+//    yc: *[YR]IT, // index container
+//) void {
+//
+//    if(XR <= YR) {
+//        @compileError("Contraction must go from a larger tensor to a smaller one.");
+//    }
+//
+//    if(I < YR) {
+//
+//        const x_perm_index = xp[I];
+//        const y_perm_index = yp[I];
+//
+//        // this first branch loads up the x and y indices
+//        // and passes them to the next loop. In this case,
+//        // I is still in bounds of both x and y ranks.
+//        
+//        var i: IT = 0;
+//        while(i < x.getSize(x_perm_index)) : (i += 1) {
+//            
+//            xc[x_perm_index] = i; 
+//            yc[y_perm_index] = i; 
+//            
+//            @call(.always_inline, recursiveContraction, .{
+//                 VT, IT, XR, YR, xp, yp, (I + 1), x, y, xc, yc
+//            });
+//        }
+//    }
+//
+//    else if ((YR <= I) and (I < (XR - 1))) {
+//
+//        // the second branch deals with values of I that are
+//        // out-of-bounds for y rank, but still in-bounds for
+//        // the x rank.
+//
+//        const x_perm_index = xp[I];
+//        
+//        var i: IT = 0;
+//        while(i < x.getSize(x_perm_index)) : (i += 1) {
+//            
+//            xc[x_perm_index] = i; 
+//            
+//            @call(.always_inline, recursiveContraction, .{
+//                 VT, IT, XR, YR, xp, yp, (I + 1), x, y, xc, yc
+//            });
+//        }
+//    }
+//
+//    else {
+//
+//        // the third branch deals with summing up the contracted
+//        // indices and writing them to the related y index
+//        
+//        const x_ss : @Vector(XR, IT) = x.*.sizes_and_strides.strides;
+//
+//        const x_perm_index = xp[I];
+//
+//        var i: IT = 0;
+//        var t: VT = 0;
+//        while(i < x.getSize(x_perm_index)) : (i += 1) {
+//            xc[x_perm_index] = i;
+//            const x_c : @Vector(XR, IT) = xc.*;
+//            const x_i = @reduce(ReduceOp.Add, x_c * x_ss);
+//            t += x.values[x_i]; // accumulate summations
+//        }
+//        const y_ss : @Vector(YR, IT) = y.sizes_and_strides.strides;
+//        const y_c : @Vector(YR, IT) = yc.*;
+//        const y_i = @reduce(ReduceOp.Add, y_c * y_ss);
+//        y.*.values[y_i] += t;
+//    }
+//}
+
+pub fn fill(
+    x: anytype, 
+    init: @TypeOf(x.*).ValueType,
+    step: @TypeOf(x.*).ValueType
+    ) void {
+    var incr = init;
+    for(x.values) |*value| {
+        value.* = incr;
+        incr += step;
+    }
+}
+
+
+inline fn quantizeGeneric(comptime int: type, x: anytype) int {
+    return @intFromFloat(@round(x * comptime @as(@TypeOf(x), math.maxInt(int))));
+}
+
+pub fn quantize(x: anytype, y: anytype) @TypeOf(x.*).ValueType {
+    const m = @abs(x);
+
+    if(m > 1.0) {
+        const s = 1.0 / m;
+        var i: usize = 0;
+        while(i < x.values.len) : (i += 1) {
+            y.values[i] = quantizeGeneric(@TypeOf(y.*).ValueType, x.values[i] * s);
+        }
+    }
+    else {
+        var i: usize = 0;
+        while(i < 100) : (i += 1) {
+            y.values[i] = quantizeGeneric(@TypeOf(y.*).ValueType, x.values[i]);
+        }
+    }
+    return m;
+}
+
+// <>--------------------------------------------------------<>
+
+inline fn unquantizeGeneric(comptime float: type, x: anytype) float {
+    return @as(float, @floatFromInt(x)) / comptime @as(float, @floatFromInt(math.maxInt(@TypeOf(x))));
+}
+
+pub fn unquantize(x: anytype, y: anytype, s: @TypeOf(y.*).ValueType) void {
+    const FT = @TypeOf(y.*).ValueType;
+    
+    if(s > 1.0) {
+        var i: usize = 0;
+        while(i < x.values.len) : (i += 1) {
+            y.values[i] = s * unquantizeGeneric(FT, x.values[i]);
+        }
+    }
+    else {
+        var i: usize = 0;
+        while(i < 100) : (i += 1) {
+            y.values[i] = unquantizeGeneric(FT, x.values[i]);
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////
+// This is the naive version of a general tensor permutation.
+// In the future, I plan on making more optimal versions of
+// this, but it's reliable baseline for future work.
+//
+// If all goes well, it will unroll to something like this:
+//
+//    for i..I
+//        indices[0] = i
+//        for j..J
+//            indices[1] = j
+//                ...
+//                for n..N
+//                    scratch[count] = x.getValue(indices);
+//                    count += 1
+//
+
+pub inline fn recursivePermutate(
+    comptime VT: type, // value type
+    comptime IT: type, // int type
+    comptime R: usize, // tensor rank
+    comptime I: usize, // starting index
+    x: anytype, // source tensor
+    y: []VT, // destination memory
+    c: *[R]IT, // index container
+    n: *IT // scratch counter
+) void {
+
+    if(I == (R - 1)) {     
+        // we only need to make this once really...
+        const x_ss : @Vector(R, IT) = x.*.sizes_and_strides.strides;
+
+        var i: IT = 0;
+        var n_i = n.*;
+        while(i < x.*.getSize(I)) : ({ i += 1; n_i += 1; }) {
+
+            c[I] = i;
+            const x_c : @Vector(R, IT) = c.*;
+            const x_i = @reduce(ReduceOp.Add, x_c * x_ss);
+
+            y[n_i] = x.*.values[x_i];
+        }
+        n.* += i;
+    }
+
+    else {
+        var i: IT = 0;
+        while(i < x.*.getSize(I)) : (i += 1) {
+            
+            c[I] = i; 
+            
+            @call(.always_inline, recursivePermutate, .{
+                 VT, IT, R, (I + 1), x, y, c, n 
+            });
+        }
+    }
+}
+
+
+inline fn reduceInit(comptime op: ReduceOp, comptime T: type) T {
+
+    const c = @typeName(T)[0];
+
+    if(op == ReduceOp.Add) {
+        return 0; // implicit cast
+    }
+    else if(op == ReduceOp.Mul) {
+        return 1; // implicit cast
+    }
+    else if(op == ReduceOp.Min) {
+        if(c == 102) { // "f"
+            return math.floatMax(T);
+        } else {
+            return math.maxInt(T);
+        }
+    }
+    else if(op == ReduceOp.Max) {
+        if(c == 102) { // "f"
+            return -math.floatMax(T);
+        } else {
+            return math.minInt(T);
+        }
+    }
+    else {
+        @compileError("Unknown Operation type for initial value.");
+    }
+}
+
+//const LinearReverse = struct {
+//    pub fn reverseArg0(grads: anytype, _: anytype, X: anytype, _: anytype, Z: anytype) void {
+//        reverseInner(X.values(), Z.grads().?, grads);
+//    }
+//    pub fn reverseArg1(grads: anytype, W: anytype, _: anytype, _: anytype, Z: anytype) void {
+//        reverseInner(W.values(), Z.grads().?, grads);
+//    }
+//    pub fn reverseArg2(grads: anytype, _: anytype, _: anytype, _: anytype, Z: anytype) void {
+//        addAssign(Z.grads().?, grads);
+//    }
+//    inline fn reverseInner(q: anytype, u: anytype, grads: anytype) void {        
+//        for (0..grads.len) |i| {
+//            grads[i] += q[i] * u[i];
+//        }
+//    }
+//};
+//
+//pub fn linear(
+//    W: anytype, 
+//    X: anytype, 
+//    B: anytype) !Contract(
+//        isGraphTensor(@TypeOf(W)) and
+//        isGraphTensor(@TypeOf(X)) and
+//        isGraphTensor(@TypeOf(B)) and
+//        @TypeOf(W).DataType == @TypeOf(X).DataType and
+//        @TypeOf(X).DataType == @TypeOf(B).DataType,
+//    GraphTensor(@TypeOf(X).DataType)) {
+//
+//        assert(std.mem.eql(SizeType, X.sizes(), B.sizes()));
+//        assert(std.mem.eql(SizeType, X.sizes(), W.sizes()));
+//
+//        const G = X.graph_ptr;
+//        const w = W.values();
+//        const x = X.values();
+//        const b = B.values();
+//        const z = try G.tensor_allocator.alloc(@TypeOf(X).DataType, x.len);
+//
+//        for (0..x.len) |i| {
+//            z[i] = w[i] * x[i] + b[i];
+//        }
+//
+//        var Z = try G.tensorFromComponents("", .hid, z, X.sizes(), X.strides());
+//
+//        return try G.appendNode(LinearReverse, .{ W, X, B }, &Z);
+//    }
+//
+// /////////////////////////////////////////////
+///////////////////////////////////////////////
+//
+//const Transpose2DImpl = struct {
+//    const Self = @This();
+//    pub fn apply(
+//        comptime overwrite: bool, 
+//        x: anytype, 
+//        z: anytype,
+//        sizes: Sizes,
+//    )  void {
+//        const row = sizes[0];
+//        const col = sizes[1];
+//        if (overwrite) {
+//            for (0..row) |i| { for (0..col) |j| { z[i * col + j]  = x[j * row + i]; } }
+//        } else {
+//            for (0..row) |i| { for (0..col) |j| { z[i * col + j] += x[j * row + i]; } }
+//        }
+//    }  
+//    pub fn reverseArg0(grads: anytype, _: anytype, Z: anytype) void {
+//        Self.apply(false, Z.grads().?, grads, Z.sizes());
+//    }
+//};
+//
+//fn transpose2D(X: anytype) !GraphTensor(@TypeOf(X).DataType) {
+//    const graph = X.graph_ptr;
+//    const sizes = X.sizes();
+//    const row = sizes[0];
+//    const col = sizes[1];
+//
+//    var Z = try graph.tensorFromType(
+//        "", .hid, &[_]SizeType{ col, row }, @TypeOf(X).DataType
+//    );
+//
+//    Transpose2DImpl.apply(true, X.values(), Z.values(), sizes);
+//
+//    return try graph.appendNode(Transpose2DImpl, .{ X }, &Z);
+//}
+//
+//pub fn transpose(
+//    X: anytype, 
+//    comptime expression: []const u8) !Contract(
+//        isGraphTensor(@TypeOf(X)),
+//    GraphTensor(@TypeOf(X).DataType)) {
+//
+//        const plan = comptime Parser.transposeParse(expression);
+//
+//        switch(plan.rank) {
+//               2 => { return try transpose2D(X); },
+//            else => @panic("Transpose: TODO."),
+//        }
+//    }
+//
+//
+// /////////////////////////////////////////////
+///////////////////////////////////////////////
+//
+//const Matmul2DImpl = struct {
+//
+//    fn apply(
+//        comptime overwrite: bool,
+//        x: anytype, // slice
+//        y: anytype, // slice
+//        x_row: SizeType,
+//        x_col: SizeType,
+//        y_col: SizeType,
+//        z: anytype
+//    ) void {
+//    // currently naive implementation - TODO: make this better
+//
+//        std.debug.print("\nX row: {}, X col: {}, Y col: {}, Z len: {}\n", .{
+//            x_row, x_col, y_col, z.len
+//        });
+//    
+//        const T = Child(@TypeOf(z));
+//
+//        for (0..x_row) |i| {
+//            for (0..y_col) |j| {
+//                var z_sum: T = 0;
+//                for (0..x_col) |k| {
+//                    z_sum += x[i * x_col + k] * y[k * y_col + j];       
+//                }
+//                if (comptime overwrite) {
+//                    z[i * y_col + j]  = z_sum;
+//                } else {
+//                    z[i * y_col + j] += z_sum;
+//                }
+//            }
+//        }
+//    }
+//    
+//    pub fn reverseArg0(grads: anytype, _: anytype, Y: anytype, Z: anytype) void {
+//    // currently naive implementation - TODO: make this better
+//
+//        // (2,3) (3,5) -> (2,5)... (2,5) (5,3) -> (2,3): x
+//
+//        const T = Child(@TypeOf(grads));
+//        const y_sizes = Y.sizes();
+//        const z_sizes = Z.sizes();
+//
+//        const yt = Y.graph_ptr.tensor_allocator.alloc(T, Y.len()) catch {
+//            @panic("Out of memory: matmul2D.");
+//        };
+//
+//        const z = Z.grads().?;
+//
+//        Transpose2DImpl.apply(true, Y.values(), yt, y_sizes);
+//
+//        Matmul2DImpl.apply(
+//            false, z, yt, z_sizes[0], z_sizes[1], y_sizes[0], grads
+//        );
+//
+//        Y.graph_ptr.tensor_allocator.free(yt);
+//    }
+//
+//    pub fn reverseArg1(grads: anytype, X: anytype, _: anytype, Z: anytype) void {
+//    // currently naive implementation - TODO: make this better
+//
+//        // (2,3) (3,5) -> (2,5)... (3,2) (2,5) -> (3,5): y
+//
+//        const T = Child(@TypeOf(grads));
+//        const x_sizes = X.sizes();
+//        const z_sizes = Z.sizes();
+//
+//        const xt = X.graph_ptr.tensor_allocator.alloc(T, X.len()) catch {
+//            @panic("Out of memory: matmul2D.");
+//        };
+//
+//        const z = Z.grads().?;
+//
+//        Transpose2DImpl.apply(true, X.values(), xt, x_sizes);
+//
+//        Matmul2DImpl.apply(
+//            false, xt, z, x_sizes[1], x_sizes[0], z_sizes[1], grads
+//        );
+//
+//        X.graph_ptr.tensor_allocator.free(xt);
+//    }
+//};
+//
+//
+//pub fn matmul(X: anytype, Y: anytype) !GraphTensor(@TypeOf(X).DataType) {
+//
+//    const graph = X.graph_ptr;
+//    const x_sizes = X.sizes();
+//    const y_sizes = Y.sizes();
+//
+//    var Z = try graph.tensorFromType(
+//        "", .hid, &[_]SizeType{ x_sizes[0], y_sizes[1] }, @TypeOf(X).DataType
+//    );
+//
+//    const x = X.values();
+//    const y = Y.values();
+//    const z = Z.values();
+//
+//    Matmul2DImpl.apply(
+//        true, x, y, x_sizes[0], x_sizes[1], y_sizes[1], z
+//    );
+//
+//    return try graph.appendNode(Matmul2DImpl, .{ X, Y }, &Z);
+//}
+//
+ /////////////////////////////////////////////
+/////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////
+// So... these functions are interesting for a few reasons:
+//
+// Sum will return zero if the tensor length is zero... so that makes some sense...
+// Product, however, really shouldn't return one (the init value), it should also return
+// zero. Min and max however are a bit worse though. What's a good value to return if
+// they fail? It seems odd to return the init value (lowest or highest possible value)
+// and only some types support infinity.
+
+// It's also annoying to put a try statement in front of each of these but that ends
+// up being the case anyway. If you get back a bogus value, you have to check it
+// already. That's what happens in the C++ standard; they try to get around this
+// by returning the element's position but because of that, you always have to check
+// if you got a pointer to the end of the container.
+
+// In short, there isn't a good answer. All of them kinda suck. Because of that,
+// I'm going to just return an error because at least then, you don't have to
+// follow all of these with some if statement to make sure they didn't return
+// garbage values. Also, like with the case of sum, you can make an argument
+// that it can't fail but then you have to know which ones return errors 
+// and which ones don't... I'm choosing consistency.
+
+//pub fn sum(x: anytype) !@TypeOf(x.*).ValueType {
+//    if(x.valueSize() > 0) {
+//        return reduceDispatch(ReduceOp.Add, addGeneric, x, reduceInit(ReduceOp.Add, @TypeOf(x.*).ValueType));
+//    } else {
+//         return OpsError.SizeZeroTensor;
+//    }
+//}
+//pub fn product(x: anytype) !@TypeOf(x.*).ValueType {
+//    if(x.valueSize() > 0) {
+//        return reduceDispatch(ReduceOp.Mul, mulGeneric, x, reduceInit(ReduceOp.Mul, @TypeOf(x.*).ValueType));
+//    } else {
+//        return OpsError.SizeZeroTensor;
+//    }
+//}
+//pub fn min(x: anytype) !@TypeOf(x.*).ValueType {
+//    if(x.valueSize() > 0) {
+//        return reduceDispatch(ReduceOp.Min, minGeneric, x, reduceInit(ReduceOp.Min, @TypeOf(x.*).ValueType));
+//    } else {
+//        return OpsError.SizeZeroTensor;
+//    }
+//}
+//pub fn max(x: anytype) !@TypeOf(x.*).ValueType {
+//    if(x.valueSize() > 0) {
+//       return reduceDispatch(ReduceOp.Max, maxGeneric, x, reduceInit(ReduceOp.Max, @TypeOf(x.*).ValueType));
+//    } else {
+//        return OpsError.SizeZeroTensor;
+//    }
+//}
+//
+//// TODO: Address the issue with checked vs unchecked absGeneric at call sight
+//pub fn absmax(x: anytype) !@TypeOf(x.*).ValueType {
+//    if(x.valueSize() > 0) {
+//       return mapReduceDispatch(
+//            ReduceOp.Max, absGenericUnchecked, maxGeneric, x, reduceInit(ReduceOp.Max, @TypeOf(x.*).ValueType)
+//       );
+//    } else {
+//        return OpsError.SizeZeroTensor;
+//    }
+//}
+//
+//// TODO: Address the issue with checked vs unchecked absGeneric at call sight
+//pub fn absmin(x: anytype) !@TypeOf(x.*).ValueType {
+//    if(x.valueSize() > 0) {
+//       return mapReduceDispatch(
+//            ReduceOp.Min, absGenericUnchecked, minGeneric, x, reduceInit(ReduceOp.Min, @TypeOf(x.*).ValueType)
+//       );
+//    } else {
+//        return OpsError.SizeZeroTensor;
+//    }
+//}
+//
+//// TODO: Address the issue with checked vs unchecked absGeneric at call sight
+//pub fn absmaxUnchecked(x: anytype) @TypeOf(x.*).ValueType {
+//    return mapReduceDispatch(
+//         ReduceOp.Max, absGenericUnchecked, maxGeneric, x, reduceInit(ReduceOp.Max, @TypeOf(x.*).ValueType)
+//    );
+//}
+//
+//// TODO: Address the issue with checked vs unchecked absGeneric at call sight
+//pub fn absminUnchecked(x: anytype) @TypeOf(x.*).ValueType {
+//    return mapReduceDispatch(
+//         ReduceOp.Min, absGenericUnchecked, minGeneric, x, reduceInit(ReduceOp.Min, @TypeOf(x.*).ValueType)
+//    );
+//}
+// To complete the set, for those who like to live dangerously... the unchecked versions.
+
+//pub fn sumUnchecked(x: anytype) @TypeOf(x.*).ValueType {
+//    return reduceDispatch(ReduceOp.Add, addGeneric, x, reduceInit(ReduceOp.Add, @TypeOf(x.*).ValueType));
+//}
+//pub fn productUnchecked(x: anytype) @TypeOf(x.*).ValueType {
+//    return reduceDispatch(ReduceOp.Mul, mulGeneric, x, reduceInit(ReduceOp.Mul, @TypeOf(x.*).ValueType));
+//}
+//pub fn minUnchecked(x: anytype) @TypeOf(x.*).ValueType {
+//    return reduceDispatch(ReduceOp.Min, minGeneric, x, reduceInit(ReduceOp.Min, @TypeOf(x.*).ValueType));
+//}
+//pub fn maxUnchecked(x: anytype) @TypeOf(x.*).ValueType {
+//    return reduceDispatch(ReduceOp.Max, maxGeneric, x, reduceInit(ReduceOp.Max, @TypeOf(x.*).ValueType));
+//}
+
+//////////////////////////////////////////////////////////////
+///////// BINARY ARITHMETIC FUNCTIONS ////////////////////////
+
+//// <>--------------------------------------------------------<>
+//
+//pub fn scale(x: anytype, y: @TypeOf(x), s: @TypeOf(x.*).ValueType) !void {
+//    if(!x.isValid() or !y.isValid()) {
+//        return TensorError.InvalidTensorLayout;
+//    }
+//    if(x.valueSize() != y.valueSize()) {
+//        return OpsError.UnequalSize;
+//    }
+//    scalarBroadcastDispatch(mulGeneric, x, y, s);
+//}
+//
+//pub fn scaleUnchecked(x: anytype, y: @TypeOf(x), s: @TypeOf(x.*).ValueType) void {
+//    scalarBroadcastDispatch(mulGeneric, x, y, s);
+//}
+//
+//// <>--------------------------------------------------------<>
+//
+//pub fn bias(x: anytype, y: @TypeOf(x), b: @TypeOf(x.*).ValueType) !void {
+//    if(!x.isValid() or !y.isValid()) {
+//        return TensorError.InvalidTensorLayout;
+//    }
+//    if(x.valueSize() != y.valueSize()) {
+//        return OpsError.UnequalSize;
+//    }
+//    scalarBroadcastDispatch(addGeneric, x, y, b);
+//}
+//
+//pub fn biasUnchecked(x: anytype, y: @TypeOf(x), b: @TypeOf(x.*).ValueType) void {
+//    scalarBroadcastDispatch(addGeneric, x, y, b);
+//}
+//// <>--------------------------------------------------------<>
+
+// TODO: Add explanation for this crazy thing...
+
+//pub fn innerProduct(
+//    comptime expression: [] const u8,
+//    x: anytype,
+//    y: anytype,
+//    z: anytype) !void {
+//
+//    if(!x.isValid() or !y.isValid() or !z.isValid()) {
+//        return TensorError.InvalidTensorLayout;
+//    }
+//    const XT = @TypeOf(x.*);
+//    const YT = @TypeOf(y.*);
+//    const ZT = @TypeOf(z.*);
+//
+//    const plan = comptime innerProductParse(
+//        XT.Rank, YT.Rank, ZT.Rank, expression
+//    );
+//
+//    for(0..plan.total) |i| {
+//        if(plan.x_perm[i] != plan.pass and plan.y_perm[i] != plan.pass) {
+//            if(x.getSize(plan.x_perm[i]) != y.getSize(plan.y_perm[i])) {
+//                return OpsError.InvalidDimensions;
+//            }
+//        }
+//    // TODO: Add a check for output dimensions...
+//    }
+//
+//    var x_i: [XT.Rank]XT.SizesType = undefined;
+//    var y_i: [YT.Rank]YT.SizesType = undefined;
+//    var z_i: [ZT.Rank]ZT.SizesType = undefined;
+//    
+//    @memset(z.values, 0);
+//    
+//    @call(.always_inline, recursiveInnerProduct, .{
+//        XT.ValueType, XT.SizesType, 0, plan, x, y, z, &x_i, &y_i, &z_i 
+//    });
+//}
+
+//pub inline fn sizeSelector(
+//    comptime x_index: usize,
+//    comptime y_index: usize,
+//    comptime select: usize,
+//    x: anytype,
+//    y: anytype
+//) usize {
+//    if(select == 0) {
+//        return x.getSize(x_index);
+//    } else {
+//        return y.getSize(y_index);
+//    }
+//}
+//
+//pub inline fn recursiveInnerProduct(
+//    comptime VT: type, // value type
+//    comptime IT: type, // int type
+//    comptime I: usize, // starting index
+//    comptime plan: anytype, // InnerProductPlan
+//    x: anytype, // lhs operand tensor
+//    y: anytype, // rhs operand tensor
+//    z: anytype, // output tensor
+//    xc: *[@TypeOf(x.*).Rank]IT, // index container
+//    yc: *[@TypeOf(y.*).Rank]IT, // index container
+//    zc: *[@TypeOf(z.*).Rank]IT, // index container
+//) void {
+//
+//    const XT = @TypeOf(x.*);
+//    const YT = @TypeOf(y.*);
+//    const ZT = @TypeOf(z.*);
+//
+//    const size = @call(.always_inline, sizeSelector,
+//        .{ plan.x_perm[I], plan.y_perm[I], plan.s_ctrl[I], x, y }
+//    );
+//
+//    if(I < (plan.total - 1)) {
+//        var i: IT = 0;
+//        while(i < size) : (i += 1) {
+//            if(comptime plan.x_perm[I] != plan.pass) { xc[plan.x_perm[I]] = i; }
+//            if(comptime plan.y_perm[I] != plan.pass) { yc[plan.y_perm[I]] = i; }
+//            if(comptime plan.z_perm[I] != plan.pass) { zc[plan.z_perm[I]] = i; }
+//            @call(.always_inline, recursiveInnerProduct, .{
+//                 VT, IT, (I + 1), plan, x, y, z, xc, yc, zc
+//            });
+//        }
+//    }
+//
+//    else {
+//        var i: IT = 0;
+//        while(i < size) : (i += 1) {
+//            if(comptime plan.x_perm[I] != plan.pass) { xc[plan.x_perm[I]] = i; }
+//            if(comptime plan.y_perm[I] != plan.pass) { yc[plan.y_perm[I]] = i; }
+//            if(comptime plan.z_perm[I] != plan.pass) { zc[plan.z_perm[I]] = i; }
+//            const x_n = computeTensorIndex(XT.Rank, XT.SizesType, &x.sizes_and_strides.strides, xc.*);
+//            const y_n = computeTensorIndex(YT.Rank, YT.SizesType, &y.sizes_and_strides.strides, yc.*);
+//            const z_n = computeTensorIndex(ZT.Rank, ZT.SizesType, &z.sizes_and_strides.strides, zc.*);
+//            z.values[z_n] += x.values[x_n] * y.values[y_n];
+//        }
+//    }
+//}
+//
+// <>--------------------------------------------------------<>
+
+// TODO: Add explanation for this crazy thing...
+
+//pub fn outerProduct(
+//    comptime expression: [] const u8,
+//    x: anytype,
+//    y: anytype,
+//    z: anytype) !void {
+//
+//    if(!x.isValid() or !y.isValid() or !z.isValid()) {
+//        return TensorError.InvalidTensorLayout;
+//    }
+//    const XT = @TypeOf(x.*);
+//    const YT = @TypeOf(y.*);
+//    const ZT = @TypeOf(z.*);
+//
+//    const plan = comptime outerProductParse(
+//        XT.Rank, YT.Rank, ZT.Rank, expression
+//    );
+//
+//    for(plan.x_perm, plan.y_perm, plan.z_perm) |xp, yp, zp| {
+//        if(xp != plan.pass and x.getSize(xp) != z.getSize(zp))
+//            return OpsError.InvalidDimensions;
+//        if(yp != plan.pass and y.getSize(yp) != z.getSize(zp))
+//            return OpsError.InvalidDimensions;
+//    }
+//
+//    var x_i: [XT.Rank]XT.SizesType = undefined;
+//    var y_i: [YT.Rank]YT.SizesType = undefined;
+//    var z_i: [ZT.Rank]ZT.SizesType = undefined;
+//    
+//    @memset(z.values, 0);
+//    
+//    @call(.always_inline, recursiveInnerProduct, .{
+//        XT.ValueType, XT.SizesType, 0, plan, x, y, z, &x_i, &y_i, &z_i 
+//    });
+//}
+//
+//pub inline fn recursiveOuterProduct(
+//    comptime VT: type, // value type
+//    comptime IT: type, // int type
+//    comptime I: usize, // starting index
+//    comptime plan: anytype, // InnerProductPlan
+//    x: anytype, // lhs operand tensor
+//    y: anytype, // rhs operand tensor
+//    z: anytype, // output tensor
+//    xc: *[@TypeOf(x.*).Rank]IT, // index container
+//    yc: *[@TypeOf(y.*).Rank]IT, // index container
+//    zc: *[@TypeOf(z.*).Rank]IT, // index container
+//) void {
+//
+//    const XT = @TypeOf(x.*);
+//    const YT = @TypeOf(y.*);
+//    const ZT = @TypeOf(z.*);
+//
+//    const size = @call(.always_inline, sizeSelector,
+//        .{ plan.x_perm[I], plan.y_perm[I], plan.s_ctrl[I], x, y }
+//    );
+//
+//    if(I < (plan.total - 1)) {
+//        var i: IT = 0;
+//        while(i < size) : (i += 1) {
+//            if(comptime plan.x_perm[I] != plan.pass) { xc[plan.x_perm[I]] = i; }
+//            if(comptime plan.y_perm[I] != plan.pass) { yc[plan.y_perm[I]] = i; }
+//            zc[plan.z_perm[I]] = i;
+//            @call(.always_inline, recursiveInnerProduct, .{
+//                 VT, IT, (I + 1), plan, x, y, z, xc, yc, zc
+//            });
+//        }
+//    }
+//
+//    else {
+//        var i: IT = 0;
+//        while(i < size) : (i += 1) {
+//            if(comptime plan.x_perm[I] != plan.pass) { xc[plan.x_perm[I]] = i; }
+//            if(comptime plan.y_perm[I] != plan.pass) { yc[plan.y_perm[I]] = i; }
+//            zc[plan.z_perm[I]] = i;
+//            const x_n = computeTensorIndex(XT.Rank, XT.SizesType, &x.sizes_and_strides.strides, xc.*);
+//            const y_n = computeTensorIndex(YT.Rank, YT.SizesType, &y.sizes_and_strides.strides, yc.*);
+//            const z_n = computeTensorIndex(ZT.Rank, ZT.SizesType, &z.sizes_and_strides.strides, zc.*);
+//            z.values[z_n] += x.values[x_n] * y.values[y_n];
+//        }
+//    }
+//}
+//
+    var X1 = try graph.tensorFromType("X1", .wgt, &[_]SizeType{ 2, 2 }, c32);
+    var X2 = try graph.tensorFromType("X2", .wgt, &[_]SizeType{ 2, 2 }, c32);
+
+    var F1 = try graph.tensorFromType("F1", .wgt, &[_]SizeType{ 2, 2 }, f32);
+    var F2 = try graph.tensorFromType("F2", .wgt, &[_]SizeType{ 2, 2 }, f32);
+
+    mp.iota(X1, c32{.r = -1, .i = -1}, c32{.r = 1, .i = 1});
+
+    scaleMax(X1.values(), X2.values());
+
+    std.debug.print("\nX1: {d:.2}\n", .{ X1.values() });
+    std.debug.print("\nX2: {d:.2}\n", .{ X2.values() });
+
+    mp.iota(F1, -1, 1);
+
+    scaleMax(F1.values(), F2.values());
+
+    std.debug.print("\nF1: {d:.2}\n", .{ F1.values() });
+    std.debug.print("\nF2: {d:.2}\n", .{ F2.values() });
+
+    // unscaleComplex2(X2.values(), X1.values());
+
+pub fn scaleComplex1(x: anytype, y: anytype) void {
+    const T = std.meta.Child(@TypeOf(x));
+    const U = DemoteComplex(T);
+
+    var min_i: usize = 0;
+    var max_i: usize = 0;
+    var min_m =  std.math.floatMax(U);
+    var max_m = -std.math.floatMax(U);
+    var _min_m = min_m;
+    var _max_m = max_m;
+
+    var i: usize = 0;
+    while (i < x.len) : (i += 1) {
+        _min_m = @min(_min_m, x[i].mod());
+        _max_m = @max(_max_m, x[i].mod());
+
+        if (_min_m < min_m) { 
+            min_m = _min_m;
+            min_i = i; 
+        }
+        if (_max_m > max_m) { 
+            max_m = _max_m;
+            max_i = i; 
+        }
+    }
+
+    std.debug.print("\nmin i: {}\nmax i: {}\n", .{ max_i, min_i });
+    
+    const denom = x[max_i].sub(x[min_i]);
+
+    i = 0;
+    while (i < x.len) : (i += 1) {
+        y[i] = scl.div(x[i].sub(x[min_i]), denom);
+    }
+}
+
+
+pub fn scaleComplex2(x: anytype, y: anytype) void {
+    const T = std.meta.Child(@TypeOf(x));
+    var sum_c: T = .{ .r = 0, .i = 0 };
+
+    var i: usize = 0;
+    while (i < x.len) : (i += 1) {
+        sum_c = scl.add(sum_c, x[i].mul(x[i]));
+    }
+    i = 0;
+    while (i < x.len) : (i += 1) {
+        y[i] = x[i].div(sum_c);
+    }
+}
+
+fn anyOf(comptime func: anytype, slice: anytype) bool {
+    for (slice) |x| { 
+        if (func(x)) return true;
+    }
+    return false;
+}
+
+fn allOf(comptime func: anytype, slice: anytype) bool {
+    for (slice) |x| { 
+        if (!func(x)) return false;
+    }
+    return true;
+}
+
+fn noneOf(comptime func: anytype, slice: anytype) bool {
+    for (slice) |x| { 
+        if (func(x)) return false;
+    }
+    return true;
+}
+
+fn typeID(comptime T: type) usize {
+    // function that returns unique integer for each type
+    _ = T;
+    const ID = struct {
+        var byte: u8 = 0;
+    };
+    return @intFromPtr(&ID.byte);
+}
+
+fn isStruct(comptime T: type) bool {    
+    return switch (@typeInfo(T)) {
+        .Struct => { return true; }, else => { return false; }
+    };
+}
+
+fn sum(slice: []const SizeType) SizeType {
+    var result: SizeType = 0;
+    for (slice) |v| { result += v; }
+    return result;
+}
+
+    fn byteConversion(slice: anytype) []const u8 {
+        const size = slice.len * @sizeOf(std.meta.child(@TypeOf(slice)));
+        var ptr: *const u8 = @ptrCast(@alignCast(slice.ptr));
+        return ptr[0..size];
+    }
+
+    pub fn asBytes(self: Self) []const u8 {
+        return switch (self) {
+             .i8 => byteConversion(self.i8),  
+            .f16 => byteConversion(self.f16),  
+            .f32 => byteConversion(self.f32),  
+            .f64 => byteConversion(self.f64),  
+            else => @compileError("TODO: Complex Byte Conversion."),        
+        };
+    }

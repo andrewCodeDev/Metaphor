@@ -1,0 +1,38 @@
+
+// File-gen Syntax
+
+
+Function generation can be achieved by permutating into valid combinations.
+
+Valid combinations do not truncate the data-type in V1 - so loss of precision
+is a concern. This could be supported in the future, but not currently.
+
+Complex numbers are just represented as a floating point pointer that is
+equivalent in size to the real parts. So c64 -> f64 where adjacent pairs
+can be grouped into a complex number.
+
+Due to this approach, the complex variants must have their own source...
+
+// ...
+
+One possible answer is to distinguish between slice lengths... so for the case of add...
+
+	let x: []c64
+	let y: []f64
+
+	thus add(x, y) -> []c64...
+
+	where add requires x.len == y.len, but in this case, x.len == y.len * 2
+
+Which perhaps means that 'add' could dispatch based on length internally.
+
+This becomes a burden for implementation though, as each implementation requires
+a length check between the two.
+
+// ...
+
+Another possibility is to use a C-style struct (like Cuda's Vec2) as a way to distinguish
+the types at the call site. 
+
+
+

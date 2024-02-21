@@ -44,15 +44,9 @@ const Strides = TC.Strides;
 const Sizes = TC.Sizes;
 
 pub fn isGraphTensor(comptime T: type) bool {
-    switch (@typeInfo(T)) {
-        .Struct => {
-            if (!@hasDecl(T, "DataType")) { return false; }
-            if (!@hasDecl(T, "Class")) { return false; }
-            return (T == GraphTensor(T.DataType, T.Class));
-        },
-        else => return false,
-    }
-    return false;
+    return switch (@typeInfo(T)) {
+        .Struct => (T == GraphTensor(T.DataType, T.Class)), else => return false,
+    };
 }
 
 fn fillSlice(

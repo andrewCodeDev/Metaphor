@@ -24,7 +24,7 @@ pub fn main() !void {
     const stream = mp.stream.init();
         defer mp.stream.deinit(stream);
 
-    var G = mp.Graph.init(.{
+    const G = mp.Graph.init(.{
         .optimizer = mp.null_optimizer,
         .auto_free_wgt_grads = false,
         .auto_free_inp_grads = false,

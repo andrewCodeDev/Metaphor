@@ -759,9 +759,9 @@ const ClosureBuffer = struct {
 
     const Self = @This();
 
-    // we want to hold at least 4 graph tensors,
-    // and a graph tensor is (ptr, idx)... ~2 usize
-    const BufferSize = @sizeOf(usize) * 8;
+    // we want to hold at least 4 graph tensors and a stream
+    // and a graph tensor is (ptr, idx)
+    const BufferSize = @sizeOf(usize) * 8 + @sizeOf(usize);
 
     items: extern union {
         inplace: [BufferSize]u8 align(@alignOf(usize)),  

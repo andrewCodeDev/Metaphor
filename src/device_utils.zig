@@ -1,22 +1,22 @@
 const std = @import("std");
 const cuda = @import("cimport.zig").C;
 
-pub const StreamPtr = *anyopaque;
+pub const Stream = cuda.Stream;
 
 pub fn initDevice(device_number: u32) void {
     cuda.initDevice(device_number);
 }
 
-pub fn initStream() StreamPtr {
-    return cuda.mpInitStream() orelse unreachable;
+pub fn initStream() Stream {
+    return cuda.mpInitStream();
 }
 
-pub fn deinitStream(stream: StreamPtr) void {
+pub fn deinitStream(stream: Stream) void {
     // std.debug.assert(stream != null);
     return cuda.mpDeinitStream(stream);
 }
 
-pub fn synchronizeStream(stream: StreamPtr) void {
+pub fn synchronizeStream(stream: Stream) void {
     cuda.mpDeviceSynchronize(stream);
 }
 
@@ -24,20 +24,20 @@ pub fn synchronizeDevice() void {
     cuda.mpDeviceSynchronize();
 }
 
-pub fn alloc(comptime T: type, N: usize, stream: StreamPtr) []T {
+pub fn alloc(comptime T: type, N: usize, stream: Stream) []T {
     // std.debug.assert(stream != null);
     const ptr: *anyopaque = cuda.mpMemAlloc(@sizeOf(T) * N, stream) orelse unreachable;
     const out: [*]T = @ptrCast(@alignCast(ptr));
     return out[0..N];
 }
 
-pub fn create(comptime T: type, stream: StreamPtr) *T {
+pub fn create(comptime T: type, stream: Stream) *T {
     std.debug.assert(stream != null);
     const ptr: *anyopaque = cuda.mpMemAlloc(@sizeOf(T), stream) orelse unreachable;
     return @ptrCast(@alignCast(ptr));
 }
 
-pub fn copyToDevice(src: anytype, dst: @TypeOf(src), stream: StreamPtr) void {
+pub fn copyToDevice(src: anytype, dst: @TypeOf(src), stream: Stream) void {
     // std.debug.assert(stream != null);
     switch (@typeInfo(@TypeOf(src))) {
         .Pointer => |p| {
@@ -55,7 +55,7 @@ pub fn copyToDevice(src: anytype, dst: @TypeOf(src), stream: StreamPtr) void {
     }    
 } 
 
-pub fn copyFromDevice(src: anytype, dst: @TypeOf(src), stream: StreamPtr) void {
+pub fn copyFromDevice(src: anytype, dst: @TypeOf(src), stream: Stream) void {
     // std.debug.assert(stream != null);
     switch (@typeInfo(@TypeOf(src))) {
         .Pointer => |p| {
@@ -73,7 +73,7 @@ pub fn copyFromDevice(src: anytype, dst: @TypeOf(src), stream: StreamPtr) void {
     }    
 } 
 
-pub fn free(dev_mem: anytype, stream: StreamPtr) void {
+pub fn free(dev_mem: anytype, stream: Stream) void {
     // std.debug.assert(stream != null);
     switch (@typeInfo(@TypeOf(dev_mem))) {
         .Pointer => |p| {

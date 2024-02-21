@@ -11,7 +11,7 @@ const DU = @import("device_utils.zig");
 
 const Optimizer = @import("optimizer.zig").Optimizer;
 const LaneAllocator = @import("lane_allocator.zig").LaneAllocator;
-const StreamPtr = DU.StreamPtr;
+const Stream = DU.Stream;
 
 const isReal = SC.isReal;
 const isFloat = SC.isFloat;
@@ -234,7 +234,7 @@ pub const GraphConfig = struct {
     auto_free_wgt_grads: bool = false,
     auto_free_inp_grads: bool = false,
     auto_free_hid_nodes: bool = true,
-    stream: StreamPtr,
+    stream: Stream,
 };
 
 pub const Graph = struct {
@@ -301,7 +301,7 @@ pub const Graph = struct {
     auto_free_inp_grads: bool,
     auto_free_hid_nodes: bool,
 
-    stream: StreamPtr,
+    stream: Stream,
 
     // this function ensures the correct allocator
     // and size are passed to the designated block

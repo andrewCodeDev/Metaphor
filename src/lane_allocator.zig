@@ -1,7 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const cuda = @import("device_utils.zig");
-const StreamPtr = cuda.StreamPtr;
+const Stream = cuda.Stream;
 
 const SCL = @import("scalar.zig");
 const SizeType = @import("tensor_components.zig").SizeType;
@@ -102,7 +102,7 @@ pub const LaneAllocator = struct {
         }
     }
 
-    pub fn deinit(self: *Self, stream: StreamPtr) void {
+    pub fn deinit(self: *Self, stream: Stream) void {
 
         // all nodes reference the elements of
         // the free node buffer. Free anything
@@ -112,7 +112,7 @@ pub const LaneAllocator = struct {
         }
     }
 
-    pub fn allocScalar(self: *Self, comptime T: type, stream: StreamPtr) *T {
+    pub fn allocScalar(self: *Self, comptime T: type, stream: Stream) *T {
 
         const lane = comptime getTypeLane(T);
 
@@ -137,7 +137,7 @@ pub const LaneAllocator = struct {
         self.scalar_lanes[lane].prepend(node);               
     }
 
-    pub fn allocTensor(self: *Self, comptime T: type, N: usize, stream: StreamPtr) []T {
+    pub fn allocTensor(self: *Self, comptime T: type, N: usize, stream: Stream) []T {
         
         const lane = comptime getTypeLane(T);
 
@@ -157,7 +157,7 @@ pub const LaneAllocator = struct {
         return cuda.alloc(T, N, stream);
     }
 
-    pub fn freeTensor(self: *Self, tensor: anytype, stream: StreamPtr) void {
+    pub fn freeTensor(self: *Self, tensor: anytype, stream: Stream) void {
 
         const node = self.getFreeNode();
 

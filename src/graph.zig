@@ -852,10 +852,13 @@ const Closure = struct {
                     CallbackType, _edge_tuple.*, next
                 );
 
-                // usuall a no-op, but potentiall calls free
+                // usually a no-op, but potentiall calls free
                 if (result.last_edge == null) {
                     args.deinit(EdgeTuple);
                 }
+
+                // assume that stream is first argument
+                DU.synchronizeStream(_edge_tuple.*[0]);
 
                 return result;
             }

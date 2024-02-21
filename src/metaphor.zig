@@ -70,8 +70,8 @@ pub const ops = struct {
         const DataType = SC.ScalarResult(@TypeOf(X).DataType, @TypeOf(Y).DataType);
         const Z = graph.nodeTensor(X.sizes(), DataType);        
         const callback = Impl{ };  // instance for comptime fields
-        callback.forward(X, Y, Z);
-        return graph.appendNode(Impl, .{ X, Y }, Z);
+        callback.forward(graph.stream, X, Y, Z);
+        return graph.appendNode(Impl, .{ graph.stream, X, Y }, Z);
     }
 
     inline fn activationDispatch(comptime Impl: type, X: anytype)
@@ -79,8 +79,8 @@ pub const ops = struct {
         const graph = X.ptr;
         const Y = graph.nodeTensor(X.sizes(), @TypeOf(X).DataType);        
         const callback = Impl{ };  // instance for comptime fields
-        callback.forward(X, Y);
-        return graph.appendNode(Impl, .{ X }, Y);
+        callback.forward(graph.stream, X, Y);
+        return graph.appendNode(Impl, .{ graph.stream, X }, Y);
     }
 
     pub fn add(X: anytype, Y: anytype) Contract(
@@ -107,16 +107,11 @@ pub const ops = struct {
     pub fn leakyRelu(X: anytype, coef: anytype) Contract(
             isGraphTensor(@TypeOf(X)) and SC.isFloat(@TypeOf(coef)), 
         Returns(@TypeOf(X))) {
-
         assert((0.0 <= coef) and (coef < 1.0));
-
         const graph = X.ptr;
-
         const Y = graph.nodeTensor(X.sizes(), @TypeOf(X).DataType);        
-
-        TenOps.leakyReluForward(X, coef, Y);
-
-        return graph.appendNode(TenOps.LeakyReluImpl, .{ X, coef }, Y);        
+        TenOps.leakyReluForward(graph.stream, X, coef, Y);
+        return graph.appendNode(TenOps.LeakyReluImpl, .{ graph.stream, X, coef }, Y);        
     }
 
     pub fn relu(X: anytype) Contract(

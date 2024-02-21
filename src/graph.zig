@@ -624,7 +624,8 @@ pub const Graph = struct {
 fn reverseEdge(
     comptime func: anytype,
     comptime edge: SizeType,
-    edge_tuple: anytype
+    edge_tuple: anytype,
+    stream: Stream,
 ) ?SizeType {
 
     const arg = edge_tuple[edge];
@@ -645,6 +646,8 @@ fn reverseEdge(
     }
 
     @call(.auto, func, edge_tuple);   
+
+    DU.synchronizeStream(stream);
 
     // this portion deals with whether or not we can
     // return the next reverse node up the tree. We
@@ -707,7 +710,8 @@ fn reverseNext(
                 const next_node = reverseEdge(
                     @field(decls, field.name).callback, 
                     edge_index,
-                    edge_tuple
+                    edge_tuple,
+                    edge_tuple[0] // stream
                 );
 
                 return ReverseNextResult {
@@ -856,9 +860,6 @@ const Closure = struct {
                 if (result.last_edge == null) {
                     args.deinit(EdgeTuple);
                 }
-
-                // assume that stream is first argument
-                DU.synchronizeStream(_edge_tuple.*[0]);
 
                 return result;
             }

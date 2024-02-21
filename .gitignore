@@ -3,3 +3,4 @@ zig-cache/
 src/libdev_utils.so
 src/libmp_kernels.so
 cleanup.sh
+src/codedump

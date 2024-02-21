@@ -19,7 +19,9 @@ extern "C" void launch_subtraction_reverse_RScalar(
   const RScalar coef,
   len_t N
 ) {
-  __kernel_subtraction_reverse_RScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(a, b, coef, N);
+  __kernel_subtraction_reverse_RScalar<<<GRID_1D(N), dim3(32), 0, getStream(stream)>>>(
+    a, b, coef, N
+  );
 }
 
 __global__ void __kernel_subtraction_reverse_CScalar(
@@ -43,7 +45,8 @@ extern "C" void launch_subtraction_reverse_CScalar(
   const RScalar coef,
   len_t N
 ) {
-  __kernel_subtraction_reverse_CScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(a, b, coef, N);
-  CUDA_ASSERT(cudaDeviceSynchronize());
+  __kernel_subtraction_reverse_CScalar<<<GRID_1D(N), dim3(32), 0, getStream(stream)>>>(
+    a, b, coef, N
+  );
 }
 

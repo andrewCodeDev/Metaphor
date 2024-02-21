@@ -19,7 +19,7 @@ extern "C" void launch_addition_RScalar(
   RScalar* c, 
   len_t N
 ) {
-  __kernel_addition_RScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(a, b, c, N);
+  __kernel_addition_RScalar<<<GRID_1D(N), dim3(32), 0, getStream(stream)>>>(a, b, c, N);
 }
 
 __global__ void __kernel_addition_CScalar(
@@ -43,6 +43,6 @@ extern "C" void launch_addition_CScalar(
   CScalar* c, 
   len_t N
 ) {
-  __kernel_addition_CScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(a, b, c, N);
+  __kernel_addition_CScalar<<<GRID_1D(N), dim3(32), 0, getStream(stream)>>>(a, b, c, N);
 }
 

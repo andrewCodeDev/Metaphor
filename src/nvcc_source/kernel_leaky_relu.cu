@@ -24,5 +24,5 @@ extern "C" void launch_leaky_relu_RScalar(
         RScalar coef,
   len_t N
 ) {
-  __kernel_leaky_relu_RScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(a, b, coef, N);
+  __kernel_leaky_relu_RScalar<<<GRID_1D(N), dim3(32), 0, getStream(stream)>>>(a, b, coef, N);
 }

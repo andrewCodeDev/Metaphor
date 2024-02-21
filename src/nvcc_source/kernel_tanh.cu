@@ -18,5 +18,5 @@ extern "C" void launch_tanh_RScalar(
         RScalar* b, 
   len_t N
 ) {
-  __kernel_tanh_RScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(a, b, N);
+  __kernel_tanh_RScalar<<<GRID_1D(N), dim3(32), 0, getStream(stream)>>>(a, b, N);
 }

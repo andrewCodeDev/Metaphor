@@ -18,7 +18,8 @@ const isGraphTensor = CG.isGraphTensor;
 const Optimizer = @import("optimizer.zig");
 
 const TenOps = @import("tensor_ops.zig");
-const Scale = @import("scale.zig");
+
+//const Scale = @import("scale.zig");
 
 ///////////////////////////////////////////////
 ///////////////////////////////////////////////
@@ -32,6 +33,14 @@ pub const stream = struct {
     pub const init = DU.initStream;  
     pub const deinit = DU.deinitStream;
     pub const synchronize = DU.synchronizeStream;
+};
+
+pub const mem = struct {
+    pub const copyToDevice = DU.copyToDevice;
+    pub const copyFromDevice = DU.copyFromDevice;
+    pub const alloc = DU.alloc;
+    pub const create = DU.create;
+    pub const free = DU.free;
 };
 
 pub const types = struct {

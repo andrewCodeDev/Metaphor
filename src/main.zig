@@ -1,6 +1,15 @@
 const mp = @import("metaphor.zig");
 const std = @import("std");
 
+pub fn copyAndPrint(name: []const u8, src: anytype, dst: anytype, stream: anytype) void {
+    
+    mp.mem.copyFromDevice(src, dst, stream);
+
+    mp.stream.synchronize(stream);
+
+    std.debug.print("\n{s}: {any}\n" , .{ name, dst });
+}
+
 pub fn main() !void {
 
     // To start Metaphor, you must initialize the
@@ -19,11 +28,14 @@ pub fn main() !void {
         .optimizer = mp.null_optimizer,
         .auto_free_wgt_grads = false,
         .auto_free_inp_grads = false,
-        .auto_free_hid_nodes = true,
+        .auto_free_hid_nodes = false,
         .stream = stream,
     });
 
     defer G.deinit();
+
+    const out = try std.heap.c_allocator.alloc(mp.types.r32, 4);
+        defer std.heap.c_allocator.free(out);
 
     /////////////////////////////////////////////////
 
@@ -36,22 +48,16 @@ pub fn main() !void {
     mp.ops.fill(X1, 2);
     mp.ops.fill(X2, 1);
 
-    for (0..10) |i| {
-
-        var clock = try std.time.Timer.start();
+    for (0..1) |_| {
 
         const Z1 = mp.ops.hadamard(X1, X2);
-        const Z2 = mp.ops.hadamard(X1, X2);
+        const Z2 = mp.ops.hadamard(X1, X1);
         const Z3 = mp.ops.add(Z1, Z2);
 
         Z3.reverse();
 
-        const delta = clock.lap();
-
-        std.debug.print(
-           "\n\n==== Lap {}: {} ====\n",
-           .{ i, delta }
-        );
+        copyAndPrint("X1", X1.grads().?, out, stream);
+        copyAndPrint("Z2", X2.grads().?, out, stream);
     }
 
     ////////////////////////////////////////////

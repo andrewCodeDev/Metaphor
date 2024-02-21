@@ -25,7 +25,7 @@ extern "C" void launch_relu_leaky_reverse_RScalar(
         RScalar coef,
   len_t N
 ) {
-  __kernel_leaky_relu_reverse_RScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(
+  __kernel_leaky_relu_reverse_RScalar<<<GRID_1D(N), dim3(32), 0, getStream(stream)>>>(
     a_value, a_grads, b_grads, coef, N
   );
 }

@@ -555,7 +555,7 @@ pub const Graph = struct {
         const closure = Closure.init(FuncObj, args ++ .{ out }) 
             catch @panic("Out of Memory");
 
-        DU.synchronizeStream(self.stream);
+        //DU.synchronizeStream(self.stream);
         
         UT.append(&self.nodes.callbacks, closure);
 
@@ -625,7 +625,6 @@ fn reverseEdge(
     comptime func: anytype,
     comptime edge: SizeType,
     edge_tuple: anytype,
-    stream: Stream,
 ) ?SizeType {
 
     const arg = edge_tuple[edge];
@@ -646,8 +645,6 @@ fn reverseEdge(
     }
 
     @call(.auto, func, edge_tuple);   
-
-    DU.synchronizeStream(stream);
 
     // this portion deals with whether or not we can
     // return the next reverse node up the tree. We
@@ -711,7 +708,6 @@ fn reverseNext(
                     @field(decls, field.name).callback, 
                     edge_index,
                     edge_tuple,
-                    edge_tuple[0] // stream
                 );
 
                 return ReverseNextResult {
@@ -735,6 +731,11 @@ fn reverseNext(
 
     // Free unnecessary data as we go along...
     if (graph_ptr.auto_free_hid_nodes) {
+        // we need to synchronize here to prevent the parent
+        // node from being released before the other children
+        // have a chance to collect their gradients
+        DU.synchronizeStream(edge_tuple[0]);
+
         graph_ptr.freeTensor(edge_tuple[N]);
     }
 
@@ -867,7 +868,7 @@ const Closure = struct {
 
         return Closure { 
             .args = ClosureBuffer.init(edge_tuple), 
-            .func = callback 
+            .func = callback, 
         };
     }
 };

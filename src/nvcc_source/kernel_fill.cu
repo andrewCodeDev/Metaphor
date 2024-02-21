@@ -7,9 +7,10 @@ __global__ void __kernel_fill_RScalar(
   len_t N
 ) {
   const len_t tid = (blockIdx.x * blockDim.x) + threadIdx.x;
-     
-  if (tid < N)
+
+  if (tid < N) {
     dev_a[tid] = value;
+  }
 }
 
 extern "C" void launch_fill_RScalar(
@@ -18,7 +19,7 @@ extern "C" void launch_fill_RScalar(
   RScalar value, 
   len_t N
 ) {
-  __kernel_fill_RScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(dev_a, value, N);
+  __kernel_fill_RScalar<<<GRID_1D(N), dim3(32), 0, getStream(stream)>>>(dev_a, value, N);
 }
 
 __global__ void __kernel_fill_CScalar(
@@ -40,7 +41,7 @@ extern "C" void launch_fill_CScalar(
   CScalar value, 
   len_t N
 ) {
-  __kernel_fill_CScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(dev_a, value, N);
+  __kernel_fill_CScalar<<<GRID_1D(N), dim3(32), 0, getStream(stream)>>>(dev_a, value, N);
 }
 
 

@@ -20,7 +20,7 @@ extern "C" void launch_hadamard_reverse_RScalar(
   const RScalar *grads_c,
   len_t N
 ) {
-  __kernel_hadamard_reverse_RScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(
+  __kernel_hadamard_reverse_RScalar<<<GRID_1D(N), dim3(32), 0, getStream(stream)>>>(
       grads_a, value_b, grads_c, N
   );
 }
@@ -46,7 +46,7 @@ extern "C" void launch_hadamard_reverse_CScalar(
   const CScalar *grads_c,
   len_t N
 ) {
-  __kernel_hadamard_reverse_CScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(
+  __kernel_hadamard_reverse_CScalar<<<GRID_1D(N), dim3(32), 0, getStream(stream)>>>(
     grads_a, value_b, grads_c, N
   );
 }

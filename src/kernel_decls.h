@@ -330,18 +330,21 @@ EXTERN_C void launch_subtraction_reverse_c64(
   len_t N
 );
 EXTERN_C void launch_tanh_reverse_r16(
+  Stream stream,
         r16 *a_grads,
   const r16 *b_value,
   const r16 *b_grads,
   len_t N
 );
 EXTERN_C void launch_tanh_reverse_r32(
+  Stream stream,
         r32 *a_grads,
   const r32 *b_value,
   const r32 *b_grads,
   len_t N
 );
 EXTERN_C void launch_tanh_reverse_r64(
+  Stream stream,
         r64 *a_grads,
   const r64 *b_value,
   const r64 *b_grads,

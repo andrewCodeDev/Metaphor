@@ -17,7 +17,7 @@ extern "C" void launch_addition_reverse_RScalar(
   const RScalar* b, 
   len_t N
 ) {
-  __kernel_addition_reverse_RScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(a, b, N);
+  __kernel_addition_reverse_RScalar<<<GRID_1D(N), dim3(32), 0, getStream(stream)>>>(a, b, N);
 }
 
 __global__ void __kernel_addition_reverse_CScalar(
@@ -39,5 +39,5 @@ extern "C" void launch_addition_reverse_CScalar(
   const CScalar* b, 
   len_t N
 ) {
-  __kernel_addition_reverse_CScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(a, b, N);
+  __kernel_addition_reverse_CScalar<<<GRID_1D(N), dim3(32), 0, getStream(stream)>>>(a, b, N);
 }

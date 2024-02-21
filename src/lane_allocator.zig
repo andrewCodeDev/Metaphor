@@ -1,6 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const cuda = @import("device_utils.zig");
+const StreamPtr = cuda.StreamPtr;
 
 const SCL = @import("scalar.zig");
 const SizeType = @import("tensor_components.zig").SizeType;
@@ -10,10 +11,6 @@ const SizeType = @import("tensor_components.zig").SizeType;
 const debug = (builtin.mode == .Debug);
 
 const SrcInfo = std.builtin.SourceLocation;
-
-fn reportPanic(comptime err: []const u8, comptime src: SrcInfo) void {
-    @panic(src.fn_name ++ ": " ++ err ++ " in file " ++ src.file);
-}
 
 const MemoryTracker = struct {
     var creates: usize = 0;  
@@ -105,17 +102,17 @@ pub const LaneAllocator = struct {
         }
     }
 
-    pub fn deinit(self: *Self) void {
+    pub fn deinit(self: *Self, stream: StreamPtr) void {
 
         // all nodes reference the elements of
         // the free node buffer. Free anything
         // that hasn't been marked as sentinel
         for (self.node_buffer[0..]) |node| {
-            if (node.data != sentinelPtr()) cuda.free(node.data);
+            if (node.data != sentinelPtr()) cuda.free(node.data, stream);
         }
     }
 
-    pub fn allocScalar(self: *Self, comptime T: type) *T {
+    pub fn allocScalar(self: *Self, comptime T: type, stream: StreamPtr) *T {
 
         const lane = comptime getTypeLane(T);
 
@@ -126,7 +123,7 @@ pub const LaneAllocator = struct {
             return @ptrCast(@alignCast(ptr));
         }
         
-        return cuda.create(T);
+        return cuda.create(T, stream);
     }
     
     pub fn freeScalar(self: *Self, scalar: anytype) void {
@@ -140,7 +137,7 @@ pub const LaneAllocator = struct {
         self.scalar_lanes[lane].prepend(node);               
     }
 
-    pub fn allocTensor(self: *Self, comptime T: type, N: usize) []T {
+    pub fn allocTensor(self: *Self, comptime T: type, N: usize, stream: StreamPtr) []T {
         
         const lane = comptime getTypeLane(T);
 
@@ -157,10 +154,10 @@ pub const LaneAllocator = struct {
                 }                
             }
         }
-        return cuda.alloc(T, N);
+        return cuda.alloc(T, N, stream);
     }
 
-    pub fn freeTensor(self: *Self, tensor: anytype) void {
+    pub fn freeTensor(self: *Self, tensor: anytype, stream: StreamPtr) void {
 
         const node = self.getFreeNode();
 
@@ -184,7 +181,7 @@ pub const LaneAllocator = struct {
             .list = .{ .first = node }, 
             .len = tensor.len
         }) catch {
-            cuda.free(tensor); // StackOverflow
+            cuda.free(tensor, stream); // StackOverflow
         };
     }
 

@@ -1,32 +1,44 @@
 const std = @import("std");
 const cuda = @import("cimport.zig").C;
 
-pub fn synchronize() void {
-    cuda.mpDeviceSynchronize();
-}
+pub const StreamPtr = ?*anyopaque;
 
-pub fn alloc(comptime T: type, N: usize) []T {
-    var ptr: *anyopaque = undefined; 
-    cuda.mpMemAlloc(@ptrCast(@alignCast(&ptr)), @sizeOf(T) * N);
+pub fn alloc(comptime T: type, N: usize, stream: StreamPtr) []T {
+    // std.debug.assert(stream != null);
+    const ptr: *anyopaque = cuda.mpMemAlloc(@sizeOf(T) * N, stream) orelse unreachable;
     const out: [*]T = @ptrCast(@alignCast(ptr));
     return out[0..N];
 }
 
-pub fn create(comptime T: type) *T {
-    var ptr: *anyopaque = undefined;
-    cuda.mpMemAlloc(@ptrCast(@alignCast(&ptr)), @sizeOf(T));
+pub fn initStream() StreamPtr {
+    return cuda.mpInitStream();
+}
+
+pub fn deinitStream(stream: StreamPtr) StreamPtr {
+    // std.debug.assert(stream != null);
+    return cuda.mpDeinitInitStream(stream);
+}
+
+pub fn synchronize(stream: StreamPtr) void {
+    cuda.mpDeviceSynchronize(stream);
+}
+
+pub fn create(comptime T: type, stream: StreamPtr) *T {
+    std.debug.assert(stream != null);
+    const ptr: *anyopaque = cuda.mpMemAlloc(@sizeOf(T), stream) orelse unreachable;
     return @ptrCast(@alignCast(ptr));
 }
 
-pub fn copyToDevice(src: anytype, dst: @TypeOf(src)) void {
+pub fn copyToDevice(src: anytype, dst: @TypeOf(src), stream: StreamPtr) void {
+    // std.debug.assert(stream != null);
     switch (@typeInfo(@TypeOf(src))) {
         .Pointer => |p| {
             const T = p.child;
             if (p.size == .Slice) {
                 std.debug.assert(src.len == dst.len);
-                cuda.mpMemcpyHtoD(dst.ptr, src.ptr, src.len * @sizeOf(T));
+                cuda.mpMemcpyHtoD(dst.ptr, src.ptr, src.len * @sizeOf(T), stream);
             } else {
-                cuda.mpMemcpyHtoD(dst, src, @sizeOf(T));
+                cuda.mpMemcpyHtoD(dst, src, @sizeOf(T), stream);
             }
         },
         else => @compileError(
@@ -35,7 +47,8 @@ pub fn copyToDevice(src: anytype, dst: @TypeOf(src)) void {
     }    
 } 
 
-pub fn copyFromDevice(src: anytype, dst: @TypeOf(src)) void {
+pub fn copyFromDevice(src: anytype, dst: @TypeOf(src), stream: StreamPtr) void {
+    // std.debug.assert(stream != null);
     switch (@typeInfo(@TypeOf(src))) {
         .Pointer => |p| {
             const T = p.child;
@@ -43,7 +56,7 @@ pub fn copyFromDevice(src: anytype, dst: @TypeOf(src)) void {
                 std.debug.assert(src.len == dst.len);
                 cuda.mpMemcpyDtoH(dst.ptr, src.ptr, src.len * @sizeOf(T));
             } else {
-                cuda.mpMemcpyDtoH(dst, src, @sizeOf(T));
+                cuda.mpMemcpyDtoH(dst, src, @sizeOf(T), stream);
             }
         },
         else => @compileError(
@@ -52,13 +65,14 @@ pub fn copyFromDevice(src: anytype, dst: @TypeOf(src)) void {
     }    
 } 
 
-pub fn free(dev_mem: anytype) void {
+pub fn free(dev_mem: anytype, stream: StreamPtr) void {
+    // std.debug.assert(stream != null);
     switch (@typeInfo(@TypeOf(dev_mem))) {
         .Pointer => |p| {
             if (p.size == .Slice) {
-                cuda.mpMemFree(dev_mem.ptr);
+                cuda.mpMemFree(dev_mem.ptr, stream);
             } else {
-                cuda.mpMemFree(dev_mem);
+                cuda.mpMemFree(dev_mem, stream);
             }
         },
         else => @compileError(

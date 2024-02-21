@@ -68,6 +68,23 @@ inline void HandleError(cudaError_t err, const char *file, int line)
   }
 }
 
+#define CURESULT_ASSERT(err) (handleCUResultError( err, __FILE__, __LINE__ ))
+inline void handleCUResultError(CUresult err, const char *file, int line)
+{
+  if (err != CUDA_SUCCESS) {
+    const char** msg = nullptr;
+
+    cuGetErrorString(err, msg);
+
+    if (*msg) {
+      printf("%s in %s at line %d\n", *msg, file, line);
+    } else {
+      printf("Unkown error in %s at line %d\n", file, line);
+    }   
+    exit(EXIT_FAILURE);
+  }
+}
+
 #define GRID_1D(N) (((N) / 32) + 1)
 
 #endif // nvcc stuff

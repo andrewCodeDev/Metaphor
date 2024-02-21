@@ -7,9 +7,11 @@ const assert = std.debug.assert;
 const UT = @import("utility.zig");
 const SC = @import("scalar.zig");
 const TC = @import("tensor_components.zig");
+const DU = @import("device_utils.zig");
 
 const Optimizer = @import("optimizer.zig").Optimizer;
 const LaneAllocator = @import("lane_allocator.zig").LaneAllocator;
+const StreamPtr = DU.StreamPtr;
 
 const isReal = SC.isReal;
 const isFloat = SC.isFloat;
@@ -232,6 +234,7 @@ pub const GraphConfig = struct {
     auto_free_wgt_grads: bool = false,
     auto_free_inp_grads: bool = false,
     auto_free_hid_nodes: bool = true,
+    stream: StreamPtr,
 };
 
 pub const Graph = struct {
@@ -297,6 +300,8 @@ pub const Graph = struct {
     auto_free_wgt_grads: bool,
     auto_free_inp_grads: bool,
     auto_free_hid_nodes: bool,
+
+    stream: StreamPtr,
 
     // this function ensures the correct allocator
     // and size are passed to the designated block
@@ -446,7 +451,7 @@ pub const Graph = struct {
 
         assert(0 < N);
 
-        const values = self.tensor_allocator.allocTensor(data_type, N);
+        const values = self.tensor_allocator.allocTensor(data_type, N, self.stream);
 
         const sizes = UT.dupe(dimensions, allocator);
         const strides = UT.alloc(SizeType, sizes.len, allocator);
@@ -501,7 +506,7 @@ pub const Graph = struct {
         const grads: *?SliceUnion = &grads_array.items[idx];
         if (grads.* == null) {            
             const size = values_array.items[idx].len();
-            const grd = self.tensor_allocator.allocTensor(T, size);
+            const grd = self.tensor_allocator.allocTensor(T, size, self.stream);
             grads.* = SliceUnion.init(grd);
             return grd;
         } else {
@@ -514,7 +519,7 @@ pub const Graph = struct {
             &self.nodes.grads else &self.leaves.grads;
 
         if (grads_array.items[idx]) |grads| {            
-            self.tensor_allocator.freeTensor(getSlice(data_type, grads));
+            self.tensor_allocator.freeTensor(getSlice(data_type, grads), self.stream);
             grads_array.items[idx] = null;
         }
     }
@@ -545,6 +550,8 @@ pub const Graph = struct {
         const closure = Closure.init(FuncObj, args ++ .{ out }) 
             catch @panic("Out of Memory");
 
+        DU.synchronize(self.stream);
+        
         UT.append(&self.nodes.callbacks, closure);
 
         comptime var i: SizeType = 0;

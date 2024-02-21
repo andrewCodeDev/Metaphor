@@ -66,7 +66,8 @@ pub fn build(b: *std.Build) void {
              "-fPIC", 
             "-I/usr/local/cuda/include",
              "-L/usr/local/cuda/lib",
-             "-lcudart"
+             "-lcudart",
+             "-lcuda"
         };
 
         _ = std.ChildProcess.run(.{

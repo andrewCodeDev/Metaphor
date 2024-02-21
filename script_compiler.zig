@@ -19,7 +19,8 @@ pub fn buildLibraryCompileArgv(
         "-fPIC", 
         "-I/usr/local/cuda/include", 
         "-L/usr/local/cuda/lib", 
-        "-lcudart"
+        "-lcudart",
+        "-lcuda"
     };
 
     var argv = try std.ArrayListUnmanaged([]const u8).initCapacity(

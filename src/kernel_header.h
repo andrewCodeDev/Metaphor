@@ -14,7 +14,7 @@
 
 #if defined(__cplusplus)
 
-#import <cmath>
+#include <cmath>
 #include <stdio.h>
 #include <cuda/cuda.h>
 #include <cuda/cuda_runtime.h>
@@ -27,7 +27,7 @@
 #ifndef __math_helper
 #define __math_helper
 
-#import <cmath>
+#include <cmath>
 
 __device__ __inline__ r16 conjmul(c16 x) { return x.r * x.r + x.i * x.i; }
 __device__ __inline__ r32 conjmul(c32 x) { return x.r * x.r + x.i * x.i; }

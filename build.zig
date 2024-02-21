@@ -70,18 +70,24 @@ pub fn build(b: *std.Build) void {
              "-lcuda"
         };
 
-        _ = std.ChildProcess.run(.{
+        const result = std.ChildProcess.run(.{
             .allocator = b.allocator, .argv = libgen_utils_argv
         }) catch |e| {
-            std.debug.print("Error: {}", .{e});
+            std.log.err("Error: {}", .{e});
             @panic("Failed to create libdev_utils.so");
         };
+
+        if (result.stderr.len != 0) {
+            std.log.err("Error: {s}", .{result.stderr});
+            @panic("Failed to create libdev_utils.so");
+        }
     }
 
     gen.generate(); // try to create kernels
 
     exe.addLibraryPath(.{ .path = gen.zigsrc_directory });
     exe.addLibraryPath(.{ .path = "/usr/local/cuda/lib64" });
+    exe.addLibraryPath(.{ .path = "/usr/local/cuda/targets/x86_64-linux/lib/stubs" });
     exe.linkSystemLibrary("cuda");
     exe.linkSystemLibrary("cudart");
     exe.linkSystemLibrary("nvrtc");

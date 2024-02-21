@@ -9,6 +9,7 @@
     #define EXTERN_C extern
 #endif
 
+EXTERN_C void initDevice(unsigned int);
 EXTERN_C void* mpMemAlloc(len_t N, void* stream);
 EXTERN_C void mpMemcpyHtoD(void* dptr, void const* hptr, len_t N, void* stream);
 EXTERN_C void mpMemcpyDtoH(void* hptr, void const* dptr, len_t N, void* stream);

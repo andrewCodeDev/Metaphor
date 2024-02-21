@@ -1,26 +1,34 @@
 const std = @import("std");
 const cuda = @import("cimport.zig").C;
 
-pub const StreamPtr = ?*anyopaque;
+pub const StreamPtr = *anyopaque;
+
+pub fn initDevice(device_number: u32) void {
+    cuda.initDevice(device_number);
+}
+
+pub fn initStream() StreamPtr {
+    return cuda.mpInitStream() orelse unreachable;
+}
+
+pub fn deinitStream(stream: StreamPtr) void {
+    // std.debug.assert(stream != null);
+    return cuda.mpDeinitStream(stream);
+}
+
+pub fn synchronizeStream(stream: StreamPtr) void {
+    cuda.mpDeviceSynchronize(stream);
+}
+
+pub fn synchronizeDevice() void {
+    cuda.mpDeviceSynchronize();
+}
 
 pub fn alloc(comptime T: type, N: usize, stream: StreamPtr) []T {
     // std.debug.assert(stream != null);
     const ptr: *anyopaque = cuda.mpMemAlloc(@sizeOf(T) * N, stream) orelse unreachable;
     const out: [*]T = @ptrCast(@alignCast(ptr));
     return out[0..N];
-}
-
-pub fn initStream() StreamPtr {
-    return cuda.mpInitStream();
-}
-
-pub fn deinitStream(stream: StreamPtr) StreamPtr {
-    // std.debug.assert(stream != null);
-    return cuda.mpDeinitInitStream(stream);
-}
-
-pub fn synchronize(stream: StreamPtr) void {
-    cuda.mpDeviceSynchronize(stream);
 }
 
 pub fn create(comptime T: type, stream: StreamPtr) *T {

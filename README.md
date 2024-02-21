@@ -4,20 +4,35 @@ Metaphor is a Zig library with Cuda backings for building machine learning model
 Examples:
 
 ```zig
+const mp = @import("metaphor.zig");
+
 pub fn main() !void {
+
+    // To start Metaphor, you must initialize the
+    // device for the GPU device you want to use
+
+    // Initialize device and cuda context on device zero
+    mp.device.init(0);
+
+    // Open the stream you want to compute on.
+    // Streams can be run in parallel to launch
+    // multiple kernels simultaneous.
+    const stream = mp.stream.init();
+        defer mp.stream.deinit(stream);
 
     var G = mp.Graph.init(.{
         .optimizer = mp.null_optimizer,
         .auto_free_wgt_grads = false,
         .auto_free_inp_grads = false,
         .auto_free_hid_nodes = true,
+        .stream = stream,
     });
 
     defer G.deinit();
 
     /////////////////////////////////////////////////
 
-    const X1 = G.tensor("X1", .wgt, .r32, mp.Dims(2){ 2, 2 });    
+    const X1 = G.tensor("X1", .wgt, .r32, mp.Dims(2){ 2, 2 });  
         defer X1.free();
     
     const X2 = G.tensor("X2", .wgt, .r32, mp.Dims(2){ 2, 2 });
@@ -39,16 +54,10 @@ pub fn main() !void {
         const delta = clock.lap();
 
         std.debug.print(
-           "\n\n==== Lap {}: {} ====\n" ++
-           "\nX2: {d:.2}\nX2: {d:.2}\n" ++
-           "\nX1: {d:.2}\nX1: {d:.2}\n",.{
-        
-           i, delta,
-           X2.values(), X2.grads().?,    
-           X1.values(), X1.grads().?,
-        });
+           "\n\n==== Lap {}: {} ====\n", 
+           .{ i, delta }
+        );
     }
-
     ////////////////////////////////////////////
 }
 

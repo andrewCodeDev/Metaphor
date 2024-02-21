@@ -6,6 +6,7 @@ const UT = @import("utility.zig");
 const SC = @import("scalar.zig");
 const TC = @import("tensor_components.zig");
 const CG = @import("graph.zig");
+const DU = @import("device_utils.zig");
 
 const Contract = UT.Contract;
 const Returns = UT.Returns;
@@ -21,6 +22,17 @@ const Scale = @import("scale.zig");
 
 ///////////////////////////////////////////////
 ///////////////////////////////////////////////
+
+pub const device = struct {
+    pub const init = DU.initDevice;  
+    pub const synchronize = DU.synchronizeDevice;
+};
+
+pub const stream = struct {
+    pub const init = DU.initStream;  
+    pub const deinit = DU.deinitStream;
+    pub const synchronize = DU.synchronizeStream;
+};
 
 pub const types = struct {
     pub const r16 = SC.r16;

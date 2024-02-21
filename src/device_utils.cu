@@ -24,11 +24,11 @@ extern "C" void mpMemFree(void* dev_ptr, void* stream) {
   CUdeviceptr dptr = reinterpret_cast<CUdeviceptr>(dev_ptr);
   CURESULT_ASSERT(cuMemFreeAsync(dptr, _stream));
 }
-extern "C" void* mpStreamSynchronize(void* stream) {
+extern "C" void mpStreamSynchronize(void* stream) {
   CUstream _stream = static_cast<CUstream>(stream);
   CURESULT_ASSERT(cuStreamSynchronize(_stream));
 }
-extern "C" void* mpDeviceSynchronize() {
+extern "C" void mpDeviceSynchronize() {
   CUDA_ASSERT(cudaDeviceSynchronize());
 }
 extern "C" void* mpInitStream() {
@@ -39,4 +39,24 @@ extern "C" void* mpInitStream() {
 extern "C" void mpDeinitStream(void* stream) {
   CUstream _stream = static_cast<CUstream>(stream);
   CURESULT_ASSERT(cuStreamDestroy(_stream));
+}
+extern "C" void initDevice(unsigned device_number) {
+
+    CURESULT_ASSERT(cuInit(0));
+
+    CUdevice device;
+    CUcontext context;
+    int device_count = 0;
+
+    CURESULT_ASSERT(cuDeviceGetCount(&device_count));
+
+    if (device_count <= device_number) {
+        fprintf(stderr, "Error: no devices supporting CUDA\n");
+        exit(-1);
+    }
+
+    // get first CUDA device
+    CURESULT_ASSERT(cuDeviceGet(&device, device_number));
+
+    CURESULT_ASSERT(cuCtxCreate(&context, 0, device));
 }

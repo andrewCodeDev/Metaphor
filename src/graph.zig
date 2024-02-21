@@ -324,6 +324,8 @@ pub const Graph = struct {
             
         self.optimizer = config.optimizer;
 
+        self.stream = config.stream;
+
         self.leaf_count = 0;
         self.node_count = 0;
 
@@ -346,7 +348,7 @@ pub const Graph = struct {
         self.node_arena.deinit();
         self.leaf_arena.deinit();
 
-        self.tensor_allocator.deinit();
+        self.tensor_allocator.deinit(self.stream);
 
         // this must always be last
         std.heap.c_allocator.destroy(self);
@@ -526,7 +528,7 @@ pub const Graph = struct {
 
     fn freeTensor(self: *Self, X: anytype) void {
         const T = @TypeOf(X);
-        self.tensor_allocator.freeTensor(X.values());
+        self.tensor_allocator.freeTensor(X.values(), self.stream);
         self.disableGradient(T.DataType, T.Class, X.idx);
     }
 
@@ -550,7 +552,7 @@ pub const Graph = struct {
         const closure = Closure.init(FuncObj, args ++ .{ out }) 
             catch @panic("Out of Memory");
 
-        DU.synchronize(self.stream);
+        DU.synchronizeStream(self.stream);
         
         UT.append(&self.nodes.callbacks, closure);
 

@@ -55,7 +55,7 @@ pub fn main() !void {
         const Z3 = mp.ops.add(Z1, Z2);
 
         Z3.reverse();
-
+        
         copyAndPrint("X1", X1.grads().?, out, stream);
         copyAndPrint("Z2", X2.grads().?, out, stream);
     }

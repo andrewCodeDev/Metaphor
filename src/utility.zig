@@ -6,13 +6,13 @@ const debug = (builtin.mode == std.builtin.OptimizeMode.Debug);
 // Allocator clean-up functions... these basically exist to regularize the syntax.
 
 pub inline fn alloc(comptime T: type, n: usize, allocator: std.mem.Allocator) []T {
-    return allocator.alloc(T, n) catch @panic("Out of memory.");
+    return allocator.alloc(T, n) catch @panic("Alloc: Out of memory.");
 }
 pub inline fn dupe(x: anytype, allocator: std.mem.Allocator) @TypeOf(x) {
-    return allocator.dupe(Child(@TypeOf(x)), x) catch @panic("Out of memory.");
+    return allocator.dupe(Child(@TypeOf(x)), x) catch @panic("Dupe: Out of memory.");
 }
 pub inline fn append(array: anytype, value: anytype) void {
-    return array.append(value) catch @panic("Out of memory.");
+    return array.append(value) catch @panic("Append: Out of memory.");
 }
 pub inline fn assertGrads(x: anytype) std.meta.Child(@TypeOf(x.grads())) {
     if (comptime debug) {

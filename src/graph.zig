@@ -32,6 +32,8 @@ const isFunction = UT.isFunction;
 const isPointer = UT.isPointer;
 const isSlice = UT.isSlice;
 const isArray = UT.isArray;
+const isStruct = UT.isStruct;
+const isTuple = UT.isTuple;
 
 // implementation declarations
 const getSlice = TC.getSlice;
@@ -40,21 +42,6 @@ const IndexType = TC.IndexType;
 const SizeType = TC.SizeType;
 const Strides = TC.Strides;
 const Sizes = TC.Sizes;
-
-pub fn isStruct(comptime T: type) bool {
-    return switch (@typeInfo(T)) {
-        .Struct => true,
-        else => false,
-    };
-}
-
-pub fn isTuple(comptime T: type) bool {
-    return switch (@typeInfo(T)) {
-        .Struct => |s| s.is_tuple,
-        else => false,
-    };
-}
-
 
 pub fn isGraphTensor(comptime T: type) bool {
     switch (@typeInfo(T)) {
@@ -175,11 +162,14 @@ pub fn NodeTensor(comptime data_type: type) type {
         pub fn len(self: Self) SizeType {
             return self.values().len;
         }
-        fn adjustDependencies(self: Self, comptime direction: i8) i8 {
-            return self.ptr.adjustDependencies(.hid, self.idx, direction);
+        pub fn attach(self: Self) void {
+            self.ptr.setAttachment(self.idx, true);
         }
-        fn reverseAssumeGrads(self: Self) void {
-            return self.ptr.nodes.callbacks.items[self.idx].call();
+        pub fn detach(self: Self) void {
+            self.ptr.setAttachment(self.idx, false);
+        }
+        pub fn attached(self: Self) bool {
+            return self.ptr.attached(self.idx);
         }
         pub fn reverse(self: Self) void {
 
@@ -192,6 +182,9 @@ pub fn NodeTensor(comptime data_type: type) type {
 
             // call graph reverse
             self.ptr.reverse(self.idx);
+        }
+        fn adjustDependencies(self: Self, comptime direction: i8) i8 {
+            return self.ptr.adjustDependencies(.hid, self.idx, direction);
         }
     };
 }
@@ -272,6 +265,7 @@ pub const Graph = struct {
         sizes: ArrayList(Sizes),
         strides: ArrayList(Strides),
         dependencies: ArrayList(i8),
+        attached: ArrayList(bool),
         pub fn init(allocator: std.mem.Allocator, block_size: usize) !Nodes {
             return @This() {
                 .callbacks = try ArrayList(Closure).initCapacity(allocator, block_size),
@@ -280,6 +274,7 @@ pub const Graph = struct {
                 .sizes = try ArrayList(Sizes).initCapacity(allocator, block_size),
                 .strides = try ArrayList(Strides).initCapacity(allocator, block_size),
                 .dependencies = try ArrayList(i8).initCapacity(allocator, block_size),
+                .attached = try ArrayList(bool).initCapacity(allocator, block_size),
             };
         }
     };
@@ -393,28 +388,29 @@ pub const Graph = struct {
         values: anytype,        
         sizes: Sizes,
         strides: Sizes,
-    ) GraphTensor(Child(@TypeOf(values)), class) {
+    ) !GraphTensor(Child(@TypeOf(values)), class) {
 
         assert(0 < sizes.len);
         assert(0 < strides.len);
         
         if (comptime class == .hid) {
-            UT.append(&self.nodes.values, SliceUnion.init(values));
-            UT.append(&self.nodes.sizes, sizes);
-            UT.append(&self.nodes.strides, strides);
-            UT.append(&self.nodes.grads, null);
-            UT.append(&self.nodes.dependencies, 0);
+            try self.nodes.values.append(SliceUnion.init(values));
+            try self.nodes.sizes.append(sizes);
+            try self.nodes.strides.append(strides);
+            try self.nodes.grads.append(null);
+            try self.nodes.dependencies.append(0);
+            try self.nodes.attached.append(true);
             self.node_count += 1;
         } else {
             if (name) |_name| {
                 assert(_name.len != 0);
-                UT.append(&self.leaves.names, _name);
-                UT.append(&self.leaves.classes, class);
-                UT.append(&self.leaves.values, SliceUnion.init(values));
-                UT.append(&self.leaves.sizes, sizes);
-                UT.append(&self.leaves.strides, strides);
-                UT.append(&self.leaves.grads, null);
-                UT.append(&self.leaves.dependencies, 0);            
+                try self.leaves.names.append(_name);
+                try self.leaves.classes.append(class);
+                try self.leaves.values.append(SliceUnion.init(values));
+                try self.leaves.sizes.append(sizes);
+                try self.leaves.strides.append(strides);
+                try self.leaves.grads.append(null);
+                try self.leaves.dependencies.append(0);            
                 self.leaf_count += 1;
             } else {
                 @panic("Leaf tensors cannot have null names.");
@@ -427,6 +423,14 @@ pub const Graph = struct {
         return GraphTensor(Child(@TypeOf(values)), class) { 
             .ptr = self, .idx = idx,
         };
+    }
+
+    inline fn setAttachment(self: *Graph, idx: IndexType, state: bool) void {
+        self.nodes.attached.items[idx] = state;
+    }
+
+    inline fn attached(self: *Graph, idx: IndexType) bool {
+        return self.nodes.attached.items[idx];
     }
 
     // Users can only provide inp or wgt,
@@ -453,7 +457,6 @@ pub const Graph = struct {
             for (dimensions) |s| { n *= s; }
             break :blk n;
         };
-
         assert(0 < N);
 
         const values = self.tensor_allocator.allocTensor(data_type, N, self.stream);
@@ -463,7 +466,8 @@ pub const Graph = struct {
 
         TC.computeStrides(sizes, strides);
 
-        return self.tensorFromComponents(name, class, values, sizes, strides);        
+        return self.tensorFromComponents(name, class, values, sizes, strides)
+            catch @panic("Failed to add tensor from components.");
     }
 
     ////////////////////////////////////////////
@@ -606,6 +610,10 @@ pub const Graph = struct {
             // if there is a another node we're connected to,
             // put it on the stack and continue depth-wise
             if (result.next_node) |next| {
+
+                if (!self.attached(next))
+                    continue;
+
                 stack.appendAssumeCapacity(next);
             }
         }

@@ -13,10 +13,10 @@ __global__ void __kernel_tanh_RScalar(
 }
 
 extern "C" void launch_tanh_RScalar(
+  Stream stream,
   const RScalar* a,
         RScalar* b, 
   len_t N
 ) {
-  __kernel_tanh_RScalar<<<GRID_1D(N), 32>>>(a, b, N);
-  CUDA_ASSERT(cudaDeviceSynchronize());
+  __kernel_tanh_RScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(a, b, N);
 }

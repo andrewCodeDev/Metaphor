@@ -14,14 +14,15 @@ __global__ void __kernel_hadamard_reverse_RScalar(
 }
 
 extern "C" void launch_hadamard_reverse_RScalar(
+  Stream stream,
   RScalar *grads_a,
   const RScalar *value_b,
   const RScalar *grads_c,
   len_t N
 ) {
-  __kernel_hadamard_reverse_RScalar<<<GRID_1D(N), 32>>>(grads_a, value_b, grads_c, N);
-
-  CUDA_ASSERT(cudaDeviceSynchronize());
+  __kernel_hadamard_reverse_RScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(
+      grads_a, value_b, grads_c, N
+  );
 }
 
 __global__ void __kernel_hadamard_reverse_CScalar(
@@ -39,13 +40,14 @@ __global__ void __kernel_hadamard_reverse_CScalar(
 }
 
 extern "C" void launch_hadamard_reverse_CScalar(
+  Stream stream,
   CScalar *grads_a,
   const CScalar *value_b,
   const CScalar *grads_c,
   len_t N
 ) {
-  __kernel_hadamard_reverse_CScalar<<<GRID_1D(N), 32>>>(grads_a, value_b, grads_c, N);
-
-  CUDA_ASSERT(cudaDeviceSynchronize());
+  __kernel_hadamard_reverse_CScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(
+    grads_a, value_b, grads_c, N
+  );
 }
 

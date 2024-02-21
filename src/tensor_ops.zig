@@ -30,7 +30,7 @@ pub fn additionForward(x: anytype, y: anytype, z: anytype) void {
     const z_values = z.values();
 
     overloads.kernel_addition.call(.{
-        x_values.ptr, y_values.ptr, z_values.ptr, z_values.len
+        z.ptr.stream, x_values.ptr, y_values.ptr, z_values.ptr, z_values.len
     });
 }
 
@@ -39,7 +39,7 @@ pub fn additionReverseArg0(X: anytype, _: anytype, Z: anytype) void {
     const z_grads = UT.assertGrads(Z);
 
     overloads.kernel_addition_reverse.call(.{
-        x_grads.ptr, z_grads.ptr, z_grads.len
+        Z.ptr.stream, x_grads.ptr, z_grads.ptr, z_grads.len
     });
 }
 
@@ -48,7 +48,7 @@ pub fn additionReverseArg1(_: anytype, Y: anytype, Z: anytype) void {
     const z_grads = UT.assertGrads(Z);
 
     overloads.kernel_addition_reverse.call(.{
-        y_grads.ptr, z_grads.ptr, z_grads.len
+        Z.ptr.stream, y_grads.ptr, z_grads.ptr, z_grads.len
     });
 }
 
@@ -67,7 +67,7 @@ pub fn subtractionForward(x: anytype, y: anytype, z: anytype) void {
     const z_values = z.values();
 
     overloads.kernel_subtraction.call(.{
-        x_values.ptr, y_values.ptr, z_values.ptr, z_values.len
+        z.ptr.stream, x_values.ptr, y_values.ptr, z_values.ptr, z_values.len
     });
 }
 
@@ -79,7 +79,7 @@ pub fn subtractionReverseArg0(X: anytype, _: anytype, Z: anytype) void {
     const coef = SC.asScalar(SC.DemoteComplex(Child(z_grads)), 1.0);
     
     overloads.kernel_subtraction_reverse.call(.{
-        x_grads.ptr, z_grads.ptr, coef, z_grads.len
+        Z.ptr.stream, x_grads.ptr, z_grads.ptr, coef, z_grads.len
     });
 }
 
@@ -91,7 +91,7 @@ pub fn subtractionReverseArg1(_: anytype, Y: anytype, Z: anytype) void {
     const coef = SC.asScalar(SC.DemoteComplex(Child(z_grads)), -1.0);
 
     overloads.kernel_subtraction_reverse.call(.{
-        y_grads.ptr, z_grads.ptr, coef, z_grads.len
+        Z.ptr.stream, y_grads.ptr, z_grads.ptr, coef, z_grads.len
     });
 }
 
@@ -110,7 +110,7 @@ pub fn hadamardForward(x: anytype, y: anytype, z: anytype) void {
     const z_values = z.values();
 
     overloads.kernel_hadamard.call(.{
-        x_values.ptr, y_values.ptr, z_values.ptr, z_values.len
+        z.ptr.stream, x_values.ptr, y_values.ptr, z_values.ptr, z_values.len
     });
 }
 
@@ -120,7 +120,7 @@ pub fn hadamardReverseArg0(X: anytype, Y: anytype, Z: anytype) void {
     const z_grads = UT.assertGrads(Z);
 
     overloads.kernel_hadamard_reverse.call(.{
-        x_grads.ptr, y_value.ptr, z_grads.ptr, z_grads.len
+        Z.ptr.stream, x_grads.ptr, y_value.ptr, z_grads.ptr, z_grads.len
     });
 }
 
@@ -130,7 +130,7 @@ pub fn hadamardReverseArg1(X: anytype, Y: anytype, Z: anytype) void {
     const z_grads = UT.assertGrads(Z);
 
     overloads.kernel_hadamard_reverse.call(.{
-        y_grads.ptr, x_value.ptr, z_grads.ptr, z_grads.len
+        Z.ptr.stream, y_grads.ptr, x_value.ptr, z_grads.ptr, z_grads.len
     });
 }
 
@@ -149,6 +149,7 @@ pub fn leakyReluForward(x: anytype, coef: anytype, y: anytype) void {
     const y_values = y.values();
 
     overloads.kernel_leaky_relu.call(.{
+        y.ptr.stream,
         x_values.ptr, 
         y_values.ptr, 
         SC.asScalar(T, coef), 
@@ -162,6 +163,7 @@ pub fn leakyReluReverse(x: anytype, coef: anytype, y: anytype) void {
     const y_values = y.values();
 
     overloads.kernel_leaky_relu_reverse.call(.{
+        y.ptr.stream,
         x_values.ptr, 
         y_values.ptr, 
         SC.asScalar(T, coef), 
@@ -182,7 +184,7 @@ pub fn tanhForward(x: anytype, y: anytype) void {
     const y_values = y.values();
 
     overloads.kernel_tanh.call(.{
-        x_values.ptr,  y_values.ptr,  y_values.len
+        y.ptr.stream, x_values.ptr,  y_values.ptr,  y_values.len
     });
 }
 
@@ -192,7 +194,7 @@ pub fn tanhReverse(x: anytype, y: anytype) void {
     const y_grads = UT.assertGrads(y);
 
     overloads.kernel_tanh_reverse.call(.{
-        x_grads.ptr, y_values.ptr, y_grads.ptr, y_values.len
+        y.ptr.stream, x_grads.ptr, y_values.ptr, y_grads.ptr, y_values.len
     });
 }
 

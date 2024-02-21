@@ -14,14 +14,13 @@ __global__ void __kernel_hadamard_RScalar(
 }
 
 extern "C" void launch_hadamard_RScalar(
+  Stream stream,
   const RScalar* a,
   const RScalar* b, 
   RScalar* c, 
   len_t N
 ) {
-  __kernel_hadamard_RScalar<<<GRID_1D(N), 32>>>(a, b, c, N);
-
-  CUDA_ASSERT(cudaDeviceSynchronize());
+  __kernel_hadamard_RScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(a, b, c, N);
 }
 
 __global__ void __kernel_hadamard_CScalar(
@@ -39,13 +38,12 @@ __global__ void __kernel_hadamard_CScalar(
 }
 
 extern "C" void launch_hadamard_CScalar(
+  Stream stream,
   const CScalar* a,
   const CScalar* b, 
   CScalar* c, 
   len_t N
 ) {
-  __kernel_hadamard_CScalar<<<GRID_1D(N), 32>>>(a, b, c, N);
-
-  CUDA_ASSERT(cudaDeviceSynchronize());
+  __kernel_hadamard_CScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(a, b, c, N);
 }
 

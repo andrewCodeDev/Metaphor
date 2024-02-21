@@ -68,22 +68,25 @@ pub fn isGraphTensor(comptime T: type) bool {
     return false;
 }
 
-pub fn fill(
-    X: anytype, 
-    value: anytype) Contract(
-        isGraphTensor(@TypeOf(X)) or isSlice(@TypeOf(X)),
-    Returns(void)) {
-        if (comptime isGraphTensor(@TypeOf(X))) {
-            return fill(X.values(), value);
-        } else {
+fn fillSlice(
+    comptime T: type,
+    x_slice: []T,
+    value: T,
+    stream: Stream,
+) void {
+    kernel_fill.call(.{
+        stream, x_slice.ptr, value, x_slice.len
+    });
+    DU.synchronizeStream(stream);    
+}
 
-            const T = Child(@TypeOf(X));
-        
-            kernel_fill.call(.{
-                X.ptr, SC.asScalar(T, value), X.len    
-            });
-        }
-    }
+pub fn fill( X: anytype, value: anytype) Contract(
+    isGraphTensor(@TypeOf(X)), Returns(void)
+){
+    const T = Child(@TypeOf(X));
+
+    fillSlice(T, X.values(), SC.asScalar(T, value), X.ptr.stream);
+}
 
 pub const TensorClass = enum {
   inp, wgt, hid, 
@@ -184,7 +187,7 @@ pub fn NodeTensor(comptime data_type: type) type {
                 // if a loss hasn't been applied, this will be null
                 const grd = self.ptr.enableGradient(DataType, .hid, self.idx);
                 // derivative with respect to self is 1
-                fill(grd, 1);
+                fillSlice(DataType, grd, SC.asScalar(DataType, 1), self.ptr.stream);
             }
 
             // call graph reverse
@@ -638,7 +641,7 @@ fn reverseEdge(
     // enable gradients if we don't have them
     if (arg.grads() == null) {
         const grd = graph_ptr.enableGradient(DataType, Class, arg.idx);
-        fill(grd, 0);
+        fillSlice(DataType, grd, SC.asScalar(DataType, 0), graph_ptr.stream);
     }
 
     @call(.auto, func, edge_tuple);   

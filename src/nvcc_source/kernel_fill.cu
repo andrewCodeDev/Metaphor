@@ -13,12 +13,12 @@ __global__ void __kernel_fill_RScalar(
 }
 
 extern "C" void launch_fill_RScalar(
+  Stream stream,
   RScalar* dev_a,
   RScalar value, 
   len_t N
 ) {
-  __kernel_fill_RScalar<<<GRID_1D(N), 32>>>(dev_a, value, N);
-  CUDA_ASSERT(cudaDeviceSynchronize());
+  __kernel_fill_RScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(dev_a, value, N);
 }
 
 __global__ void __kernel_fill_CScalar(
@@ -35,12 +35,12 @@ __global__ void __kernel_fill_CScalar(
 }
 
 extern "C" void launch_fill_CScalar(
+  Stream stream,
   CScalar* dev_a,
   CScalar value, 
   len_t N
 ) {
-  __kernel_fill_CScalar<<<GRID_1D(N), 32>>>(dev_a, value, N);
-  CUDA_ASSERT(cudaDeviceSynchronize());
+  __kernel_fill_CScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(dev_a, value, N);
 }
 
 

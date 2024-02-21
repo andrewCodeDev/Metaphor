@@ -18,11 +18,11 @@ __global__ void __kernel_leaky_relu_RScalar(
 }
 
 extern "C" void launch_leaky_relu_RScalar(
+  Stream stream,
   const RScalar* a,
         RScalar* b, 
         RScalar coef,
   len_t N
 ) {
-  __kernel_leaky_relu_RScalar<<<GRID_1D(N), 32>>>(a, b, coef, N);
-  CUDA_ASSERT(cudaDeviceSynchronize());
+  __kernel_leaky_relu_RScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(a, b, coef, N);
 }

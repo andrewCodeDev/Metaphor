@@ -3,8 +3,12 @@
 
 #include "tensor_types.h"
 
-////////////////////////////////
-// NVCC COMPILER STUFF /////////
+// This must be cast back to a
+// CUstream before using it to
+// launch cuda kernels
+typedef struct {
+    void* ptr;
+} Stream;
 
 // generator types
 #define RScalar float
@@ -13,7 +17,8 @@
 #define CTensor CTensor32
 
 #if defined(__cplusplus)
-
+////////////////////////////////
+// NVCC COMPILER STUFF /////////
 #include <cmath>
 #include <stdio.h>
 #include <cuda/cuda.h>
@@ -21,34 +26,13 @@
 #include <cuda/cooperative_groups.h>
 
 #if defined(__CUDACC__)
+
+  inline CUstream getStream(Stream stream) {
+    return static_cast<CUstream>(stream.ptr);
+  }
+
   namespace cg = cooperative_groups;
 #endif
-
-#ifndef __math_helper
-#define __math_helper
-
-#include <cmath>
-
-__device__ __inline__ r16 conjmul(c16 x) { return x.r * x.r + x.i * x.i; }
-__device__ __inline__ r32 conjmul(c32 x) { return x.r * x.r + x.i * x.i; }
-__device__ __inline__ r64 conjmul(c64 x) { return x.r * x.r + x.i * x.i; }
-
-__device__ __inline__ r16 rtanh(r16 x) { return r16(std::tanh(static_cast<r32>(x))); }
-__device__ __inline__ r32 rtanh(r32 x) { return std::tanh(x); }
-__device__ __inline__ r64 rtanh(r64 x) { return std::tanh(x); }
-
-__device__ __inline__ r16 rtan(r16 x) { return r16(std::tan(static_cast<r32>(x))); }
-__device__ __inline__ r32 rtan(r32 x) { return std::tan(x); }
-__device__ __inline__ r64 rtan(r64 x) { return std::tan(x); }
-
-template<class T>
-__device__ __inline__ T cdiv(T x, T y) { 
-  auto u = conjmul(y); return T{ .r = x.r / u, .i = x.i / u };  
-}
-template<class T>
-__device__ __inline__ T cmul(T x, T y) { 
-  return T { .r = (x.r * y.r - x.i * y.i), .i = (x.r * y.i + x.i * y.r) };
-}
 
 template<class T>
 __device__ T ctanh(T x) { 
@@ -56,8 +40,6 @@ __device__ T ctanh(T x) {
   auto b = rtan(x.i);
   return cdiv(T{ .r = a, .i = b }, T{ .r = decltype(a){1.0}, .i = a * b });
 }
-
-#endif
 
 #define CUDA_ASSERT(err) (HandleError( err, __FILE__, __LINE__ ))
 inline void HandleError(cudaError_t err, const char *file, int line)
@@ -86,6 +68,29 @@ inline void handleCUResultError(CUresult err, const char *file, int line)
 }
 
 #define GRID_1D(N) (((N) / 32) + 1)
+
+// TODO: Move this math stuff to a different header
+__device__ __inline__ r16 conjmul(c16 x) { return x.r * x.r + x.i * x.i; }
+__device__ __inline__ r32 conjmul(c32 x) { return x.r * x.r + x.i * x.i; }
+__device__ __inline__ r64 conjmul(c64 x) { return x.r * x.r + x.i * x.i; }
+
+__device__ __inline__ r16 rtanh(r16 x) { return r16(std::tanh(static_cast<r32>(x))); }
+__device__ __inline__ r32 rtanh(r32 x) { return std::tanh(x); }
+__device__ __inline__ r64 rtanh(r64 x) { return std::tanh(x); }
+
+__device__ __inline__ r16 rtan(r16 x) { return r16(std::tan(static_cast<r32>(x))); }
+__device__ __inline__ r32 rtan(r32 x) { return std::tan(x); }
+__device__ __inline__ r64 rtan(r64 x) { return std::tan(x); }
+
+template<class T>
+__device__ __inline__ T cdiv(T x, T y) { 
+  auto u = conjmul(y); return T{ .r = x.r / u, .i = x.i / u };  
+}
+template<class T>
+__device__ __inline__ T cmul(T x, T y) { 
+  return T { .r = (x.r * y.r - x.i * y.i), .i = (x.r * y.i + x.i * y.r) };
+}
+
 
 #endif // nvcc stuff
 #endif // header guard

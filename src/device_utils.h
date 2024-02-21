@@ -9,10 +9,6 @@
     #define EXTERN_C extern
 #endif
 
-typedef struct {
-    void* ptr;
-} Stream;
-
 EXTERN_C void initDevice(unsigned int);
 EXTERN_C void* mpMemAlloc(len_t N, Stream);
 EXTERN_C void mpMemcpyHtoD(void* dptr, void const* hptr, len_t N, Stream);

@@ -12,12 +12,12 @@ __global__ void __kernel_addition_reverse_RScalar(
 }
 
 extern "C" void launch_addition_reverse_RScalar(
+  Stream stream,
   RScalar* a, 
   const RScalar* b, 
   len_t N
 ) {
-  __kernel_addition_reverse_RScalar<<<GRID_1D(N), 32>>>(a, b, N);
-  CUDA_ASSERT(cudaDeviceSynchronize());
+  __kernel_addition_reverse_RScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(a, b, N);
 }
 
 __global__ void __kernel_addition_reverse_CScalar(
@@ -34,10 +34,10 @@ __global__ void __kernel_addition_reverse_CScalar(
 }
 
 extern "C" void launch_addition_reverse_CScalar(
+  Stream stream,
   CScalar* a, 
   const CScalar* b, 
   len_t N
 ) {
-  __kernel_addition_reverse_CScalar<<<GRID_1D(N), 32>>>(a, b, N);
-  CUDA_ASSERT(cudaDeviceSynchronize());
+  __kernel_addition_reverse_CScalar<<<1, GRID_1D(N), 32, getStream(stream)>>>(a, b, N);
 }

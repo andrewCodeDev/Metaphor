@@ -20,7 +20,7 @@ pub fn main() !void {
     const stream = mp.stream.init();
         defer mp.stream.deinit(stream);
 
-    var G = mp.Graph.init(.{
+    const G = mp.Graph.init(.{
         .optimizer = mp.null_optimizer,
         .auto_free_wgt_grads = false,
         .auto_free_inp_grads = false,
@@ -38,8 +38,8 @@ pub fn main() !void {
     const X2 = G.tensor("X2", .wgt, .r32, mp.Dims(2){ 2, 2 });
         defer X2.free();
 
-    ops.fill(X1, 2);
-    ops.fill(X2, 1);
+    mp.ops.fill(X1, 2);
+    mp.ops.fill(X2, 1);
 
     for (0..10) |i| {
 

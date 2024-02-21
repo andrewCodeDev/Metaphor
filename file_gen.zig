@@ -74,7 +74,7 @@ const EXTERN_C: []const u8 = "extern \"C\"";
 const EXTERN_HEADER_MACRO = 
     \\/* GENERATED FILE */
     \\
-    \\#include "../tensor_types.h"
+    \\#include "tensor_types.h"
     \\
     \\#if defined(__cplusplus)
     \\    #define EXTERN_C extern "C"
@@ -208,7 +208,6 @@ fn collectSources(self: *Self) !bool {
         const src = self.appendSourceDirectory(path.name);
         const trg = self.appendTargetDirectory(path.name);
 
-
         if (isModified(src, trg)) {
             std.log.info("Modified: {s}", .{ src });
             modified = true;
@@ -319,7 +318,7 @@ pub fn generate(self: *Self) void {
 
         stringToFile(trg_path, trg_buffer);
     }    
-    stringToFile(self.appendTargetDirectory("kernel_decls.h"), declarations);
+    stringToFile(self.appendZigsrcDirectory("kernel_decls.h"), declarations);
 
     self.makeKernelOverloads() 
         catch @panic("Failed to make overloads.");

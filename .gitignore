@@ -1,4 +1,4 @@
 zig-out/
 zig-cache/
-src/nvcc_target/
 src/libdev_utils.so
+src/libmp_kernels.so

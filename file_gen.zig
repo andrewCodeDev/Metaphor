@@ -366,7 +366,7 @@ fn makeKernelOverloads(self: *Self) !void {
 
         overloadset_args = "";
 
-        var start: usize = 42;
+        var start: usize = 0;
         var last: usize = 0;
 
         while (true) {

@@ -2,4 +2,4 @@ zig-out/
 zig-cache/
 /config.json
 /cleanup.sh
-src/cimports.zig
+src/cimport.zig

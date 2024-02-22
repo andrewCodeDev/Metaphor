@@ -16,7 +16,7 @@ You can now use Metaphor!
 
 Currently, "Metaphor/build.zig" is pointed to a "Metaphor/src/main.zig". This is a sandbox for the early period of this library's development that will be removed in future releases.
 
-Examples:
+# Examples:
 
 ```zig
 const mp = @import("metaphor.zig");

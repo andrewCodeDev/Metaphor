@@ -15,15 +15,16 @@ typedef struct {
 #define CScalar c32
 #define RTensor RTensor32
 #define CTensor CTensor32
+#define WARP_SIZE 32
 
 #if defined(__cplusplus)
 ////////////////////////////////
 // NVCC COMPILER STUFF /////////
 #include <cmath>
 #include <stdio.h>
-#include "../dependencies/cuda/include/cuda.h"
-#include "../dependencies/cuda/include/cuda_runtime.h"
-#include "../dependencies/cuda/include/cooperative_groups.h"
+#include "../../dependencies/cuda/include/cuda.h"
+#include "../../dependencies/cuda/include/cuda_runtime.h"
+#include "../../dependencies/cuda/include/cooperative_groups.h"
 
 #if defined(__CUDACC__)
 

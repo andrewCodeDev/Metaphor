@@ -9,6 +9,9 @@ pub const kernel_tanh = OverloadSet(.{
 	decls.launch_tanh_r64,
 });
 
+pub const kernel_square_transpose = OverloadSet(.{
+});
+
 pub const kernel_hadamard_reverse = OverloadSet(.{
 	decls.launch_hadamard_reverse_r16,
 	decls.launch_hadamard_reverse_c16,

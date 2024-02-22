@@ -1,7 +1,5 @@
 zig-out/
 zig-cache/
-src/libdev_utils.so
-src/libmp_kernels.so
 /config.json
 /cleanup.sh
-src/codedump
+src/cimports.zig

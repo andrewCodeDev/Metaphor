@@ -161,6 +161,16 @@ pub fn appendSourceDirectory(self: *Self, source_name: []const u8) []const u8 {
         catch @panic("Out of Memory");
 }
 
+pub fn appendLibraryDirectory(self: *Self, source_name: []const u8) []const u8 {
+    return std.fs.path.join(self.allocator, &.{ self.zigsrc_directory, "lib", source_name })
+        catch @panic("Out of Memory");
+}
+
+pub fn appendCudaDirectory(self: *Self, source_name: []const u8) []const u8 {
+    return std.fs.path.join(self.allocator, &.{ self.zigsrc_directory, "cuda", source_name })
+        catch @panic("Out of Memory");
+}
+
 pub fn appendTargetDirectory(self: *Self, target_name: []const u8) []const u8 {
     return std.fs.path.join(self.allocator, &.{ self.target_directory, target_name })
         catch @panic("Out of Memory");
@@ -168,6 +178,16 @@ pub fn appendTargetDirectory(self: *Self, target_name: []const u8) []const u8 {
 
 pub fn appendZigsrcDirectory(self: *Self, zigsrc_name: []const u8) []const u8 {
     return std.fs.path.join(self.allocator, &.{ self.zigsrc_directory, zigsrc_name })
+        catch @panic("Out of Memory");
+}
+
+fn joinSourceAbsPaths(self: *Self) []const u8 {
+    return std.mem.join(self.allocator, " ", self.source_abspaths.items)
+        catch @panic("Out of Memory");
+}
+
+fn joinTargetAbsPaths(self: *Self) []const u8 {
+    return std.mem.join(self.allocator, " ", self.target_abspaths.items)
         catch @panic("Out of Memory");
 }
 
@@ -321,7 +341,7 @@ pub fn generate(self: *Self) void {
 
         stringToFile(trg_path, trg_buffer);
     }    
-    stringToFile(self.appendZigsrcDirectory("kernel_decls.h"), declarations);
+    stringToFile(self.appendCudaDirectory("kernel_decls.h"), declarations);
 
     self.makeKernelOverloads() 
         catch @panic("Failed to make overloads.");
@@ -331,7 +351,7 @@ pub fn generate(self: *Self) void {
     ScriptCompiler.compileSharedLibrary(.{
         .allocator = self.allocator,
         .targets = self.target_abspaths.items,
-        .libname  = self.appendZigsrcDirectory("libmp_kernels.so")
+        .libname  = self.appendLibraryDirectory("libmp_kernels.so")
     });
 }
 
@@ -386,14 +406,17 @@ fn makeKernelOverloads(self: *Self) !void {
     stringToFile(self.appendZigsrcDirectory("kernel_overloads.zig"), overloadset_decls);
 }
 
-fn joinSourceAbsPaths(self: *Self) []const u8 {
-    return std.mem.join(self.allocator, " ", self.source_abspaths.items)
-        catch @panic("Out of Memory");
-}
+pub fn makeCImport(self: *Self) void {
 
-fn joinTargetAbsPaths(self: *Self) []const u8 {
-    return std.mem.join(self.allocator, " ", self.target_abspaths.items)
-        catch @panic("Out of Memory");
+    const cimport_string = std.mem.join(self.allocator, "", &.{
+        "pub const C = @cImport({\n",
+            "\t@cInclude(\"", self.appendCudaDirectory("device_utils.h"), "\");\n",
+            "\t@cInclude(\"", self.appendCudaDirectory("tensor_types.h"), "\");\n",
+            "\t@cInclude(\"", self.appendCudaDirectory("kernel_decls.h"), "\");\n",
+        "});\n"
+    }) catch @panic("Failed to make cimport.zig");
+
+    stringToFile(self.appendZigsrcDirectory("cimport.zig"), cimport_string);
 }
 
 pub fn reset(self: *Self) void {

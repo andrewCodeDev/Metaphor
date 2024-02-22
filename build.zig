@@ -27,8 +27,8 @@ pub fn build(b: *std.Build) void {
 
     const gen: *FileGen = FileGen.init(.{
         .source_extension = ".cu",
-        .source_directory = "src/nvcc_source",
-        .target_directory = "src/nvcc_target",
+        .source_directory = "src/cuda/nvcc_source",
+        .target_directory = "src/cuda/nvcc_target",
         .zigsrc_directory = "src",
     });
 
@@ -36,17 +36,22 @@ pub fn build(b: *std.Build) void {
 
     ScriptCompiler.setupConfig(b.allocator, gen.current_directory);
 
-    const src = gen.appendZigsrcDirectory("device_utils.cu");
-    const trg = gen.appendZigsrcDirectory("libdev_utils.so");
+    const src_body = gen.appendCudaDirectory("device_utils.cu");
+    const src_head = gen.appendCudaDirectory("device_utils.h");
+    const trg_lib = gen.appendLibraryDirectory("libdev_utils.so");
 
-    if (FileGen.isModified(src, trg))
-        ScriptCompiler.compileSingleFile(b.allocator, src, trg);
+    if (FileGen.isModified(src_body, trg_lib) or FileGen.isModified(src_head, trg_lib))
+        ScriptCompiler.compileSingleFile(b.allocator, src_body, trg_lib);
+
+    // ensures that the @cImport always has the correct
+    // absolute paths for importing C-files into Zig
+    gen.makeCImport();
 
     gen.generate(); // try to create kernels
 
-    exe.addLibraryPath(.{ .path = gen.zigsrc_directory });
-    exe.addLibraryPath(.{ .path = "/usr/local/cuda/lib64" });
-    exe.addLibraryPath(.{ .path = "/usr/local/cuda/targets/x86_64-linux/lib/stubs" });
+    exe.addLibraryPath(.{ .path = gen.appendZigsrcDirectory("lib") });
+    exe.addLibraryPath(.{ .path = "dependencies/cuda/lib64" });
+    exe.addLibraryPath(.{ .path = "dependencies/cuda/targets/x86_64-linux/lib/stubs" });
     exe.linkSystemLibrary("cuda");
     exe.linkSystemLibrary("cudart");
     exe.linkSystemLibrary("nvrtc");

@@ -21,9 +21,9 @@ typedef struct {
 // NVCC COMPILER STUFF /////////
 #include <cmath>
 #include <stdio.h>
-#include <cuda/cuda.h>
-#include <cuda/cuda_runtime.h>
-#include <cuda/cooperative_groups.h>
+#include "../dependencies/cuda/include/cuda.h"
+#include "../dependencies/cuda/include/cuda_runtime.h"
+#include "../dependencies/cuda/include/cooperative_groups.h"
 
 #if defined(__CUDACC__)
 

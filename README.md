@@ -1,6 +1,21 @@
 # Metaphor
 Metaphor is a Zig library with Cuda backings for building machine learning models. This library is in a highly experimental state and will likely change a lot.
 
+
+# Installation Steps
+
+If you do not have a version of the CUDA Developer Toolkit on your machine, download it and locate the path it was saved to.
+
+Clone this repository onto your local machine.
+
+Either copy, move, or symlink the CUDA Developer Toolkit to the "Metaphor/dependencies" folder. Metaphor uses this path to ensure that CUDA includes are correct.
+
+Open the "Metaphor/config.json" file and specify your GPU's compute architecture (such as sm_89) in the config.json file.
+
+You can now use Metaphor!
+
+Currently, "Metaphor/build.zig" is pointed to a "Metaphor/src/main.zig". This is a sandbox for the early period of this library's development that will be removed in future releases.
+
 Examples:
 
 ```zig

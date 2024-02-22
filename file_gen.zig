@@ -106,6 +106,7 @@ const Self = @This();
 
 arena: std.heap.ArenaAllocator,
 allocator: std.mem.Allocator,
+current_directory: []const u8,
 source_abspaths: StringList,
 target_abspaths: StringList,
 source_filenames: StringList,
@@ -133,6 +134,8 @@ pub fn init(config: FileGenConfig) *Self {
 
     const cwd_path = std.fs.cwd().realpathAlloc(self.allocator, ".")
         catch @panic("Out of Memory");
+
+    self.current_directory = cwd_path;
 
     self.source_directory = std.fs.path.join(self.allocator, &.{ cwd_path, config.source_directory })
         catch @panic("Out of Memory");

@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const FileGen = @import("file_gen.zig");
+const ScriptCompiler = @import("script_compiler.zig");
 
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
@@ -16,21 +17,6 @@ pub fn build(b: *std.Build) void {
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
-
-    //const lib = b.addSharedLibrary(.{
-    //    .name = "lib",
-    //    // In this case the main source file is merely a path, however, in more
-    //    // complicated build scripts, this could be a generated file.
-    //    .root_source_file = .{ .path = "lib.so" },
-    //    .target = target,
-    //    .optimize = optimize,
-    //    .link_libc = true,
-    //});
-
-    //// This declares intent for the library to be installed into the standard
-    //// location when the user invokes the "install" step (the default step when
-    //// running `zig build`).
-    //b.installArtifact(lib);
 
     const exe = b.addExecutable(.{
         .name = "Cuda",
@@ -48,40 +34,13 @@ pub fn build(b: *std.Build) void {
 
     defer gen.deinit();
 
-    gen_utils: {
-        const src = gen.appendZigsrcDirectory("device_utils.cu");
-        const trg = gen.appendZigsrcDirectory("libdev_utils.so");
+    ScriptCompiler.setupConfig(b.allocator, gen.current_directory);
 
-        if (!FileGen.isModified(src, trg))
-            break :gen_utils;
+    const src = gen.appendZigsrcDirectory("device_utils.cu");
+    const trg = gen.appendZigsrcDirectory("libdev_utils.so");
 
-        std.log.info("Creating device utilities...\n", .{});
-        
-        const libgen_utils_argv: []const []const u8 = &.{  
-            "nvcc",
-            "--shared",
-            "-o", trg, src,
-            "--gpu-architecture=sm_89",
-             "--compiler-options",
-             "-fPIC", 
-            "-I/usr/local/cuda/include",
-             "-L/usr/local/cuda/lib",
-             "-lcudart",
-             "-lcuda"
-        };
-
-        const result = std.ChildProcess.run(.{
-            .allocator = b.allocator, .argv = libgen_utils_argv
-        }) catch |e| {
-            std.log.err("Error: {}", .{e});
-            @panic("Failed to create libdev_utils.so");
-        };
-
-        if (result.stderr.len != 0) {
-            std.log.err("Error: {s}", .{result.stderr});
-            @panic("Failed to create libdev_utils.so");
-        }
-    }
+    if (FileGen.isModified(src, trg))
+        ScriptCompiler.compileSingleFile(b.allocator, src, trg);
 
     gen.generate(); // try to create kernels
 
@@ -144,7 +103,7 @@ pub fn build(b: *std.Build) void {
     // Similar to creating the run step earlier, this exposes a `test` step to
     // the `zig build --help` menu, providing a way for the user to request
     // running the unit tests.
-    const test_step = b.step("test", "Run unit tests");
+    const test_step = b.step("test-zig", "Run unit tests");
     test_step.dependOn(&run_lib_unit_tests.step);
     test_step.dependOn(&run_exe_unit_tests.step);
 }

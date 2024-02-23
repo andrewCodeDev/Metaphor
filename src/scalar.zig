@@ -119,6 +119,12 @@ pub fn DeduceComplex(comptime ctype: type, comptime rtype: type) type {
 }
 
 pub fn ScalarResult(comptime T: type, comptime U: type) type {
+
+    if (@typeInfo(T) == .Struct) {
+        if (comptime @hasDecl(T, "DataType") and @hasDecl(U, "DataType")) {
+            return ScalarResult(T.DataType, U.DataType);
+        }
+    }    
     if (comptime !(isScalar(T) and isScalar(U))) {
         @compileError("Scalar arithmetic requires scalar types.");
     }

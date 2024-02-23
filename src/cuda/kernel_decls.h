@@ -1,6 +1,6 @@
 /* GENERATED FILE */
 
-#include "tensor_types.h"
+#include "kernel_header.h"
 
 #if defined(__cplusplus)
     #define EXTERN_C extern "C"
@@ -130,6 +130,30 @@ EXTERN_C void launch_leaky_relu_r64(
         r64* b, 
         r64 coef,
   len_t N
+);
+EXTERN_C void launch_transpose_2D_r16(
+    Stream stream,
+    const r16* src,
+          r16* dst,
+    r16 dst_coef,
+    len_t row,
+    len_t col
+);
+EXTERN_C void launch_transpose_2D_r32(
+    Stream stream,
+    const r32* src,
+          r32* dst,
+    r32 dst_coef,
+    len_t row,
+    len_t col
+);
+EXTERN_C void launch_transpose_2D_r64(
+    Stream stream,
+    const r64* src,
+          r64* dst,
+    r64 dst_coef,
+    len_t row,
+    len_t col
 );
 EXTERN_C void launch_fill_r16(
   Stream stream,
@@ -285,6 +309,27 @@ EXTERN_C void launch_addition_reverse_c64(
   Stream stream,
   c64* a, 
   const c64* b, 
+  len_t N
+);
+EXTERN_C void launch_sequence_r16(
+  Stream stream,
+  r16* dev_a,
+  r16 init,
+  r16 step,
+  len_t N
+);
+EXTERN_C void launch_sequence_r32(
+  Stream stream,
+  r32* dev_a,
+  r32 init,
+  r32 step,
+  len_t N
+);
+EXTERN_C void launch_sequence_r64(
+  Stream stream,
+  r64* dev_a,
+  r64 init,
+  r64 step,
   len_t N
 );
 EXTERN_C void launch_subtraction_reverse_r16(

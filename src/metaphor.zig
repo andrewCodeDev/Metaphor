@@ -7,6 +7,7 @@ const SC = @import("scalar.zig");
 const TC = @import("tensor_components.zig");
 const CG = @import("graph.zig");
 const DU = @import("device_utils.zig");
+const Parser = @import("expression_parsing.zig");
 
 const Contract = UT.Contract;
 const Returns = UT.Returns;
@@ -41,6 +42,9 @@ pub const mem = struct {
     pub const alloc = DU.alloc;
     pub const create = DU.create;
     pub const free = DU.free;
+    pub const fill = CG.fill;
+    pub const sequence = TenOps.sequence;
+
 };
 
 pub const types = struct {
@@ -70,10 +74,11 @@ pub fn Dims(comptime Rank: usize) type {
 
 pub const ops = struct {
 
-    pub const fill = CG.fill;
-
-    inline fn elementwiseDispatch(comptime Impl: type, X: anytype, Y: anytype)
-        NodeTensor(SC.ScalarResult(@TypeOf(X).DataType, @TypeOf(Y).DataType)) {
+    inline fn elementwiseDispatch(
+        comptime Impl: type, 
+        X: anytype, 
+        Y: anytype
+    ) NodeTensor(SC.ScalarResult(@TypeOf(X), @TypeOf(Y))) {
         assert(std.mem.eql(types.SizeType, X.sizes(), Y.sizes()));
         const graph = X.ptr;
         const DataType = SC.ScalarResult(@TypeOf(X).DataType, @TypeOf(Y).DataType);
@@ -83,8 +88,7 @@ pub const ops = struct {
         return graph.appendNode(Impl, .{ graph.stream, X, Y }, Z);
     }
 
-    inline fn activationDispatch(comptime Impl: type, X: anytype)
-        NodeTensor(@TypeOf(X).DataType) {
+    inline fn activationDispatch(comptime Impl: type,  X: anytype) NodeTensor(Child(@TypeOf(X))) {
         const graph = X.ptr;
         const Y = graph.nodeTensor(X.sizes(), @TypeOf(X).DataType);        
         const callback = Impl{ };  // instance for comptime fields
@@ -92,48 +96,102 @@ pub const ops = struct {
         return graph.appendNode(Impl, .{ graph.stream, X }, Y);
     }
 
-    pub fn add(X: anytype, Y: anytype) Contract(
-            isGraphTensor(@TypeOf(X)) and
-            isGraphTensor(@TypeOf(Y)),
-        NodeTensor(SC.ScalarResult(@TypeOf(X).DataType, @TypeOf(Y).DataType))) {
-            return @call(.always_inline, elementwiseDispatch, .{ TenOps.AddImpl, X, Y});
-        }
+// <>--------------------------------------------------------<>
+
+    pub fn add(X: anytype, Y: anytype) NodeTensor(SC.ScalarResult(@TypeOf(X), @TypeOf(Y))) {
+
+        if (comptime !isGraphTensor(@TypeOf(X)) or !isGraphTensor(@TypeOf(Y)))
+            @compileError("Addition requires graph tensor.");
+
+        return @call(.always_inline, elementwiseDispatch, .{ TenOps.AddImpl, X, Y});
+    }
     
-    pub fn hadamard(X: anytype, Y: anytype) Contract(
-            isGraphTensor(@TypeOf(X)) and
-            isGraphTensor(@TypeOf(Y)),
-        NodeTensor(SC.ScalarResult(@TypeOf(X).DataType, @TypeOf(Y).DataType))) {
-            return @call(.always_inline, elementwiseDispatch, .{ TenOps.HadamardImpl, X, Y});
-        }
+// <>--------------------------------------------------------<>
+
+    pub fn hadamard(X: anytype, Y: anytype) NodeTensor(SC.ScalarResult(@TypeOf(X), @TypeOf(Y))) {
+
+        if (comptime !isGraphTensor(@TypeOf(X)) or !isGraphTensor(@TypeOf(Y)))
+            @compileError("Hadamard requires graph tensor.");
+
+        return @call(.always_inline, elementwiseDispatch, .{ TenOps.HadamardImpl, X, Y});
+    }
     
-    pub fn subtract(X: anytype, Y: anytype) Contract(
-            isGraphTensor(@TypeOf(X)) and
-            isGraphTensor(@TypeOf(Y)),
-        NodeTensor(SC.ScalarResult(@TypeOf(X).DataType, @TypeOf(Y).DataType))) {
-            return @call(.always_inline, elementwiseDispatch, .{ TenOps.SubImpl, X, Y});    
-        }
+// <>--------------------------------------------------------<>
+
+    pub fn subtract(X: anytype,  Y: anytype) NodeTensor(SC.ScalarResult(@TypeOf(X), @TypeOf(Y))) {
+
+        if (comptime !isGraphTensor(@TypeOf(X)) or !isGraphTensor(@TypeOf(Y)))
+            @compileError("Subtract requires graph tensor.");
+
+        return @call(.always_inline, elementwiseDispatch, .{ TenOps.SubImpl, X, Y});    
+    }
     
-    pub fn leakyRelu(X: anytype, coef: anytype) Contract(
-            isGraphTensor(@TypeOf(X)) and SC.isFloat(@TypeOf(coef)), 
-        Returns(@TypeOf(X))) {
-        assert((0.0 <= coef) and (coef < 1.0));
+// <>--------------------------------------------------------<>
+
+    pub fn leakyRelu(X: anytype, coef: f16) NodeTensor(Child(@TypeOf(X))) {
+
+        if (comptime !isGraphTensor(@TypeOf(X)))
+            @compileError("Leaky Relu requires graph tensor.");
+
         const graph = X.ptr;
+
+        assert((0.0 <= coef) and (coef < 1.0));
+
         const Y = graph.nodeTensor(X.sizes(), @TypeOf(X).DataType);        
+
         TenOps.leakyReluForward(graph.stream, X, coef, Y);
+
         return graph.appendNode(TenOps.LeakyReluImpl, .{ graph.stream, X, coef }, Y);        
     }
 
-    pub fn relu(X: anytype) Contract(
-            isGraphTensor(@TypeOf(X)), 
-        Returns(@TypeOf(X))) {
-            return @call(.always_inline, leakyRelu, .{ X, 0.0 });
-        }    
+// <>--------------------------------------------------------<>
 
-    pub fn tanh(X: anytype) Contract(
-            isGraphTensor(@TypeOf(X)), 
-        Returns(@TypeOf(X))) {
-            return @call(.always_inline, activationDispatch, .{ TenOps.TanhImpl, X, 0.0 });
-        }    
+    pub fn relu(X: anytype) NodeTensor(Child(@TypeOf(X))) {
+
+        if (comptime !isGraphTensor(@TypeOf(X)))
+            @compileError("Relu requires graph tensor.");
+
+        return @call(.always_inline, leakyRelu, .{ X, 0.0 });
+    }    
+
+// <>--------------------------------------------------------<>
+
+    pub fn tanh(X: anytype) NodeTensor(Child(@TypeOf(X))) {
+
+        if (comptime !isGraphTensor(@TypeOf(X)))
+            @compileError("Tanh requires graph tensor.");
+
+        return @call(.always_inline, activationDispatch, .{ TenOps.TanhImpl, X, 0.0 });
+    }    
+
+// <>--------------------------------------------------------<>
+
+    pub fn permutate(X: anytype, comptime expression: []const u8) NodeTensor(Child(@TypeOf(X))) {
+
+        if (comptime !isGraphTensor(@TypeOf(X)))
+            @compileError("Permutate requires graph tensor.");
+        
+        const graph = X.ptr;
+
+        // tells us which size index to map from x to y
+        const map = comptime Parser.permutateSizes(expression);
+
+        std.debug.assert(X.sizes().len == map.len);
+
+        var y_sizes: [map.len]types.SizeType = undefined;        
+
+        for (X.sizes(), 0..) |elem, i| {
+            y_sizes[map.perm[i]] = elem;
+        }
+    
+        const Y = graph.nodeTensor(y_sizes[0..], UT.Child(@TypeOf(X)));
+        
+        TenOps.permutate(graph.stream, X, Y, expression);
+
+        return graph.appendNode(
+            TenOps.PermutateCallback(expression), .{ graph.stream, X }, Y
+        );
+    }
 };
 
 

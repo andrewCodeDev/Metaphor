@@ -66,7 +66,7 @@ fn fillSlice(
     DU.synchronizeStream(stream);    
 }
 
-pub fn fill( X: anytype, value: anytype) Contract(
+pub fn fill(X: anytype, value: anytype) Contract(
     isGraphTensor(@TypeOf(X)), Returns(void)
 ){
     const T = Child(@TypeOf(X));
@@ -78,7 +78,7 @@ pub const TensorClass = enum {
   inp, wgt, hid, 
 };
 
-pub fn LeafTensor(comptime data_type: type, comptime class: TensorClass) type {
+pub fn LeafTensor(comptime T: type, comptime class: TensorClass) type {
 
     if (comptime class == .hid) {
         @compileError("Cannot instantiate a leaf with class type of hidden.");
@@ -86,7 +86,7 @@ pub fn LeafTensor(comptime data_type: type, comptime class: TensorClass) type {
     
     return struct {
         const Self = @This();
-        pub const DataType = data_type;
+        pub const DataType = T;
         pub const Class = class;
 
         ptr: *Graph,
@@ -128,10 +128,13 @@ pub fn LeafTensor(comptime data_type: type, comptime class: TensorClass) type {
     };
 }
 
-pub fn NodeTensor(comptime data_type: type) type {
+pub fn NodeTensor(comptime T: type) type {
     return struct {
         const Self = @This();
-        pub const DataType = data_type;
+
+        pub const DataType = switch (@typeInfo(T)) {
+            .Struct => T.DataType, else => T
+        };
         pub const Class = TensorClass.hid;
 
         ptr: *Graph,
@@ -549,6 +552,10 @@ pub const Graph = struct {
         return array.items[idx];
     }
 
+    // TODO: 
+    //    I don't like that this function is public
+    //    but it's used by the tensor ops to make
+    //    nodes on the graph for a given op.
     pub fn appendNode(
         self: *Self, 
         comptime FuncObj: type,
@@ -557,8 +564,6 @@ pub const Graph = struct {
     ) @TypeOf(out) {
         const closure = Closure.init(FuncObj, args ++ .{ out }) 
             catch @panic("Out of Memory");
-
-        //DU.synchronizeStream(self.stream);
         
         UT.append(&self.nodes.callbacks, closure);
 

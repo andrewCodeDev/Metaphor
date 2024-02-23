@@ -10,18 +10,7 @@ const CallbackBuilder = CB.CallbackBuilder;
 const NoCleanup = CB.NoCleanup;
 const overloads = @import("kernel_overloads.zig");
 const Stream = @import("cimport.zig").C.Stream;
-
-//pub const InnerProductPlan = @import("expression_parsing.zig").InnerProductPlan;
-pub const contractionParse = @import("expression_parsing.zig").contractionParse;
-pub const innerProductParse = @import("expression_parsing.zig").innerProductParse;
-pub const outerProductParse = @import("expression_parsing.zig").outerProductParse;
-//pub const compUT.TensorIndex = @import("Tensor.zig").compUT.TensorIndex;
-
-// TODO: 
-//  add extra parameter for device - how to do that? Stream? Maybe.
-//  add same parameter to realArithmetic and complexArithmetic.
-//  write 'add' cuda kernel for dispatch - needs multiple types.
-//  write cuda allocator... caching_allocator with cuda backing?
+const Parser = @import("expression_parsing.zig");
 
 // <>--------------------------------------------------------<>
 
@@ -205,3 +194,106 @@ pub const TanhImpl = CallbackBuilder(
     }, NoCleanup
 );
 
+// <>--------------------------------------------------------<>
+
+pub fn sequence(
+    tensor: anytype, 
+    init: anytype,
+    step: anytype
+) void {
+    const T = UT.Child(@TypeOf(tensor));
+    const _init = SC.asScalar(T, init);
+    const _step = SC.asScalar(T, step);
+    const values = tensor.values();
+
+    overloads.kernel_sequence.call(.{
+       tensor.ptr.stream, values.ptr, _init, _step, values.len 
+    });
+}
+
+// <>--------------------------------------------------------<>
+
+inline fn transpose2D(
+    stream: Stream, 
+    x: anytype, 
+    y: anytype,
+) void {
+    const T = UT.Child(@TypeOf(x));
+    const x_values = x.values();
+    const y_values = y.values();
+    const x_sizes = x.sizes();
+    overloads.kernel_transpose_2D.call(.{
+       stream, x_values.ptr, y_values.ptr, SC.asScalar(T, 0.0), x_sizes[0], x_sizes[1] 
+    });
+}
+
+inline fn transpose2DReverse(
+    stream: Stream, 
+    x: anytype, 
+    y: anytype,
+) void {
+    const T = UT.Child(@TypeOf(x));
+    const x_grads = x.grads().?;
+    const y_grads = y.grads().?;
+    const y_sizes = y.sizes();
+    overloads.kernel_transpose_2D.call(.{
+       stream, y_grads.ptr, x_grads.ptr, SC.asScalar(T, 1.0), y_sizes[0], y_sizes[1] 
+    });
+}
+
+pub fn permutate(
+    stream: Stream, 
+    x: anytype, 
+    y: anytype,    
+    comptime expression: []const u8
+) void {
+    const permutation = comptime Parser.permutation(expression);
+
+    switch (permutation) {
+        .@"ij->ji" => transpose2D(stream, x, y),
+        // try to never reach this branch
+        // this is the unoptimized kernel
+        .unknown => {
+            @compileError("TODO: Declare General Permutation Kernel.");            
+        }
+    }
+}
+
+pub fn permutateReverse(
+    stream: Stream, 
+    x: anytype, 
+    y: anytype,    
+    comptime expression: []const u8
+) void {
+    const permutation = comptime Parser.permutation(expression);
+
+    switch (permutation) {
+        .@"ij->ji" => transpose2DReverse(stream, x, y),
+        // try to never reach this branch
+        // this is the unoptimized kernel
+        .unknown => {
+            @compileError("TODO: Declare General Permutation Kernel.");            
+        }
+    }
+}
+
+// reversing a permutation means applying it again to itself
+pub fn PermutateCallback(comptime expression: []const u8) type {
+    return struct {
+        reverse: struct {
+            
+            callback: fn (Stream, anytype, anytype) void = struct {
+                // bind expression to reversal for undoing permutation
+                // this function will be called because i
+                pub fn call(stream: Stream, x: anytype, y: anytype) void {
+                    permutateReverse(stream, x, y, expression);
+                }
+            }.call,
+
+            edge_index: comptime_int = 1,
+
+        } = .{ },
+    };
+}
+
+// <>--------------------------------------------------------<>

@@ -17,6 +17,8 @@ typedef struct {
 #define CTensor CTensor32
 #define WARP_SIZE 32
 
+#define DIMPAD(M, N) ((M + (N - 1)) / N)
+
 #if defined(__cplusplus)
 ////////////////////////////////
 // NVCC COMPILER STUFF /////////

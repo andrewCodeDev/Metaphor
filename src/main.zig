@@ -1,7 +1,14 @@
 const mp = @import("metaphor.zig");
 const std = @import("std");
+const ops = @import("tensor_ops.zig");
+const Parser = @import("expression_parsing.zig");
 
-pub fn copyAndPrint(name: []const u8, src: anytype, dst: anytype, stream: anytype) void {
+pub fn copyAndPrintFlat(
+    name: []const u8,
+    src: anytype,
+    dst: anytype,
+    stream: anytype
+) void {
     
     mp.mem.copyFromDevice(src, dst, stream);
 
@@ -10,17 +17,34 @@ pub fn copyAndPrint(name: []const u8, src: anytype, dst: anytype, stream: anytyp
     std.debug.print("\n{s}: {any}\n" , .{ name, dst });
 }
 
+pub fn copyAndPrintMatrix(
+    name: []const u8, 
+    src: anytype, 
+    dst: anytype, 
+    row: usize,
+    col: usize,
+    stream: anytype
+) void {    
+    std.debug.assert(src.len == dst.len);
+    std.debug.assert(src.len == row * col);
+    
+    mp.mem.copyFromDevice(src, dst, stream);
+
+    mp.stream.synchronize(stream);
+
+    std.debug.print("\nName: {s}:\n", .{ name });
+
+    var start: usize = 0;
+    for (0..row) |_| {
+        std.debug.print("{any}\n", .{ dst[start..start + col]});
+        start += col;
+    }
+}
+
 pub fn main() !void {
 
-    // To start Metaphor, you must initialize the
-    // device for the GPU device you want to use
-
-    // Initialize device and cuda context on device zero
     mp.device.init(0);
 
-    // Open the stream you want to compute on.
-    // Streams can be run in parallel to launch
-    // multiple kernels simultaneous.
     const stream = mp.stream.init();
         defer mp.stream.deinit(stream);
 
@@ -34,31 +58,28 @@ pub fn main() !void {
 
     defer G.deinit();
 
-    const out = try std.heap.c_allocator.alloc(mp.types.r32, 4);
-        defer std.heap.c_allocator.free(out);
+    ///////////////////////////////////////////////////
 
-    /////////////////////////////////////////////////
-
-    const X1 = G.tensor("X1", .wgt, .r32, mp.Dims(2){ 2, 2 });  
+    const X1 = G.tensor("X1", .wgt, .r32, mp.Dims(2){ 10, 10 });  
         defer X1.free();
-    
-    const X2 = G.tensor("X2", .wgt, .r32, mp.Dims(2){ 2, 2 });
+
+    const X2 = G.tensor("X1", .wgt, .r32, mp.Dims(2){ 10, 10 });  
         defer X2.free();
+    
+    mp.mem.sequence(X1, 0.0, 1.0);
+    mp.mem.sequence(X2, 0.0, 1.0);
 
-    mp.ops.fill(X1, 2);
-    mp.ops.fill(X2, 1);
+    ///////////////////////////////////////////////////
 
-    for (0..1) |_| {
+    const Z1 = mp.ops.hadamard(X1, X1);
 
-        const Z1 = mp.ops.hadamard(X1, X2);
-        const Z2 = mp.ops.hadamard(X1, X1);
-        const Z3 = mp.ops.add(Z1, Z2);
+    const XT = mp.ops.permutate(X1, "ij->ji");
 
-        Z3.reverse();
-        
-        copyAndPrint("X1", X1.grads().?, out, stream);
-        copyAndPrint("Z2", X2.grads().?, out, stream);
-    }
+    const Z2 = mp.ops.hadamard(X1, XT);
 
+    const Z3 = mp.ops.add(Z1, Z2);
+
+    Z3.reverse();
+            
     ////////////////////////////////////////////
 }

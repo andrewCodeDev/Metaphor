@@ -74,7 +74,7 @@ const EXTERN_C: []const u8 = "extern \"C\"";
 const EXTERN_HEADER_MACRO = 
     \\/* GENERATED FILE */
     \\
-    \\#include "tensor_types.h"
+    \\#include "kernel_header.h"
     \\
     \\#if defined(__cplusplus)
     \\    #define EXTERN_C extern "C"

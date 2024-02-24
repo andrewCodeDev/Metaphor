@@ -18,11 +18,11 @@ __global__ void __kernel_leaky_relu_RScalar(
 }
 
 extern "C" void launch_leaky_relu_RScalar(
-  Stream stream,
+  StreamCtx stream,
   const RScalar* a,
         RScalar* b, 
         RScalar coef,
   len_t N
 ) {
-  __kernel_leaky_relu_RScalar<<<GRID_1D(N), dim3(32), 0, getStream(stream)>>>(a, b, coef, N);
+  __kernel_leaky_relu_RScalar<<<GRID_1D(N), dim3(32), 0, getCtx(stream)>>>(a, b, coef, N);
 }

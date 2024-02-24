@@ -7,15 +7,15 @@
 // CUstream before using it to
 // launch cuda kernels
 typedef struct {
-    void* ptr;
-} Stream;
+  void* ptr;
+} StreamCtx;
 
 // generator types
 #define RScalar float
 #define CScalar c32
 #define RTensor RTensor32
 #define CTensor CTensor32
-#define WARP_SIZE 32
+const len_t WARP_SIZE = 32;
 
 #define DIMPAD(M, N) ((M + (N - 1)) / N)
 
@@ -30,8 +30,8 @@ typedef struct {
 
 #if defined(__CUDACC__)
 
-  inline CUstream getStream(Stream stream) {
-    return static_cast<CUstream>(stream.ptr);
+  inline CUstream getCtx(StreamCtx context) {
+    return static_cast<CUstream>(context.ptr);
   }
 
   namespace cg = cooperative_groups;

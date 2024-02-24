@@ -14,13 +14,13 @@ __global__ void __kernel_hadamard_RScalar(
 }
 
 extern "C" void launch_hadamard_RScalar(
-  Stream stream,
+  StreamCtx stream,
   const RScalar* a,
   const RScalar* b, 
   RScalar* c, 
   len_t N
 ) {
-  __kernel_hadamard_RScalar<<<GRID_1D(N), dim3(32), 0, getStream(stream)>>>(a, b, c, N);
+  __kernel_hadamard_RScalar<<<GRID_1D(N), dim3(32), 0, getCtx(stream)>>>(a, b, c, N);
 }
 
 __global__ void __kernel_hadamard_CScalar(
@@ -38,12 +38,12 @@ __global__ void __kernel_hadamard_CScalar(
 }
 
 extern "C" void launch_hadamard_CScalar(
-  Stream stream,
+  StreamCtx stream,
   const CScalar* a,
   const CScalar* b, 
   CScalar* c, 
   len_t N
 ) {
-  __kernel_hadamard_CScalar<<<GRID_1D(N), dim3(32), 0, getStream(stream)>>>(a, b, c, N);
+  __kernel_hadamard_CScalar<<<GRID_1D(N), dim3(32), 0, getCtx(stream)>>>(a, b, c, N);
 }
 

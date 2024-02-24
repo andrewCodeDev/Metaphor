@@ -8,6 +8,53 @@
 
 // parser utility functions. These functions are intended
 // to be executed at comptime.
+pub fn symmetricDifference(
+    comptime lhs: []const u8,
+    comptime rhs: []const u8,
+) []const u8 {
+    const tot_len: usize = lhs.len + rhs.len;
+
+    // inspired by LucasSantos91:
+    //    https://ziggit.dev/t/algorithm-translation-challenge-1-symmetric-difference/2572/2
+    
+    // buffer to contain the results
+    comptime var out_buf: [tot_len]u8 = .{ '0' } ** tot_len;
+    // slices to resize and advance
+    comptime var tmp_lhs = lhs;
+    comptime var tmp_rhs = rhs;
+    // final output length
+    comptime var out_len: usize = tot_len;
+    comptime var i: usize = 0;
+
+    while (true) {
+        if (tmp_lhs.len == 0) {
+            @memcpy(out_buf[i..out_len], tmp_rhs);
+            break;
+        }
+        if (tmp_rhs.len == 0) {
+            @memcpy(out_buf[i..out_len], tmp_lhs);
+            break;
+        }
+        switch (std.math.order(tmp_lhs[0], tmp_rhs[0])) {
+            .lt => {
+                out_buf[i] = tmp_lhs[0];
+                tmp_lhs = tmp_lhs[1..];
+                i += 1;
+            },
+            .gt => {
+                out_buf[i] = tmp_rhs[0];
+                tmp_rhs = tmp_rhs[1..];
+                i += 1;
+            },
+            .eq => {
+                tmp_lhs = tmp_lhs[1..];
+                tmp_rhs = tmp_rhs[1..];
+                out_len -= 2;
+            },
+        }
+    }
+    return out_buf[0..out_len];
+}
 
 const std = @import("std");
 
@@ -139,20 +186,25 @@ pub fn findCommaOp(str: []const u8) usize {
 // this function disambiguates index characters
 pub fn translateIndices(comptime string: []const u8) []const u8 {
     comptime var min: u8 = std.math.maxInt(u8);
-    for (string) |char| {
-        if (comptime !isAlphaLower(char)) {
-            @compileError("Only lower case alpha characters permitted for indices.");
-        }
-        min = @min(char, min);
+    for (string) |c| {
+
+        if (comptime !isAlphaLower(c))
+            continue;
+
+        min = @min(c, min);
     }
     comptime var buffer: [string.len]u8 = undefined;
 
-    if (min < 'i') {
-        const dif = 'i' - min;
-        for (string, 0..) |char, i| { buffer[i] = char + dif;  }
-    } else {
-        const dif = min - 'i';
-        for (string, 0..) |char, i| { buffer[i] = char - dif;  }
+    @memcpy(buffer[0..], string);
+
+    const dif = if (min < 'i') 'i' - min else min - 'i';    
+
+    for (string, 0..) |c, i| { 
+
+        if (comptime !isAlphaLower(c))
+            continue;
+        
+        buffer[i] = if (min < 'i') c + dif else c - dif;  
     }
     return buffer[0..];
 }
@@ -172,7 +224,7 @@ const permutation_map = std.ComptimeStringMap(
     }
 );
 
-// Contraction parsing is expects strings of the form:
+// Permutation parsing expects strings of the form:
 //
 //     example: ijk->jik
 //
@@ -182,9 +234,10 @@ const permutation_map = std.ComptimeStringMap(
 
 pub fn permutation(comptime str: []const u8) Permutation {
 
-    const arrow = comptime findArrowOp(str);
-    const lhs = comptime translateIndices(str[0..arrow.tail]);
-    const rhs = comptime translateIndices(str[arrow.head + 1 ..]);
+    const trn = comptime translateIndices(str);
+    const arrow = comptime findArrowOp(trn);
+    const lhs = comptime translateIndices(trn[0..arrow.tail]);
+    const rhs = comptime translateIndices(trn[arrow.head + 1 ..]);
 
     if (!comptime isPermutation(lhs, rhs)) {
         @compileError("Permutate requires left and right operands to be permutations of eachother." ++ str);
@@ -196,10 +249,14 @@ pub fn permutation(comptime str: []const u8) Permutation {
 
 pub fn permutateSizes(comptime str: []const u8) struct { perm: []const usize, len: usize }{
 
-    const arrow = comptime findArrowOp(str);
-    const lhs = comptime translateIndices(str[0..arrow.tail]);
-    const rhs = comptime translateIndices(str[arrow.head + 1 ..]);
+    const trn = comptime translateIndices(str);
+    const arrow = comptime findArrowOp(trn);
+    const lhs = comptime translateIndices(trn[0..arrow.tail]);
+    const rhs = comptime translateIndices(trn[arrow.head + 1 ..]);
 
+    if (!allAlphaLower(lhs) or !allAlphaLower(rhs)) {
+        @compileError("Tensor indices must be lower case characters: " ++ str);
+    }
     if (!comptime isPermutation(lhs, rhs)) {
         @compileError("Permutate requires left and right operands to be permutations of eachother." ++ str);
     }
@@ -214,5 +271,90 @@ pub fn permutateSizes(comptime str: []const u8) struct { perm: []const usize, le
     return .{
         .perm = indices[0..],
         .len = lhs.len
+    };
+}
+
+////////////////////////////////////////////
+///////// INNER PRODUCT ////////////////////
+
+// optimized permutation patterns
+
+const InnerProduct = enum {
+    unknown, @"ij,jk->ik",
+};
+
+const inner_product_map = std.ComptimeStringMap(
+    InnerProduct, .{
+        .{ @tagName(InnerProduct.@"ij,jk->ik"), InnerProduct.@"ij,jk->ik" }
+    }
+);
+
+// Contraction parsing expects strings of the form:
+//
+//     example: ijk->jik
+//
+// The left and right operands must be alpha-characters.
+// Both sides of the arrow operand must be permutations of eachother.
+//
+
+pub fn innerProduct(comptime str: []const u8) InnerProduct {
+
+    const trn = comptime translateIndices(str);
+    const arrow = comptime findArrowOp(trn);
+    const comma = comptime findCommaOp(trn);
+    const lhs = trn[0..comma];
+    const rhs = trn[comma + 1..arrow.tail];
+    const out = trn[arrow.head + 1..];
+
+    if (!allAlphaLower(lhs) or !allAlphaLower(rhs) or !allAlphaLower(out)) {
+        @compileError("Tensor indices must be lower case characters: " ++ str);
+    }
+
+    const sym_dif = comptime symmetricDifference(lhs, rhs);
+
+    if (!comptime isPermutation(sym_dif, out)) {
+        @compileError("Invalid inner product expression: " ++ str);
+    }
+
+    return comptime inner_product_map.get(lhs ++ "," ++ rhs ++ "->" ++ out)
+        orelse inner_product_map.unknown;
+}
+
+
+pub fn innerProductSizes(comptime str: []const u8) struct { 
+    x_map: []const ?usize, 
+    y_map: []const ?usize, 
+    len: usize 
+}{
+    const trn = translateIndices(str);
+    const arrow = comptime findArrowOp(trn);
+    const comma = comptime findCommaOp(trn);
+    const lhs = comptime trn[0..comma];
+    const rhs = comptime trn[comma + 1..arrow.tail];
+    const out = comptime trn[arrow.head + 1..];
+
+    // TODO: add checks for inner product
+
+    comptime var x_map: [lhs.len]?usize = .{ null } ** lhs.len;
+    comptime var y_map: [rhs.len]?usize = .{ null } ** rhs.len;
+
+    // left hand side indices
+    for (lhs, 0..) |l, i| {
+        for (out, 0..) |o, j| {
+            if (l == o) x_map[i] = j;
+        }
+    }
+
+    // right hand side indices
+    for (rhs, 0..) |r, i| {
+        for (out, 0..) |o, j| {
+            if (r == o) y_map[i] = j;
+        }
+    }
+
+    return .{
+        .x_map = x_map[0..],
+        .y_map = y_map[0..],
+        .len = out.len
     };
 }

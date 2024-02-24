@@ -18,14 +18,14 @@ __global__ void __kernel_leaky_relu_reverse_RScalar(
 }
 
 extern "C" void launch_relu_leaky_reverse_RScalar(
-  Stream stream,
+  StreamCtx stream,
   const RScalar *a_value,
         RScalar *a_grads,
   const RScalar *b_grads,
         RScalar coef,
   len_t N
 ) {
-  __kernel_leaky_relu_reverse_RScalar<<<GRID_1D(N), dim3(32), 0, getStream(stream)>>>(
+  __kernel_leaky_relu_reverse_RScalar<<<GRID_1D(N), dim3(32), 0, getCtx(stream)>>>(
     a_value, a_grads, b_grads, coef, N
   );
 }

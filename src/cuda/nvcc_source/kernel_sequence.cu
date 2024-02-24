@@ -16,13 +16,13 @@ __global__ void __kernel_sequence_RScalar(
 }
 
 extern "C" void launch_sequence_RScalar(
-  Stream stream,
+  StreamCtx stream,
   RScalar* dev_a,
   RScalar init,
   RScalar step,
   len_t N
 ) {
-  __kernel_sequence_RScalar<<<GRID_1D(N), dim3(1024), 0, getStream(stream)>>>(
+  __kernel_sequence_RScalar<<<GRID_1D(N), dim3(1024), 0, getCtx(stream)>>>(
     dev_a, init, step, N
   );
 }

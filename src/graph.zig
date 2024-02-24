@@ -61,7 +61,7 @@ fn fillSlice(
     stream: Stream,
 ) void {
     kernel_fill.call(.{
-        stream, x_slice.ptr, value, x_slice.len
+        stream.context, x_slice.ptr, value, x_slice.len
     });
     DU.synchronizeStream(stream);    
 }

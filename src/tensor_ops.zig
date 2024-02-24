@@ -1,16 +1,18 @@
 
 const std = @import("std");
 const math = std.math;
-const Child = std.meta.Child;
-const SizeType = usize;
 const SC = @import("scalar.zig");
 const UT = @import("utility.zig");
 const CB = @import("callback_builder.zig");
+const TC = @import("tensor_components.zig");
+const DU = @import("device_utils.zig");
+const Child = UT.Child;
+
 const CallbackBuilder = CB.CallbackBuilder;
 const NoCleanup = CB.NoCleanup;
 const overloads = @import("kernel_overloads.zig");
-const Stream = @import("cimport.zig").C.Stream;
 const Parser = @import("expression_parsing.zig");
+const Stream = DU.Stream;
 
 // <>--------------------------------------------------------<>
 
@@ -20,7 +22,7 @@ pub fn additionForward(stream: Stream, x: anytype, y: anytype, z: anytype) void 
     const z_values = z.values();
 
     overloads.kernel_addition.call(.{
-        stream, x_values.ptr, y_values.ptr, z_values.ptr, z_values.len
+        stream.context, x_values.ptr, y_values.ptr, z_values.ptr, z_values.len
     });
 }
 
@@ -29,7 +31,7 @@ pub fn additionReverseArg1(stream: Stream, X: anytype, _: anytype, Z: anytype) v
     const z_grads = UT.assertGrads(Z);
 
     overloads.kernel_addition_reverse.call(.{
-        stream, x_grads.ptr, z_grads.ptr, z_grads.len
+        stream.context, x_grads.ptr, z_grads.ptr, z_grads.len
     });
 }
 
@@ -38,7 +40,7 @@ pub fn additionReverseArg2(stream: Stream, _: anytype, Y: anytype, Z: anytype) v
     const z_grads = UT.assertGrads(Z);
 
     overloads.kernel_addition_reverse.call(.{
-        stream, y_grads.ptr, z_grads.ptr, z_grads.len
+        stream.context, y_grads.ptr, z_grads.ptr, z_grads.len
     });
 }
 
@@ -57,7 +59,7 @@ pub fn subtractionForward(stream: Stream, x: anytype, y: anytype, z: anytype) vo
     const z_values = z.values();
 
     overloads.kernel_subtraction.call(.{
-        stream, x_values.ptr, y_values.ptr, z_values.ptr, z_values.len
+        stream.context, x_values.ptr, y_values.ptr, z_values.ptr, z_values.len
     });
 }
 
@@ -69,7 +71,7 @@ pub fn subtractionReverseArg1(stream: Stream, X: anytype, _: anytype, Z: anytype
     const coef = SC.asScalar(SC.DemoteComplex(Child(z_grads)), 1.0);
     
     overloads.kernel_subtraction_reverse.call(.{
-        stream, x_grads.ptr, z_grads.ptr, coef, z_grads.len
+        stream.context, x_grads.ptr, z_grads.ptr, coef, z_grads.len
     });
 }
 
@@ -81,7 +83,7 @@ pub fn subtractionReverseArg2(stream: Stream, _: anytype, Y: anytype, Z: anytype
     const coef = SC.asScalar(SC.DemoteComplex(Child(z_grads)), -1.0);
 
     overloads.kernel_subtraction_reverse.call(.{
-        stream, y_grads.ptr, z_grads.ptr, coef, z_grads.len
+        stream.context, y_grads.ptr, z_grads.ptr, coef, z_grads.len
     });
 }
 
@@ -100,7 +102,7 @@ pub fn hadamardForward(stream: Stream, x: anytype, y: anytype, z: anytype) void 
     const z_values = z.values();
 
     overloads.kernel_hadamard.call(.{
-        stream, x_values.ptr, y_values.ptr, z_values.ptr, z_values.len
+        stream.context, x_values.ptr, y_values.ptr, z_values.ptr, z_values.len
     });
 }
 
@@ -110,7 +112,7 @@ pub fn hadamardReverseArg1(stream: Stream, X: anytype, Y: anytype, Z: anytype) v
     const z_grads = UT.assertGrads(Z);
 
     overloads.kernel_hadamard_reverse.call(.{
-        stream, x_grads.ptr, y_value.ptr, z_grads.ptr, z_grads.len
+        stream.context, x_grads.ptr, y_value.ptr, z_grads.ptr, z_grads.len
     });
 }
 
@@ -120,7 +122,7 @@ pub fn hadamardReverseArg2(stream: Stream, X: anytype, Y: anytype, Z: anytype) v
     const z_grads = UT.assertGrads(Z);
 
     overloads.kernel_hadamard_reverse.call(.{
-        stream, y_grads.ptr, x_value.ptr, z_grads.ptr, z_grads.len
+        stream.context, y_grads.ptr, x_value.ptr, z_grads.ptr, z_grads.len
     });
 }
 
@@ -139,7 +141,7 @@ pub fn leakyReluForward(stream: Stream, x: anytype, coef: anytype, y: anytype) v
     const y_values = y.values();
 
     overloads.kernel_leaky_relu.call(.{
-        stream,
+        stream.context,
         x_values.ptr, 
         y_values.ptr, 
         SC.asScalar(T, coef), 
@@ -153,7 +155,7 @@ pub fn leakyReluReverse(stream: Stream, x: anytype, coef: anytype, y: anytype) v
     const y_values = y.values();
 
     overloads.kernel_leaky_relu_reverse.call(.{
-        stream,
+        stream.context,
         x_values.ptr, 
         y_values.ptr, 
         SC.asScalar(T, coef), 
@@ -174,7 +176,7 @@ pub fn tanhForward(stream: Stream, x: anytype, y: anytype) void {
     const y_values = y.values();
 
     overloads.kernel_tanh.call(.{
-        stream, x_values.ptr,  y_values.ptr,  y_values.len
+        stream.context, x_values.ptr,  y_values.ptr,  y_values.len
     });
 }
 
@@ -184,7 +186,7 @@ pub fn tanhReverse(stream: Stream, x: anytype, y: anytype) void {
     const y_grads = UT.assertGrads(y);
 
     overloads.kernel_tanh_reverse.call(.{
-        stream, x_grads.ptr, y_values.ptr, y_grads.ptr, y_values.len
+        stream.context, x_grads.ptr, y_values.ptr, y_grads.ptr, y_values.len
     });
 }
 
@@ -207,13 +209,13 @@ pub fn sequence(
     const values = tensor.values();
 
     overloads.kernel_sequence.call(.{
-       tensor.ptr.stream, values.ptr, _init, _step, values.len 
+       tensor.ptr.stream.context, values.ptr, _init, _step, values.len 
     });
 }
 
 // <>--------------------------------------------------------<>
 
-inline fn transpose2D(
+pub inline fn transpose2D(
     stream: Stream, 
     x: anytype, 
     y: anytype,
@@ -223,11 +225,11 @@ inline fn transpose2D(
     const y_values = y.values();
     const x_sizes = x.sizes();
     overloads.kernel_transpose_2D.call(.{
-       stream, x_values.ptr, y_values.ptr, SC.asScalar(T, 0.0), x_sizes[0], x_sizes[1] 
+       stream.context, x_values.ptr, y_values.ptr, SC.asScalar(T, 0.0), x_sizes[0], x_sizes[1] 
     });
 }
 
-inline fn transpose2DReverse(
+pub inline fn transpose2DReverse(
     stream: Stream, 
     x: anytype, 
     y: anytype,
@@ -237,7 +239,7 @@ inline fn transpose2DReverse(
     const y_grads = y.grads().?;
     const y_sizes = y.sizes();
     overloads.kernel_transpose_2D.call(.{
-       stream, y_grads.ptr, x_grads.ptr, SC.asScalar(T, 1.0), y_sizes[0], y_sizes[1] 
+       stream.context, y_grads.ptr, x_grads.ptr, SC.asScalar(T, 1.0), y_sizes[0], y_sizes[1] 
     });
 }
 
@@ -286,7 +288,7 @@ pub fn PermutateCallback(comptime expression: []const u8) type {
                 // bind expression to reversal for undoing permutation
                 // this function will be called because i
                 pub fn call(stream: Stream, x: anytype, y: anytype) void {
-                    permutateReverse(stream, x, y, expression);
+                    permutateReverse(stream.context, x, y, expression);
                 }
             }.call,
 
@@ -296,4 +298,206 @@ pub fn PermutateCallback(comptime expression: []const u8) type {
     };
 }
 
+// <>--------------------------------------------------------<>
+
+inline fn __matmul2D(
+    stream: Stream,
+    x_values: anytype,
+    y_values: anytype,
+    alpha: f16,
+    z_values: anytype,
+    beta: f16,
+    m: TC.SizeType,
+    n: TC.SizeType,
+    k: TC.SizeType,
+) void {
+    const T = UT.Child(@TypeOf(z_values));
+    
+    overloads.kernel_matmul_2D.call(.{
+        stream.context, 
+        x_values.ptr, 
+        y_values.ptr, 
+        SC.asScalar(T, alpha),
+        z_values.ptr,
+        SC.asScalar(T, beta), 
+        m, n, k
+    });
+}
+
+pub inline fn matmul2D(
+    stream: Stream, 
+    x: anytype, 
+    y: anytype,
+    z: anytype,
+) void {
+    const x_sizes = x.sizes();
+    const y_sizes = y.sizes();
+
+    std.debug.assert(x_sizes.len == 2);
+    std.debug.assert(y_sizes.len == 2);
+    std.debug.assert(x_sizes[1] == y_sizes[0]);
+
+    std.debug.print("\nx: {any}\n", .{ x_sizes });
+    std.debug.print("\ny: {any}\n", .{ y_sizes });
+    
+    __matmul2D(
+        stream,
+        x.values(),
+        y.values(),
+        1.0, // alpha
+        z.values(),
+        0.0, //beta
+        x_sizes[0],
+        x_sizes[1],
+        y_sizes[1],
+    );
+}
+
+inline fn matmul2DReverseArg1(
+    stream: Stream, 
+    x: anytype, 
+    y: anytype,
+    z: anytype,
+) void {
+    const T = Child(@TypeOf(x));
+    const x_grads = x.grads().?;
+    const y_values = y.values();
+    const z_grads = z.grads().?;
+    const z_sizes = z.sizes();
+    const y_sizes = y.sizes();
+
+    const y_tran = stream.getScratch(T, y_values.len);
+
+    overloads.kernel_transpose_2D.call(.{
+        stream.context, 
+        y_values.ptr, 
+        y_tran.ptr, 
+        SC.asScalar(T, 0.0), 
+        y_sizes[0], 
+        y_sizes[1] 
+    });
+
+    __matmul2D(
+        stream, 
+        z_grads,
+        y_tran,
+        1.0, // alpha
+        x_grads,
+        1.0, // beta
+        z_sizes[0],
+        z_sizes[1],
+        y_sizes[0],
+    );
+}
+
+pub fn copyAndPrintMatrix(
+    name: []const u8, 
+    src: anytype, 
+    dst: anytype, 
+    row: usize,
+    col: usize,
+    stream: anytype
+) void {    
+    std.debug.assert(src.len == dst.len);
+    std.debug.assert(src.len == row * col);
+    
+    DU.copyFromDevice(src, dst, stream);
+    DU.synchronizeStream(stream);
+
+    std.debug.print("\nName: {s}:\n", .{ name });
+
+    var start: usize = 0;
+    for (0..row) |_| {
+        std.debug.print("{any}\n", .{ dst[start..start + col]});
+        start += col;
+    }
+}
+
+inline fn matmul2DReverseArg2(
+    stream: Stream, 
+    x: anytype, 
+    y: anytype,
+    z: anytype,
+) void {
+    const T = Child(@TypeOf(x));
+
+    const x_values = x.values();
+    const y_grads = y.grads().?;
+    const z_grads = z.grads().?;
+
+    const z_sizes = z.sizes();
+    const x_sizes = x.sizes();
+
+    const x_tran = stream.getScratch(T, x_values.len);
+
+    overloads.kernel_transpose_2D.call(.{
+        stream.context, 
+        x_values.ptr, 
+        x_tran.ptr, 
+        SC.asScalar(T, 0.0), 
+        x_sizes[0], 
+        x_sizes[1] 
+    });
+
+    const mem_1 = std.heap.c_allocator.alloc(f32, x_sizes[0] * x_sizes[1]) catch unreachable;
+        defer std.heap.c_allocator.free(mem_1);
+
+    copyAndPrintMatrix("X_T", x_tran, mem_1, x_sizes[1], x_sizes[0], stream);
+
+    __matmul2D(
+        stream, 
+        x_tran,
+        z_grads,
+        1.0, // alpha
+        y_grads,
+        1.0, // beta
+        x_sizes[1],
+        x_sizes[0],
+        z_sizes[1],
+    );
+}
+
+const MatMul2DImpl = CallbackBuilder(
+    matmul2D, .{
+        .{ matmul2DReverseArg1, 1 },
+        .{ matmul2DReverseArg2, 2 },
+    }, NoCleanup,
+);
+
+pub fn innerProduct(
+    stream: Stream, 
+    x: anytype, 
+    y: anytype,
+    z: anytype,    
+    comptime expression: []const u8
+) void {
+    const inner_product = comptime Parser.innerProduct(expression);
+
+    switch (inner_product) {
+        .@"ij,jk->ik" => matmul2D(stream, x, y, z),
+        // try to never reach this branch
+        // this is the unoptimized kernel
+        .unknown => {
+            @compileError("TODO: Declare General Permutation Kernel.");            
+        }
+    }
+}
+
+pub fn innerProductReverse(
+    // this is different than permutate
+    // because we have separate reversals
+    // for each argument in the call
+    comptime expression: []const u8
+) type {
+    const inner_product = comptime Parser.innerProduct(expression);
+
+    return switch (inner_product) {
+        .@"ij,jk->ik" => MatMul2DImpl,
+        // try to never reach this branch
+        // this is the unoptimized kernel
+        .unknown => {
+            @compileError("TODO: Declare General Permutation Kernel.");            
+        }
+    };
+}
 // <>--------------------------------------------------------<>

@@ -364,6 +364,8 @@ fn makeKernelOverloads(self: *Self) !void {
 
         const content = self.fileToString(path);
 
+        const return_type: []const u8 = "void ";
+
         overloadset_args = "";
 
         var start: usize = 0;
@@ -371,15 +373,17 @@ fn makeKernelOverloads(self: *Self) !void {
 
         while (true) {
 
-            start = std.mem.indexOfPos(u8, content, last, "launch_")
+            start = std.mem.indexOfPos(u8, content, last, "void launch_")
                 orelse break;
 
-             last = std.mem.indexOfPos(u8, content, start, "(")
-                 orelse @panic("Incomplete declaration.");
+            start += return_type.len;
 
-             overloadset_args = try std.mem.join(
-                 self.allocator, "", &.{ overloadset_args, "\tdecls.", content[start..last], ",\n" }
-             );                
+            last = std.mem.indexOfPos(u8, content, start, "(")
+                orelse @panic("Incomplete declaration.");
+
+            overloadset_args = try std.mem.join(
+                self.allocator, "", &.{ overloadset_args, "\tdecls.", content[start..last], ",\n" }
+            );                
         }
 
         const name_stop = std.mem.indexOfScalar(u8, name, '.')

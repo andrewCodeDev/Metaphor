@@ -13,10 +13,10 @@ __global__ void __kernel_tanh_RScalar(
 }
 
 extern "C" void launch_tanh_RScalar(
-  Stream stream,
+  StreamCtx stream,
   const RScalar* a,
         RScalar* b, 
   len_t N
 ) {
-  __kernel_tanh_RScalar<<<GRID_1D(N), dim3(32), 0, getStream(stream)>>>(a, b, N);
+  __kernel_tanh_RScalar<<<GRID_1D(N), dim3(1024), 0, getCtx(stream)>>>(a, b, N);
 }

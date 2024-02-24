@@ -41,6 +41,10 @@ pub fn copyAndPrintMatrix(
     }
 }
 
+
+
+
+
 pub fn main() !void {
 
     mp.device.init(0);
@@ -58,28 +62,50 @@ pub fn main() !void {
 
     defer G.deinit();
 
-    ///////////////////////////////////////////////////
+    const row_x: usize = 3;
+    const col_x: usize = 4;
+    const row_y: usize = 4;
+    const col_y: usize = 2;
 
-    const X1 = G.tensor("X1", .wgt, .r32, mp.Dims(2){ 10, 10 });  
+    const mem_1 = try std.heap.c_allocator.alloc(mp.types.r32, row_x * col_x);
+        defer std.heap.c_allocator.free(mem_1);
+
+    const mem_2 = try std.heap.c_allocator.alloc(mp.types.r32, row_y * col_y);
+        defer std.heap.c_allocator.free(mem_2);
+
+    const mem_3 = try std.heap.c_allocator.alloc(mp.types.r32, row_x * col_y);
+        defer std.heap.c_allocator.free(mem_3);
+
+    /////////////////////////////////////////////////////
+
+    const X1 = G.tensor("X1", .wgt, .r32, mp.Dims(2){ row_x, col_x });  
         defer X1.free();
 
-    const X2 = G.tensor("X1", .wgt, .r32, mp.Dims(2){ 10, 10 });  
+    const X2 = G.tensor("X2", .wgt, .r32, mp.Dims(2){ row_y, col_y });  
         defer X2.free();
     
-    mp.mem.sequence(X1, 0.0, 1.0);
-    mp.mem.sequence(X2, 0.0, 1.0);
+    mp.mem.sequence(X1, 0.0,  1.0);
+    mp.mem.sequence(X2, 0.0,  1.0);
 
-    ///////////////////////////////////////////////////
+    /////////////////////////////////////////////////////
 
-    const Z1 = mp.ops.hadamard(X1, X1);
+    //const Z1 = mp.ops.hadamard(X1, X1);
+    //const XT = mp.ops.permutate(X1, "ij->ji");
+    //const Z2 = mp.ops.hadamard(X1, XT);
+    //const Z3 = mp.ops.add(Z1, Z2);
 
-    const XT = mp.ops.permutate(X1, "ij->ji");
+    const Z1 = mp.ops.innerProduct(X1, X2, "ij,jk->ik");
 
-    const Z2 = mp.ops.hadamard(X1, XT);
+    //_ = &Z1;
 
-    const Z3 = mp.ops.add(Z1, Z2);
+    copyAndPrintMatrix("X1", X1.values(), mem_1, row_x, col_x, stream);
+    copyAndPrintMatrix("X2", X2.values(), mem_2, row_y, col_y, stream);
+    copyAndPrintMatrix("Z1", Z1.values(), mem_3, row_x, col_y, stream);
 
-    Z3.reverse();
+    Z1.reverse();
+
+    copyAndPrintMatrix("dX1", X1.grads().?, mem_1, row_x, col_x, stream);
+    copyAndPrintMatrix("dX2", X2.grads().?, mem_2, row_y, col_y, stream);
             
     ////////////////////////////////////////////
 }

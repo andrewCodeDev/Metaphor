@@ -192,8 +192,44 @@ pub const ops = struct {
             TenOps.PermutateCallback(expression), .{ graph.stream, X }, Y
         );
     }
-};
 
+// <>--------------------------------------------------------<>
+
+    pub fn innerProduct(
+        X: anytype,
+        Y: anytype,
+        comptime expression: []const u8
+    ) NodeTensor(Child(@TypeOf(X))) {
+
+        if (comptime !isGraphTensor(@TypeOf(X)) and !isGraphTensor(@TypeOf(Y)))
+            @compileError("innerProduct requires graph tensors.");
+        
+        const graph = X.ptr;
+
+        // tells us which size index to map from x to y
+        const maps = comptime Parser.innerProductSizes(expression);
+
+        std.debug.assert(X.sizes().len == maps.x_map.len);
+        std.debug.assert(Y.sizes().len == maps.y_map.len);
+
+        var z_sizes: [maps.len]types.SizeType = undefined;
+
+        for (X.sizes(), 0..) |elem, i| {
+            if (maps.x_map[i]) |idx| { z_sizes[idx] = elem; }
+        }
+        for (Y.sizes(), 0..) |elem, i| {
+            if (maps.y_map[i]) |idx| { z_sizes[idx] = elem; }
+        }
+    
+        const Z = graph.nodeTensor(z_sizes[0..], UT.Child(@TypeOf(X)));
+        
+        TenOps.innerProduct(graph.stream, X, Y, Z, expression);
+
+        return graph.appendNode(
+            TenOps.innerProductReverse(expression), .{ graph.stream, X, Y }, Z
+        );
+    }
+};
 
  /////////////////////////////////////////////
 /////////////////////////////////////////////

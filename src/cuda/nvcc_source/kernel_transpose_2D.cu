@@ -41,7 +41,7 @@ __global__ void __kernel_transpose_2D_RScalar(
 }
 
 extern "C" void launch_transpose_2D_RScalar(
-    Stream stream,
+    StreamCtx stream,
     const RScalar* src,
           RScalar* dst,
     RScalar dst_coef,
@@ -57,7 +57,7 @@ extern "C" void launch_transpose_2D_RScalar(
         WARP_SIZE, BLOCK_ROWS 
     );
 
-    __kernel_transpose_2D_RScalar<<<grid_block, tile_block>>>(
+    __kernel_transpose_2D_RScalar<<<grid_block, tile_block, 0, getCtx(stream)>>>(
         src, dst, dst_coef, row, col
     );
 }

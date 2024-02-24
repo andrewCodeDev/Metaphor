@@ -81,6 +81,12 @@ pub const kernel_addition_reverse = OverloadSet(.{
 	decls.launch_addition_reverse_c64,
 });
 
+pub const kernel_matmul_2D = OverloadSet(.{
+	decls.launch_matmul_2D_r16,
+	decls.launch_matmul_2D_r32,
+	decls.launch_matmul_2D_r64,
+});
+
 pub const kernel_sequence = OverloadSet(.{
 	decls.launch_sequence_r16,
 	decls.launch_sequence_r32,

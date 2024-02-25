@@ -337,9 +337,6 @@ pub inline fn matmul2D(
     std.debug.assert(y_sizes.len == 2);
     std.debug.assert(x_sizes[1] == y_sizes[0]);
 
-    std.debug.print("\nx: {any}\n", .{ x_sizes });
-    std.debug.print("\ny: {any}\n", .{ y_sizes });
-    
     __matmul2D(
         stream,
         x.values(),
@@ -390,29 +387,6 @@ inline fn matmul2DReverseArg1(
     );
 }
 
-pub fn copyAndPrintMatrix(
-    name: []const u8, 
-    src: anytype, 
-    dst: anytype, 
-    row: usize,
-    col: usize,
-    stream: anytype
-) void {    
-    std.debug.assert(src.len == dst.len);
-    std.debug.assert(src.len == row * col);
-    
-    DU.copyFromDevice(src, dst, stream);
-    DU.synchronizeStream(stream);
-
-    std.debug.print("\nName: {s}:\n", .{ name });
-
-    var start: usize = 0;
-    for (0..row) |_| {
-        std.debug.print("{any}\n", .{ dst[start..start + col]});
-        start += col;
-    }
-}
-
 inline fn matmul2DReverseArg2(
     stream: Stream, 
     x: anytype, 
@@ -438,11 +412,6 @@ inline fn matmul2DReverseArg2(
         x_sizes[0], 
         x_sizes[1] 
     });
-
-    const mem_1 = std.heap.c_allocator.alloc(f32, x_sizes[0] * x_sizes[1]) catch unreachable;
-        defer std.heap.c_allocator.free(mem_1);
-
-    copyAndPrintMatrix("X_T", x_tran, mem_1, x_sizes[1], x_sizes[0], stream);
 
     __matmul2D(
         stream, 
@@ -478,7 +447,7 @@ pub fn innerProduct(
         // try to never reach this branch
         // this is the unoptimized kernel
         .unknown => {
-            @compileError("TODO: Declare General Permutation Kernel.");            
+            @compileError("TODO: Declare General Inner Product Kernel.");            
         }
     }
 }
@@ -496,7 +465,7 @@ pub fn innerProductReverse(
         // try to never reach this branch
         // this is the unoptimized kernel
         .unknown => {
-            @compileError("TODO: Declare General Permutation Kernel.");            
+            @compileError("TODO: Declare General Inner Product Kernel.");            
         }
     };
 }

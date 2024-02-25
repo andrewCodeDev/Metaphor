@@ -14,8 +14,26 @@ pub fn copyAndPrintFlat(
 
     mp.stream.synchronize(stream);
 
-    std.debug.print("\n{s}: {any}\n" , .{ name, dst });
+    std.debug.print("\n{s}: {any} " , .{ name, dst });
 }
+pub fn cpu_print_matrix(
+    name: []const u8, 
+    dst: anytype, 
+    row: usize,
+    col: usize,
+) void {    
+    std.debug.assert(dst.len == row * col);
+    
+    std.debug.print("\nName: {s}:\n", .{ name });
+
+    for (0..row) |i| {
+        for (0..col) |j| {
+            std.debug.print("{d:.1} ", .{ dst[i * col + j]});
+        }
+        std.debug.print("\n", .{});
+    }
+}
+
 
 pub fn copyAndPrintMatrix(
     name: []const u8, 
@@ -34,16 +52,64 @@ pub fn copyAndPrintMatrix(
 
     std.debug.print("\nName: {s}:\n", .{ name });
 
-    var start: usize = 0;
-    for (0..row) |_| {
-        std.debug.print("{any}\n", .{ dst[start..start + col]});
-        start += col;
+    for (0..row) |i| {
+        for (0..col) |j| {
+            std.debug.print("{d:.1} ", .{ dst[i * col + j] });
+        }
+        std.debug.print("\n", .{});
     }
 }
 
 
+pub fn cpu_matmul_2D(
+    x: anytype,
+    y: @TypeOf(x),
+    z: @TypeOf(x),
+    M: usize,
+    N: usize,
+    K: usize
+) void {
+    std.debug.assert(x.len == M * N);
+    std.debug.assert(y.len == N * K);
+    std.debug.assert(z.len == M * K);
+
+    for (0..M) |m| {
+
+        for (0..K) |k| {
+
+            var tmp: f32 = 0;
+
+            for (0..N) |n| {
+                tmp += x[m * N + n] * y[n * K + k];
+            }
+            z[m * K + k] = tmp;
+        }
+    }
+}
 
 
+pub fn verify_restuls(
+    name: []const u8,
+    x: anytype,
+    y: @TypeOf(x),
+) void {
+    std.debug.assert(x.len == y.len);
+
+    // just check within a tenth
+
+    var good: bool = true;
+
+    for (x, y) |a, b| {
+        if (@abs(a - b) > 0.01) {
+            std.log.err("Verification FAILURE: {s}", .{name});
+            good = false;
+            break;
+        }
+    }
+    if (good) {    
+        std.log.info("Verification SUCCESS: {s}", .{name});
+    }
+}
 
 pub fn main() !void {
 
@@ -62,19 +128,23 @@ pub fn main() !void {
 
     defer G.deinit();
 
-    const row_x: usize = 3;
-    const col_x: usize = 4;
-    const row_y: usize = 4;
-    const col_y: usize = 2;
+    const row_x: usize = 128;
+    const col_x: usize = 64;
+    const row_y: usize = 64;
+    const col_y: usize = 200;
 
-    const mem_1 = try std.heap.c_allocator.alloc(mp.types.r32, row_x * col_x);
-        defer std.heap.c_allocator.free(mem_1);
+    // cpu side memory for verifying results
+    const x1 = try std.heap.c_allocator.alloc(mp.types.r32, row_x * col_x);
+        defer std.heap.c_allocator.free(x1);
 
-    const mem_2 = try std.heap.c_allocator.alloc(mp.types.r32, row_y * col_y);
-        defer std.heap.c_allocator.free(mem_2);
+    const x2 = try std.heap.c_allocator.alloc(mp.types.r32, row_y * col_y);
+        defer std.heap.c_allocator.free(x2);
 
-    const mem_3 = try std.heap.c_allocator.alloc(mp.types.r32, row_x * col_y);
-        defer std.heap.c_allocator.free(mem_3);
+    const z1 = try std.heap.c_allocator.alloc(mp.types.r32, row_x * col_y);
+        defer std.heap.c_allocator.free(z1);
+
+    const z1_verify = try std.heap.c_allocator.alloc(mp.types.r32, row_x * col_y);
+        defer std.heap.c_allocator.free(z1_verify);
 
     /////////////////////////////////////////////////////
 
@@ -84,28 +154,33 @@ pub fn main() !void {
     const X2 = G.tensor("X2", .wgt, .r32, mp.Dims(2){ row_y, col_y });  
         defer X2.free();
     
-    mp.mem.sequence(X1, 0.0,  1.0);
-    mp.mem.sequence(X2, 0.0,  1.0);
+    mp.mem.sequence(X1, 0.0, 0.01);
+    mp.mem.sequence(X2, 0.0, 0.01);
 
     /////////////////////////////////////////////////////
 
-    //const Z1 = mp.ops.hadamard(X1, X1);
-    //const XT = mp.ops.permutate(X1, "ij->ji");
-    //const Z2 = mp.ops.hadamard(X1, XT);
-    //const Z3 = mp.ops.add(Z1, Z2);
-
     const Z1 = mp.ops.innerProduct(X1, X2, "ij,jk->ik");
+
+    mp.mem.copyFromDevice(X1.values(), x1, stream);
+    mp.mem.copyFromDevice(X2.values(), x2, stream);
+    mp.mem.copyFromDevice(Z1.values(), z1, stream);
+
+    mp.stream.synchronize(stream);
+
+    cpu_matmul_2D(x1, x2, z1_verify, row_x, col_x, col_y);
+
+    verify_restuls("matmul2D", z1, z1_verify);
+
+    cpu_print_matrix("z1_verify", z1_verify, row_x, col_y);
 
     //_ = &Z1;
 
-    copyAndPrintMatrix("X1", X1.values(), mem_1, row_x, col_x, stream);
-    copyAndPrintMatrix("X2", X2.values(), mem_2, row_y, col_y, stream);
-    copyAndPrintMatrix("Z1", Z1.values(), mem_3, row_x, col_y, stream);
+    //copyAndPrintMatrix("X1", X1.values(), x1, row_x, col_x, stream);
+    //copyAndPrintMatrix("X2", X2.values(), x2, row_y, col_y, stream);
+    //copyAndPrintMatrix("Z1", Z1.values(), z1, row_x, col_y, stream);
 
-    Z1.reverse();
-
-    copyAndPrintMatrix("dX1", X1.grads().?, mem_1, row_x, col_x, stream);
-    copyAndPrintMatrix("dX2", X2.grads().?, mem_2, row_y, col_y, stream);
+    //copyAndPrintMatrix("dX1", X1.grads().?, x1, row_x, col_x, stream);
+    //copyAndPrintMatrix("dX2", X2.grads().?, x2, row_y, col_y, stream);
             
     ////////////////////////////////////////////
 }

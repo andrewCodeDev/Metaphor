@@ -2,6 +2,7 @@ const mp = @import("metaphor.zig");
 const std = @import("std");
 const ops = @import("tensor_ops.zig");
 const Parser = @import("expression_parsing.zig");
+const DU = @import("device_utils.zig");
 
 pub fn copyAndPrintFlat(
     name: []const u8,
@@ -34,6 +35,31 @@ pub fn cpu_print_matrix(
     }
 }
 
+
+
+    pub fn randomize(
+        x: anytype,
+        stream: DU.Stream
+    ) void {
+        // testing function - should use cuda support in the future.
+        // perhaps thrust namespace functions?
+        
+        var backing = std.rand.DefaultPrng.init(42);
+    
+        var random = backing.random();
+        
+        const mem = std.heap.c_allocator.alloc(@TypeOf(x).DataType, x.len())
+            catch @panic("randomize out of memory");
+
+            defer std.heap.c_allocator.free(mem);
+    
+        for (0..x.len()) |i|
+            mem[i] = random.float(@TypeOf(x).DataType);
+    
+        DU.copyToDevice(mem, x.values(), stream);
+
+        DU.synchronizeStream(stream);
+    }
 
 pub fn copyAndPrintMatrix(
     name: []const u8, 
@@ -87,7 +113,6 @@ pub fn cpu_matmul_2D(
     }
 }
 
-
 pub fn verify_restuls(
     name: []const u8,
     x: anytype,
@@ -95,12 +120,10 @@ pub fn verify_restuls(
 ) void {
     std.debug.assert(x.len == y.len);
 
-    // just check within a tenth
-
     var good: bool = true;
 
     for (x, y) |a, b| {
-        if (@abs(a - b) > 0.01) {
+        if (@abs(a - b) > 0.0001) {
             std.log.err("Verification FAILURE: {s}", .{name});
             good = false;
             break;
@@ -129,8 +152,8 @@ pub fn main() !void {
     defer G.deinit();
 
     const row_x: usize = 128;
-    const col_x: usize = 64;
-    const row_y: usize = 64;
+    const col_x: usize = 72;
+    const row_y: usize = 72;
     const col_y: usize = 200;
 
     // cpu side memory for verifying results
@@ -154,8 +177,8 @@ pub fn main() !void {
     const X2 = G.tensor("X2", .wgt, .r32, mp.Dims(2){ row_y, col_y });  
         defer X2.free();
     
-    mp.mem.sequence(X1, 0.0, 0.01);
-    mp.mem.sequence(X2, 0.0, 0.01);
+    randomize(X1, stream);
+    randomize(X2, stream);
 
     /////////////////////////////////////////////////////
 
@@ -171,13 +194,13 @@ pub fn main() !void {
 
     verify_restuls("matmul2D", z1, z1_verify);
 
-    cpu_print_matrix("z1_verify", z1_verify, row_x, col_y);
+    //cpu_print_matrix("z1_verify", z1_verify, row_x, col_y);
+    //copyAndPrintMatrix("Z1", Z1.values(), z1, row_x, col_y, stream);
 
     //_ = &Z1;
 
     //copyAndPrintMatrix("X1", X1.values(), x1, row_x, col_x, stream);
     //copyAndPrintMatrix("X2", X2.values(), x2, row_y, col_y, stream);
-    //copyAndPrintMatrix("Z1", Z1.values(), z1, row_x, col_y, stream);
 
     //copyAndPrintMatrix("dX1", X1.grads().?, x1, row_x, col_x, stream);
     //copyAndPrintMatrix("dX2", X2.grads().?, x2, row_y, col_y, stream);

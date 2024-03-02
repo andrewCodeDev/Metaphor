@@ -108,7 +108,7 @@ pub fn copyToDevice(src: anytype, dst: @TypeOf(src), stream: Stream) void {
             const T = p.child;
             if (p.size == .Slice) {
                 std.debug.assert(src.len == dst.len);
-                cuda.mpMemcpyHtoD(dst.ptr, src.ptr, src.len * @sizeOf(T), stream);
+                cuda.mpMemcpyHtoD(dst.ptr, src.ptr, src.len * @sizeOf(T), stream.context);
             } else {
                 cuda.mpMemcpyHtoD(dst, src, @sizeOf(T), stream.context);
             }

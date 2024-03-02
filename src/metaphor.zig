@@ -44,7 +44,6 @@ pub const mem = struct {
     pub const free = DU.free;
     pub const fill = CG.fill;
     pub const sequence = TenOps.sequence;
-
 };
 
 pub const types = struct {

@@ -48,7 +48,6 @@ __global__ void __kernel_matmul_2D_RScalar(
     if ((m_pos < M) && (n_pos_A < N))
       tile_A[t_row][t_col] = A[t_col];
 
-
     if ((k_pos < K) && (n_pos_B < N))
       tile_B[t_row][t_col] = B[t_col];
 

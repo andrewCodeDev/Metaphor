@@ -26,6 +26,36 @@ EXTERN_C void launch_tanh_r64(
         r64* b, 
   len_t N
 );
+EXTERN_C void launch_inner_product_ij_j_r16(
+  StreamCtx stream,
+  const r16 *A, 
+  const r16 *x,
+        r16 alpha, // scales product
+        r16 *y,
+        r16 beta, // blends C back in
+  len_t M, 
+  len_t N
+);
+EXTERN_C void launch_inner_product_ij_j_r32(
+  StreamCtx stream,
+  const r32 *A, 
+  const r32 *x,
+        r32 alpha, // scales product
+        r32 *y,
+        r32 beta, // blends C back in
+  len_t M, 
+  len_t N
+);
+EXTERN_C void launch_inner_product_ij_j_r64(
+  StreamCtx stream,
+  const r64 *A, 
+  const r64 *x,
+        r64 alpha, // scales product
+        r64 *y,
+        r64 beta, // blends C back in
+  len_t M, 
+  len_t N
+);
 EXTERN_C void launch_hadamard_reverse_r16(
   StreamCtx stream,
   r16 *grads_a,
@@ -66,6 +96,36 @@ EXTERN_C void launch_hadamard_reverse_c64(
   c64 *grads_a,
   const c64 *value_b,
   const c64 *grads_c,
+  len_t N
+);
+EXTERN_C void launch_outer_product_i_j_r16(
+  StreamCtx stream,
+  const r16 *x,
+  const r16 *y, 
+        r16 alpha, // scales product
+        r16 *A,
+        r16 beta, // blends A back in
+  len_t M, 
+  len_t N
+);
+EXTERN_C void launch_outer_product_i_j_r32(
+  StreamCtx stream,
+  const r32 *x,
+  const r32 *y, 
+        r32 alpha, // scales product
+        r32 *A,
+        r32 beta, // blends A back in
+  len_t M, 
+  len_t N
+);
+EXTERN_C void launch_outer_product_i_j_r64(
+  StreamCtx stream,
+  const r64 *x,
+  const r64 *y, 
+        r64 alpha, // scales product
+        r64 *A,
+        r64 beta, // blends A back in
+  len_t M, 
   len_t N
 );
 EXTERN_C void launch_subtraction_r16(
@@ -273,6 +333,36 @@ EXTERN_C void launch_addition_c64(
   const c64* a,
   const c64* b, 
   c64* c, 
+  len_t N
+);
+EXTERN_C void launch_inner_product_i_ij_r16(
+  StreamCtx stream,
+  const r16 *x,
+  const r16 *A, 
+        r16 alpha, // scales product
+        r16 *y,
+        r16 beta, // blends y back in
+  len_t M, 
+  len_t N
+);
+EXTERN_C void launch_inner_product_i_ij_r32(
+  StreamCtx stream,
+  const r32 *x,
+  const r32 *A, 
+        r32 alpha, // scales product
+        r32 *y,
+        r32 beta, // blends y back in
+  len_t M, 
+  len_t N
+);
+EXTERN_C void launch_inner_product_i_ij_r64(
+  StreamCtx stream,
+  const r64 *x,
+  const r64 *A, 
+        r64 alpha, // scales product
+        r64 *y,
+        r64 beta, // blends y back in
+  len_t M, 
   len_t N
 );
 EXTERN_C void launch_addition_reverse_r16(

@@ -17,6 +17,7 @@ pub fn copyAndPrintFlat(
 
     std.debug.print("\n{s}: {any} " , .{ name, dst });
 }
+
 pub fn cpu_print_matrix(
     name: []const u8, 
     dst: anytype, 
@@ -35,31 +36,29 @@ pub fn cpu_print_matrix(
     }
 }
 
-
-
-    pub fn randomize(
-        x: anytype,
-        stream: DU.Stream
-    ) void {
-        // testing function - should use cuda support in the future.
-        // perhaps thrust namespace functions?
-        
-        var backing = std.rand.DefaultPrng.init(42);
+pub fn randomize(
+    x: anytype,
+    stream: DU.Stream
+) void {
+    // testing function - should use cuda support in the future.
+    // perhaps thrust namespace functions?
     
-        var random = backing.random();
-        
-        const mem = std.heap.c_allocator.alloc(@TypeOf(x).DataType, x.len())
-            catch @panic("randomize out of memory");
+    var backing = std.rand.DefaultPrng.init(42);
 
-            defer std.heap.c_allocator.free(mem);
+    var random = backing.random();
     
-        for (0..x.len()) |i|
-            mem[i] = random.float(@TypeOf(x).DataType);
-    
-        DU.copyToDevice(mem, x.values(), stream);
+    const mem = std.heap.c_allocator.alloc(@TypeOf(x).DataType, x.len())
+        catch @panic("randomize out of memory");
 
-        DU.synchronizeStream(stream);
-    }
+        defer std.heap.c_allocator.free(mem);
+
+    for (0..x.len()) |i|
+        mem[i] = random.float(@TypeOf(x).DataType);
+
+    DU.copyToDevice(mem, x.values(), stream);
+
+    DU.synchronizeStream(stream);
+}
 
 pub fn copyAndPrintMatrix(
     name: []const u8, 
@@ -151,38 +150,43 @@ pub fn main() !void {
 
     defer G.deinit();
 
-    const row_x: usize = 128;
-    const col_x: usize = 72;
-    const row_y: usize = 72;
-    const col_y: usize = 200;
+    const row_x: usize = 32;
+    const col_x: usize = 32;
 
     // cpu side memory for verifying results
-    const x1 = try std.heap.c_allocator.alloc(mp.types.r32, row_x * col_x);
+    const x1 = try std.heap.c_allocator.alloc(mp.types.r32, row_x);
         defer std.heap.c_allocator.free(x1);
 
-    const x2 = try std.heap.c_allocator.alloc(mp.types.r32, row_y * col_y);
+    const x2 = try std.heap.c_allocator.alloc(mp.types.r32, row_x * col_x);
         defer std.heap.c_allocator.free(x2);
 
-    const z1 = try std.heap.c_allocator.alloc(mp.types.r32, row_x * col_y);
+    const z1 = try std.heap.c_allocator.alloc(mp.types.r32, col_x);
         defer std.heap.c_allocator.free(z1);
 
-    const z1_verify = try std.heap.c_allocator.alloc(mp.types.r32, row_x * col_y);
+    const z1_verify = try std.heap.c_allocator.alloc(mp.types.r32, col_x);
         defer std.heap.c_allocator.free(z1_verify);
 
     /////////////////////////////////////////////////////
 
-    const X1 = G.tensor("X1", .wgt, .r32, mp.Dims(2){ row_x, col_x });  
+    const X1 = G.tensor("X1", .wgt, .r32, mp.Dims(1){ row_x });  
         defer X1.free();
 
-    const X2 = G.tensor("X2", .wgt, .r32, mp.Dims(2){ row_y, col_y });  
+    const X2 = G.tensor("X2", .wgt, .r32, mp.Dims(2){ row_x, col_x });  
         defer X2.free();
+
+    const Z1 = G.tensor("Z1", .wgt, .r32, mp.Dims(1){ col_x });  
+        defer Z1.free();
     
     randomize(X1, stream);
     randomize(X2, stream);
+    //mp.mem.sequence(X1, 0.0, 0.01);
+    //mp.mem.fill(X1, 1.0);
+    //mp.mem.sequence(X2, 0.0, 0.01);
+    //mp.mem.fill(X2, 1.0);
 
     /////////////////////////////////////////////////////
 
-    const Z1 = mp.ops.innerProduct(X1, X2, "ij,jk->ik");
+    ops.innerProduct_i_ij(stream, X1, X2, Z1);
 
     mp.mem.copyFromDevice(X1.values(), x1, stream);
     mp.mem.copyFromDevice(X2.values(), x2, stream);
@@ -190,13 +194,12 @@ pub fn main() !void {
 
     mp.stream.synchronize(stream);
 
-    cpu_matmul_2D(x1, x2, z1_verify, row_x, col_x, col_y);
+    //cpu_matmul_2D(x1, x2, z1_verify, 1, row_x, col_x);
+    //cpu_print_matrix("z1_verify", z1_verify, 1, col_x);
 
-    verify_restuls("matmul2D", z1, z1_verify);
+    copyAndPrintMatrix("Z1", Z1.values(), z1, 1, col_x, stream);
 
-    //cpu_print_matrix("z1_verify", z1_verify, row_x, col_y);
-    //copyAndPrintMatrix("Z1", Z1.values(), z1, row_x, col_y, stream);
-
+    //verify_restuls("i,ij->j", z1, z1_verify);
     //_ = &Z1;
 
     //copyAndPrintMatrix("X1", X1.values(), x1, row_x, col_x, stream);

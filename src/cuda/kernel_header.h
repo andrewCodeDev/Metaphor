@@ -15,7 +15,6 @@ typedef struct {
 #define CScalar c32
 #define RTensor RTensor32
 #define CTensor CTensor32
-const len_t WARP_SIZE = 32;
 
 #define DIMPAD(M, N) ((M + (N - 1)) / N)
 
@@ -37,12 +36,6 @@ const len_t WARP_SIZE = 32;
   namespace cg = cooperative_groups;
 #endif
 
-template<class T>
-__device__ T ctanh(T x) { 
-  auto a = rtanh(x.r);
-  auto b = rtan(x.i);
-  return cdiv(T{ .r = a, .i = b }, T{ .r = decltype(a){1.0}, .i = a * b });
-}
 
 #define CUDA_ASSERT(err) (HandleError( err, __FILE__, __LINE__ ))
 inline void HandleError(cudaError_t err, const char *file, int line)
@@ -72,10 +65,20 @@ inline void handleCUResultError(CUresult err, const char *file, int line)
 
 #define GRID_1D(N) (((N) / 32) + 1)
 
+#define DIVISIBLE_BY_FOUR(N) ((N & 3) == 0)
+
+///////////////////////////////////////////////////
 // TODO: Move this math stuff to a different header
 __device__ __inline__ r16 conjmul(c16 x) { return x.r * x.r + x.i * x.i; }
 __device__ __inline__ r32 conjmul(c32 x) { return x.r * x.r + x.i * x.i; }
 __device__ __inline__ r64 conjmul(c64 x) { return x.r * x.r + x.i * x.i; }
+
+template<class T>
+__device__ T ctanh(T x) { 
+  auto a = rtanh(x.r);
+  auto b = rtan(x.i);
+  return cdiv(T{ .r = a, .i = b }, T{ .r = decltype(a){1.0}, .i = a * b });
+}
 
 __device__ __inline__ r16 rtanh(r16 x) { return r16(std::tanh(static_cast<r32>(x))); }
 __device__ __inline__ r32 rtanh(r32 x) { return std::tanh(x); }

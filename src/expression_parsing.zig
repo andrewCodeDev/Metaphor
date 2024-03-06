@@ -280,11 +280,27 @@ pub fn permutateSizes(comptime str: []const u8) struct { perm: []const usize, le
 // optimized permutation patterns
 
 const InnerProduct = enum {
-    unknown, @"ij,jk->ik",
+    unknown, 
+
+    // vector to matrix
+    @"ij,j->i",
+    @"i,ij->j",
+
+    @"j,ij->i",
+    @"ij,i->j",
+
+    @"ij,jk->ik",
 };
 
 const inner_product_map = std.ComptimeStringMap(
     InnerProduct, .{
+
+        // vector to matrix
+        .{ @tagName(InnerProduct.@"ij,j->i"),   InnerProduct.@"ij,j->i"   },
+        .{ @tagName(InnerProduct.@"i,ij->j"),   InnerProduct.@"i,ij->j"   },
+        .{ @tagName(InnerProduct.@"j,ij->i"),   InnerProduct.@"j,ij->i"   },
+        .{ @tagName(InnerProduct.@"ij,i->j"),   InnerProduct.@"ij,i->j"   },
+
         .{ @tagName(InnerProduct.@"ij,jk->ik"), InnerProduct.@"ij,jk->ik" }
     }
 );

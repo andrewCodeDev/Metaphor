@@ -300,7 +300,200 @@ pub fn PermutateCallback(comptime expression: []const u8) type {
 
 // <>--------------------------------------------------------<>
 
-inline fn __matmul2D(
+//////////////////////////////
+// ---- matrix-to-vector -----
+
+
+inline fn __innerProduct_ij_j(
+    stream: Stream,
+    x_values: anytype,
+    y_values: anytype,
+    alpha: f16,
+    z_values: anytype,
+    beta: f16,
+    m: TC.SizeType,
+    n: TC.SizeType,
+) void {
+    const T = UT.Child(@TypeOf(z_values));
+    
+    overloads.kernel_inner_product_ij_j.call(.{
+        stream.context, 
+        x_values.ptr, 
+        y_values.ptr, 
+        SC.asScalar(T, alpha),
+        z_values.ptr,
+        SC.asScalar(T, beta), 
+        m, n
+    });
+}
+
+pub inline fn innerProduct_ij_j(
+    stream: Stream, 
+    x: anytype, 
+    y: anytype,
+    z: anytype,
+) void {
+
+    std.debug.assert(x.sizes().len == 2);
+    std.debug.assert(y.sizes().len == 1);
+    std.debug.assert(z.sizes().len == 1);
+
+    const x_sizes = x.sizes();
+
+    std.debug.assert(x_sizes[0] == z.len());
+    std.debug.assert(x_sizes[1] == y.len());
+
+    __innerProduct_ij_j(
+        stream,
+        x.values(),
+        y.values(),
+        1.0, // alpha
+        z.values(),
+        0.0, //beta
+        x_sizes[0],
+        x_sizes[1],
+    );
+}
+
+pub inline fn innerProduct_ij_j_ReveseArg1(
+    stream: Stream, 
+    x: anytype, 
+    y: anytype,
+    z: anytype,
+) void {
+
+    std.debug.assert(x.sizes().len == 2);
+    std.debug.assert(y.sizes().len == 1);
+    std.debug.assert(z.sizes().len == 1);
+
+    const x_sizes = x.sizes();
+
+    std.debug.assert(x_sizes[0] == z.len());
+    std.debug.assert(x_sizes[1] == y.len());
+
+    __outerProduct_i_j(
+        stream,
+        z.grads().?,
+        y.values(),
+        1.0, // alpha
+        x.grads(),
+        1.0, //beta
+        x_sizes[0],
+        x_sizes[1],
+    );
+}
+
+pub inline fn innerProduct_ij_j_ReveseArg2(
+    stream: Stream, 
+    x: anytype, 
+    y: anytype,
+    z: anytype,
+) void {
+
+    std.debug.assert(x.sizes().len == 2);
+    std.debug.assert(y.sizes().len == 1);
+    std.debug.assert(z.sizes().len == 1);
+
+    const x_sizes = x.sizes();
+
+    std.debug.assert(x_sizes[0] == z.len());
+    std.debug.assert(x_sizes[1] == y.len());
+
+    __innerProduct_i_ij(
+        stream,
+        z.grads().?,
+        x.values(),
+        1.0, // alpha
+        y.grads(),
+        0.0, //beta
+        x_sizes[0],
+        x_sizes[1],
+    );
+}
+
+inline fn __innerProduct_i_ij(
+    stream: Stream,
+    x_values: anytype,
+    y_values: anytype,
+    alpha: f16,
+    z_values: anytype,
+    beta: f16,
+    m: TC.SizeType,
+    n: TC.SizeType,
+) void {
+    const T = UT.Child(@TypeOf(z_values));
+    
+    overloads.kernel_inner_product_i_ij.call(.{
+        stream.context, 
+        x_values.ptr, 
+        y_values.ptr, 
+        SC.asScalar(T, alpha),
+        z_values.ptr,
+        SC.asScalar(T, beta), 
+        m, n
+    });
+}
+
+pub inline fn innerProduct_i_ij(
+    stream: Stream, 
+    x: anytype, 
+    y: anytype,
+    z: anytype,
+) void {
+
+    std.debug.assert(x.sizes().len == 1);
+    std.debug.assert(y.sizes().len == 2);
+    std.debug.assert(z.sizes().len == 1);
+
+    const y_sizes = y.sizes();
+
+    std.debug.assert(y_sizes[0] == x.len());
+    std.debug.assert(y_sizes[1] == z.len());
+
+    __innerProduct_ij_j(
+        stream,
+        y.values(),
+        z.grads().?,
+        1.0, // alpha
+        x.grads().?,
+        1.0, //beta
+        y_sizes[0],
+        y_sizes[1],
+    );
+}
+
+pub inline fn innerProduct_i_ij_ReveseArg2(
+    stream: Stream, 
+    x: anytype, 
+    y: anytype,
+    z: anytype,
+) void {
+
+    std.debug.assert(x.sizes().len == 2);
+    std.debug.assert(y.sizes().len == 1);
+    std.debug.assert(z.sizes().len == 1);
+
+    const x_sizes = x.sizes();
+
+    std.debug.assert(x_sizes[0] == z.len());
+    std.debug.assert(x_sizes[1] == y.len());
+
+    __innerProduct_i_ij(
+        stream,
+        z.grads().?,
+        x.values(),
+        1.0, // alpha
+        y.grads(),
+        0.0, //beta
+        x_sizes[0],
+        x_sizes[1],
+    );
+}
+
+//////////////////////////////
+// ---- matrix-to-matrix -----
+
+inline fn __innerProduct_ij_jk(
     stream: Stream,
     x_values: anytype,
     y_values: anytype,
@@ -324,7 +517,7 @@ inline fn __matmul2D(
     });
 }
 
-pub inline fn matmul2D(
+pub inline fn innerProduct_ij_jk(
     stream: Stream, 
     x: anytype, 
     y: anytype,
@@ -337,7 +530,7 @@ pub inline fn matmul2D(
     std.debug.assert(y_sizes.len == 2);
     std.debug.assert(x_sizes[1] == y_sizes[0]);
 
-    __matmul2D(
+    __innerProduct_ij_jk(
         stream,
         x.values(),
         y.values(),
@@ -350,7 +543,7 @@ pub inline fn matmul2D(
     );
 }
 
-inline fn matmul2DReverseArg1(
+inline fn innerProduct_ij_jk_ReverseArg1(
     stream: Stream, 
     x: anytype, 
     y: anytype,
@@ -374,7 +567,7 @@ inline fn matmul2DReverseArg1(
         y_sizes[1] 
     });
 
-    __matmul2D(
+    __innerProduct_ij_jk(
         stream, 
         z_grads,
         y_tran,
@@ -387,7 +580,7 @@ inline fn matmul2DReverseArg1(
     );
 }
 
-inline fn matmul2DReverseArg2(
+inline fn innerProduct_ij_jk_ReverseArg2(
     stream: Stream, 
     x: anytype, 
     y: anytype,
@@ -413,7 +606,7 @@ inline fn matmul2DReverseArg2(
         x_sizes[1] 
     });
 
-    __matmul2D(
+    __innerProduct_ij_jk(
         stream, 
         x_tran,
         z_grads,
@@ -427,9 +620,9 @@ inline fn matmul2DReverseArg2(
 }
 
 const MatMul2DImpl = CallbackBuilder(
-    matmul2D, .{
-        .{ matmul2DReverseArg1, 1 },
-        .{ matmul2DReverseArg2, 2 },
+    innerProduct_ij_jk, .{
+        .{ innerProduct_ij_jk_ReverseArg1, 1 },
+        .{ innerProduct_ij_jk_ReverseArg2, 2 },
     }, NoCleanup,
 );
 
@@ -443,11 +636,17 @@ pub fn innerProduct(
     const inner_product = comptime Parser.innerProduct(expression);
 
     switch (inner_product) {
-        .@"ij,jk->ik" => matmul2D(stream, x, y, z),
+        // vector to matrix
+        .@"ij,j->i" => innerProduct_ij_j(stream, x, y, z),
+        .@"j,ij->i" => innerProduct_ij_j(stream, y, x, z),
+        .@"i,ij->j" => innerProduct_i_ij(stream, x, y, z),
+        .@"ij,i->j" => innerProduct_i_ij(stream, y, x, z),
+        // matrix to matrix
+        .@"ij,jk->ik" => innerProduct_ij_jk(stream, x, y, z),
         // try to never reach this branch
         // this is the unoptimized kernel
-        .unknown => {
-            @compileError("TODO: Declare General Inner Product Kernel.");            
+        else => {
+            @compileError("TODO: Declare General Inner Product Kernel: " ++ @tagName(inner_product));            
         }
     }
 }
@@ -464,9 +663,59 @@ pub fn innerProductReverse(
         .@"ij,jk->ik" => MatMul2DImpl,
         // try to never reach this branch
         // this is the unoptimized kernel
-        .unknown => {
-            @compileError("TODO: Declare General Inner Product Kernel.");            
+        else => {
+            @compileError("TODO: Declare General Inner Product Kernel: " ++ @tagName(inner_product));            
         }
     };
 }
-// <>--------------------------------------------------------<>
+
+//////////////////////////////
+// outer product vector-vector
+
+inline fn __outerProduct_i_j(
+    stream: Stream,
+    x_values: anytype,
+    y_values: anytype,
+    alpha: f16,
+    z_values: anytype,
+    beta: f16,
+    m: TC.SizeType,
+    n: TC.SizeType,
+) void {
+    const T = UT.Child(@TypeOf(z_values));
+    
+    overloads.kernel_outer_product_i_j.call(.{
+        stream.context, 
+        x_values.ptr, 
+        y_values.ptr, 
+        SC.asScalar(T, alpha),
+        z_values.ptr,
+        SC.asScalar(T, beta), 
+        m, n
+    });
+}
+
+pub inline fn outerProduct_i_j(
+    stream: Stream, 
+    x: anytype, 
+    y: anytype,
+    z: anytype,
+) void {
+    const z_sizes = z.sizes();
+
+    std.debug.assert(x.sizes().len == 1);
+    std.debug.assert(y.sizes().len == 1);
+    std.debug.assert(z_sizes[0] == x.len());
+    std.debug.assert(z_sizes[1] == y.len());
+
+    __innerProduct_ij_jk(
+        stream,
+        x.values(),
+        y.values(),
+        1.0, // alpha
+        z.values(),
+        0.0, //beta
+        z_sizes[0],
+        z_sizes[1],
+    );
+}

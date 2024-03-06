@@ -3,8 +3,24 @@
 
 #define MAX_DIMS 8
 typedef unsigned long len_t;
+const len_t WARP_SIZE = 32;
 
-// This is to make the C tranlation happy
+// coalesced types for load optimization
+#if defined(__cplusplus)
+
+template <class T>
+struct coalesce {
+  using c_ptr = const coalesce<T>*;
+  using ptr = coalesce<T>*;
+  static constexpr len_t warp_step = WARP_SIZE / 4;
+  T w, x, y, z;
+};
+
+#else
+#endif
+
+// fundamental types
+
 // use the cuda definitions with device
 // defined member functions.
 #if defined(__cplusplus)
@@ -91,5 +107,6 @@ typedef struct {
 typedef struct {
   len_t order[MAX_DIMS];
 } Permutation;
+
 
 #endif

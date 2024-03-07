@@ -222,10 +222,13 @@ pub const ops = struct {
     
         const Z = graph.nodeTensor(z_sizes[0..], UT.Child(@TypeOf(X)));
         
-        TenOps.innerProduct(graph.stream, X, Y, Z, expression);
+        // locate inner product by expression
+        const ip = TenOps.findInnerProduct(expression){ };
+
+        ip.forward(graph.stream, X, Y, Z);
 
         return graph.appendNode(
-            TenOps.innerProductReverse(expression), .{ graph.stream, X, Y }, Z
+            @TypeOf(ip), .{ graph.stream, X, Y }, Z
         );
     }
 };

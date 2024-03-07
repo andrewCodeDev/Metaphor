@@ -157,13 +157,13 @@ pub fn main() !void {
     const x1 = try std.heap.c_allocator.alloc(mp.types.r32, row_x);
         defer std.heap.c_allocator.free(x1);
 
-    const x2 = try std.heap.c_allocator.alloc(mp.types.r32, row_x * col_x);
+    const x2 = try std.heap.c_allocator.alloc(mp.types.r32, col_x);
         defer std.heap.c_allocator.free(x2);
 
-    const z1 = try std.heap.c_allocator.alloc(mp.types.r32, col_x);
+    const z1 = try std.heap.c_allocator.alloc(mp.types.r32, row_x * col_x);
         defer std.heap.c_allocator.free(z1);
 
-    const z1_verify = try std.heap.c_allocator.alloc(mp.types.r32, col_x);
+    const z1_verify = try std.heap.c_allocator.alloc(mp.types.r32, row_x * col_x);
         defer std.heap.c_allocator.free(z1_verify);
 
     /////////////////////////////////////////////////////
@@ -171,33 +171,33 @@ pub fn main() !void {
     const X1 = G.tensor("X1", .wgt, .r32, mp.Dims(1){ row_x });  
         defer X1.free();
 
-    const X2 = G.tensor("X2", .wgt, .r32, mp.Dims(2){ row_x, col_x });  
+    const X2 = G.tensor("X2", .wgt, .r32, mp.Dims(1){ col_x });  
         defer X2.free();
 
-    const Z1 = G.tensor("Z1", .wgt, .r32, mp.Dims(1){ col_x });  
+    const Z1 = G.tensor("Z1", .wgt, .r32, mp.Dims(2){ row_x, col_x });  
         defer Z1.free();
     
-    randomize(X1, stream);
-    randomize(X2, stream);
-    //mp.mem.sequence(X1, 0.0, 0.01);
-    //mp.mem.fill(X1, 1.0);
-    //mp.mem.sequence(X2, 0.0, 0.01);
+    //randomize(X1, stream);
+    //randomize(X2, stream);
+    //mp.mem.sequence(X1, 0.0, 1.0);
+    mp.mem.fill(X1, 1.0);
+    mp.mem.sequence(X2, 0.0, 1.0);
     //mp.mem.fill(X2, 1.0);
 
     /////////////////////////////////////////////////////
 
-    ops.innerProduct_i_ij(stream, X1, X2, Z1);
+    ops.outerProduct_i_j(stream, X1, X2, Z1);
 
-    mp.mem.copyFromDevice(X1.values(), x1, stream);
-    mp.mem.copyFromDevice(X2.values(), x2, stream);
-    mp.mem.copyFromDevice(Z1.values(), z1, stream);
+    //mp.mem.copyFromDevice(X1.values(), x1, stream);
+    //mp.mem.copyFromDevice(X2.values(), x2, stream);
+    //mp.mem.copyFromDevice(Z1.values(), z1, stream);
 
     mp.stream.synchronize(stream);
 
     //cpu_matmul_2D(x1, x2, z1_verify, 1, row_x, col_x);
     //cpu_print_matrix("z1_verify", z1_verify, 1, col_x);
 
-    copyAndPrintMatrix("Z1", Z1.values(), z1, 1, col_x, stream);
+    copyAndPrintMatrix("Z1", Z1.values(), z1, row_x, col_x, stream);
 
     //verify_restuls("i,ij->j", z1, z1_verify);
     //_ = &Z1;

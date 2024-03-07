@@ -355,13 +355,13 @@ pub inline fn innerProduct_ij_j(
     );
 }
 
-pub inline fn innerProduct_ij_j_ReveseArg1(
+pub inline fn innerProduct_ij_j_ReverseArg1(
     stream: Stream, 
     x: anytype, 
     y: anytype,
     z: anytype,
 ) void {
-
+    // outer product i,j to get ij
     std.debug.assert(x.sizes().len == 2);
     std.debug.assert(y.sizes().len == 1);
     std.debug.assert(z.sizes().len == 1);
@@ -383,13 +383,13 @@ pub inline fn innerProduct_ij_j_ReveseArg1(
     );
 }
 
-pub inline fn innerProduct_ij_j_ReveseArg2(
+pub inline fn innerProduct_ij_j_ReverseArg2(
     stream: Stream, 
     x: anytype, 
     y: anytype,
     z: anytype,
 ) void {
-
+    // inner product i,ij to get j
     std.debug.assert(x.sizes().len == 2);
     std.debug.assert(y.sizes().len == 1);
     std.debug.assert(z.sizes().len == 1);
@@ -404,7 +404,7 @@ pub inline fn innerProduct_ij_j_ReveseArg2(
         z.grads().?,
         x.values(),
         1.0, // alpha
-        y.grads(),
+        y.grads().?,
         0.0, //beta
         x_sizes[0],
         x_sizes[1],
@@ -434,6 +434,13 @@ inline fn __innerProduct_i_ij(
     });
 }
 
+const IP_i_ij_Impl = CallbackBuilder(
+    innerProduct_i_ij, .{
+        innerProduct_i_ij_ReverseArg1,   
+        innerProduct_i_ij_ReverseArg2,   
+    }, NoCleanup
+);
+
 pub inline fn innerProduct_i_ij(
     stream: Stream, 
     x: anytype, 
@@ -462,34 +469,101 @@ pub inline fn innerProduct_i_ij(
     );
 }
 
-pub inline fn innerProduct_i_ij_ReveseArg2(
+
+pub inline fn innerProduct_i_ij_ReverseArg1(
     stream: Stream, 
     x: anytype, 
     y: anytype,
     z: anytype,
 ) void {
-
-    std.debug.assert(x.sizes().len == 2);
-    std.debug.assert(y.sizes().len == 1);
+    // inner product ij,j to get i
+    std.debug.assert(x.sizes().len == 1);
+    std.debug.assert(y.sizes().len == 2);
     std.debug.assert(z.sizes().len == 1);
 
-    const x_sizes = x.sizes();
+    const y_sizes = y.sizes();
 
-    std.debug.assert(x_sizes[0] == z.len());
-    std.debug.assert(x_sizes[1] == y.len());
+    std.debug.assert(y_sizes[0] == x.len());
+    std.debug.assert(y_sizes[1] == z.len());
 
-    __innerProduct_i_ij(
+    __innerProduct_ij_j(
         stream,
+        y.values(),
         z.grads().?,
-        x.values(),
         1.0, // alpha
-        y.grads(),
+        x.grads().?,
         0.0, //beta
-        x_sizes[0],
-        x_sizes[1],
+        y_sizes[0],
+        y_sizes[1],
     );
 }
 
+pub inline fn innerProduct_i_ij_ReverseArg2(
+    stream: Stream, 
+    x: anytype, 
+    y: anytype,
+    z: anytype,
+) void {
+    // outer product i,j to get ij
+    std.debug.assert(x.sizes().len == 1);
+    std.debug.assert(y.sizes().len == 2);
+    std.debug.assert(z.sizes().len == 1);
+
+    const y_sizes = y.sizes();
+
+    std.debug.assert(y_sizes[0] == x.len());
+    std.debug.assert(y_sizes[1] == z.len());
+
+    __outerProduct_i_j(
+        stream,
+        x.values(),
+        z.grads().?,
+        1.0, // alpha
+        y.grads().?,
+        1.0, //beta
+        y_sizes[0],
+        y_sizes[1],
+    );
+}
+
+const IP_ij_j_Impl = CallbackBuilder(
+    innerProduct_ij_j, .{
+        .{ innerProduct_ij_j_ReverseArg1, 1 },
+        .{ innerProduct_ij_j_ReverseArg2, 2 },
+    }, NoCleanup
+);
+
+pub fn innerProduct_i_ji(stream: Stream, x: anytype, y: anytype, z: anytype) void {
+    return innerProduct_ij_j(stream, y, x, z);
+}
+pub fn innerProduct_i_ji_ReverseArg1(stream: Stream, x: anytype, y: anytype, z: anytype) void {
+    return innerProduct_ij_j_ReverseArg1(stream, y, x, z);
+}
+pub fn innerProduct_i_ji_ReverseArg2(stream: Stream, x: anytype, y: anytype, z: anytype) void {
+    return innerProduct_ij_j_ReverseArg2(stream, y, x, z);
+}
+const IP_i_ji_Impl = CallbackBuilder(
+    innerProduct_i_ji, .{
+        .{ innerProduct_i_ji_ReverseArg1, 1 },
+        .{ innerProduct_i_ji_ReverseArg2, 2 },
+    }, NoCleanup
+);
+
+pub fn innerProduct_ij_i(stream: Stream, x: anytype, y: anytype, z: anytype) void {
+    return innerProduct_i_ij(stream, y, x, z);
+}
+pub fn innerProduct_ij_i_ReverseArg1(stream: Stream, x: anytype, y: anytype, z: anytype) void {
+    return innerProduct_i_ij_ReverseArg1(stream, y, x, z);
+}
+pub fn innerProduct_ij_i_ReverseArg2(stream: Stream, x: anytype, y: anytype, z: anytype) void {
+    return innerProduct_i_ij_ReverseArg2(stream, y, x, z);
+}
+const IP_ij_i_Impl = CallbackBuilder(
+    innerProduct_ij_i, .{
+        .{ innerProduct_ij_i_ReverseArg1, 1 },
+        .{ innerProduct_ij_i_ReverseArg2, 2 },
+    }, NoCleanup
+);
 //////////////////////////////
 // ---- matrix-to-matrix -----
 
@@ -619,54 +693,39 @@ inline fn innerProduct_ij_jk_ReverseArg2(
     );
 }
 
-const MatMul2DImpl = CallbackBuilder(
+const IP_ij_jk_Impl = CallbackBuilder(
     innerProduct_ij_jk, .{
         .{ innerProduct_ij_jk_ReverseArg1, 1 },
         .{ innerProduct_ij_jk_ReverseArg2, 2 },
     }, NoCleanup,
 );
 
-pub fn innerProduct(
-    stream: Stream, 
-    x: anytype, 
-    y: anytype,
-    z: anytype,    
-    comptime expression: []const u8
-) void {
-    const inner_product = comptime Parser.innerProduct(expression);
+const inner_product_expressions = std.ComptimeStringMap(
+    type, .{
+        // Rank-1-to-Rank-2
+        .{ "i,ij->j", IP_i_ij_Impl },
+        .{ "i,ji->j", IP_i_ji_Impl },
+        .{ "j,ij->i", IP_i_ji_Impl },
+        .{ "j,ji->i", IP_i_ij_Impl },
 
-    switch (inner_product) {
-        // vector to matrix
-        .@"ij,j->i" => innerProduct_ij_j(stream, x, y, z),
-        .@"j,ij->i" => innerProduct_ij_j(stream, y, x, z),
-        .@"i,ij->j" => innerProduct_i_ij(stream, x, y, z),
-        .@"ij,i->j" => innerProduct_i_ij(stream, y, x, z),
-        // matrix to matrix
-        .@"ij,jk->ik" => innerProduct_ij_jk(stream, x, y, z),
-        // try to never reach this branch
-        // this is the unoptimized kernel
-        else => {
-            @compileError("TODO: Declare General Inner Product Kernel: " ++ @tagName(inner_product));            
-        }
+        // Rank-2-to-Rank-1
+        .{ "ij,j->i", IP_ij_j_Impl },
+        .{ "ij,i->j", IP_ij_i_Impl },
+        .{ "ji,i->j", IP_ij_j_Impl },
+        .{ "ji,j->i", IP_ij_i_Impl },
+
+        // Rank-2-to-Rank-2
+        .{ "ij,jk->ik", IP_ij_jk_Impl }
     }
-}
+);
 
-pub fn innerProductReverse(
-    // this is different than permutate
-    // because we have separate reversals
-    // for each argument in the call
-    comptime expression: []const u8
-) type {
-    const inner_product = comptime Parser.innerProduct(expression);
-
-    return switch (inner_product) {
-        .@"ij,jk->ik" => MatMul2DImpl,
-        // try to never reach this branch
-        // this is the unoptimized kernel
-        else => {
-            @compileError("TODO: Declare General Inner Product Kernel: " ++ @tagName(inner_product));            
-        }
-    };
+pub fn findInnerProduct(comptime expression: []const u8) void {
+    const parsed = comptime Parser.innerProductExpression(expression);
+    if (inner_product_expressions.get(parsed)) |ip| {
+        return ip;
+    } else {
+        @compileError("TODO: Declare General Inner Product Kernel: " ++ expression);            
+    }
 }
 
 //////////////////////////////
@@ -708,7 +767,7 @@ pub inline fn outerProduct_i_j(
     std.debug.assert(z_sizes[0] == x.len());
     std.debug.assert(z_sizes[1] == y.len());
 
-    __innerProduct_ij_jk(
+    __outerProduct_i_j(
         stream,
         x.values(),
         y.values(),

@@ -279,32 +279,6 @@ pub fn permutateSizes(comptime str: []const u8) struct { perm: []const usize, le
 
 // optimized permutation patterns
 
-const InnerProduct = enum {
-    unknown, 
-
-    // vector to matrix
-    @"ij,j->i",
-    @"i,ij->j",
-
-    @"j,ij->i",
-    @"ij,i->j",
-
-    @"ij,jk->ik",
-};
-
-const inner_product_map = std.ComptimeStringMap(
-    InnerProduct, .{
-
-        // vector to matrix
-        .{ @tagName(InnerProduct.@"ij,j->i"),   InnerProduct.@"ij,j->i"   },
-        .{ @tagName(InnerProduct.@"i,ij->j"),   InnerProduct.@"i,ij->j"   },
-        .{ @tagName(InnerProduct.@"j,ij->i"),   InnerProduct.@"j,ij->i"   },
-        .{ @tagName(InnerProduct.@"ij,i->j"),   InnerProduct.@"ij,i->j"   },
-
-        .{ @tagName(InnerProduct.@"ij,jk->ik"), InnerProduct.@"ij,jk->ik" }
-    }
-);
-
 // Contraction parsing expects strings of the form:
 //
 //     example: ijk->jik
@@ -313,7 +287,7 @@ const inner_product_map = std.ComptimeStringMap(
 // Both sides of the arrow operand must be permutations of eachother.
 //
 
-pub fn innerProduct(comptime str: []const u8) InnerProduct {
+pub fn innerProductExpression(comptime str: []const u8) []const u8 {
 
     const trn = comptime translateIndices(str);
     const arrow = comptime findArrowOp(trn);
@@ -332,8 +306,7 @@ pub fn innerProduct(comptime str: []const u8) InnerProduct {
         @compileError("Invalid inner product expression: " ++ str);
     }
 
-    return comptime inner_product_map.get(lhs ++ "," ++ rhs ++ "->" ++ out)
-        orelse inner_product_map.unknown;
+    return lhs ++ "," ++ rhs ++ "->" ++ out;
 }
 
 

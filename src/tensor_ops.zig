@@ -376,7 +376,7 @@ pub inline fn innerProduct_ij_j_ReverseArg1(
         z.grads().?,
         y.values(),
         1.0, // alpha
-        x.grads(),
+        x.grads().?,
         1.0, //beta
         x_sizes[0],
         x_sizes[1],
@@ -436,8 +436,8 @@ inline fn __innerProduct_i_ij(
 
 const IP_i_ij_Impl = CallbackBuilder(
     innerProduct_i_ij, .{
-        innerProduct_i_ij_ReverseArg1,   
-        innerProduct_i_ij_ReverseArg2,   
+        .{ innerProduct_i_ij_ReverseArg1, 1 },   
+        .{ innerProduct_i_ij_ReverseArg2, 2 },   
     }, NoCleanup
 );
 
@@ -459,10 +459,10 @@ pub inline fn innerProduct_i_ij(
 
     __innerProduct_ij_j(
         stream,
+        x.values(),
         y.values(),
-        z.grads().?,
         1.0, // alpha
-        x.grads().?,
+        z.values(),
         1.0, //beta
         y_sizes[0],
         y_sizes[1],
@@ -513,6 +513,8 @@ pub inline fn innerProduct_i_ij_ReverseArg2(
 
     std.debug.assert(y_sizes[0] == x.len());
     std.debug.assert(y_sizes[1] == z.len());
+
+    _ = &stream;
 
     __outerProduct_i_j(
         stream,
@@ -719,7 +721,7 @@ const inner_product_expressions = std.ComptimeStringMap(
     }
 );
 
-pub fn findInnerProduct(comptime expression: []const u8) void {
+pub fn findInnerProduct(comptime expression: []const u8) type {
     const parsed = comptime Parser.innerProductExpression(expression);
     if (inner_product_expressions.get(parsed)) |ip| {
         return ip;

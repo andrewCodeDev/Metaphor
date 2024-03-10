@@ -8,6 +8,30 @@
     #define EXTERN_C extern
 #endif
 
+EXTERN_C void launch_transpose_2D_r16(
+    StreamCtx stream,
+    const r16* src,
+          r16* dst,
+    r16 dst_coef,
+    len_t row,
+    len_t col
+);
+EXTERN_C void launch_transpose_2D_r32(
+    StreamCtx stream,
+    const r32* src,
+          r32* dst,
+    r32 dst_coef,
+    len_t row,
+    len_t col
+);
+EXTERN_C void launch_transpose_2D_r64(
+    StreamCtx stream,
+    const r64* src,
+          r64* dst,
+    r64 dst_coef,
+    len_t row,
+    len_t col
+);
 EXTERN_C void launch_tanh_r16(
   StreamCtx stream,
   const r16* a,
@@ -169,30 +193,6 @@ EXTERN_C void launch_subtraction_c64(
   const c64* b, 
   c64* c, 
   len_t N
-);
-EXTERN_C void launch_transpose_2D_r16(
-    StreamCtx stream,
-    const r16* src,
-          r16* dst,
-    r16 dst_coef,
-    len_t row,
-    len_t col
-);
-EXTERN_C void launch_transpose_2D_r32(
-    StreamCtx stream,
-    const r32* src,
-          r32* dst,
-    r32 dst_coef,
-    len_t row,
-    len_t col
-);
-EXTERN_C void launch_transpose_2D_r64(
-    StreamCtx stream,
-    const r64* src,
-          r64* dst,
-    r64 dst_coef,
-    len_t row,
-    len_t col
 );
 EXTERN_C void launch_leaky_relu_r16(
   StreamCtx stream,

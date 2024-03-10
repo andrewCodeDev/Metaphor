@@ -3,6 +3,12 @@ const OverloadSet = @import("overloadset.zig").OverloadSet;
 
 const decls = @import("cimport.zig").C;
 
+pub const kernel_permutate_ij_ji = OverloadSet(.{
+	decls.launch_transpose_2D_r16,
+	decls.launch_transpose_2D_r32,
+	decls.launch_transpose_2D_r64,
+});
+
 pub const kernel_tanh = OverloadSet(.{
 	decls.launch_tanh_r16,
 	decls.launch_tanh_r32,
@@ -37,12 +43,6 @@ pub const kernel_subtraction = OverloadSet(.{
 	decls.launch_subtraction_c32,
 	decls.launch_subtraction_r64,
 	decls.launch_subtraction_c64,
-});
-
-pub const kernel_permutate_ij_jk = OverloadSet(.{
-	decls.launch_transpose_2D_r16,
-	decls.launch_transpose_2D_r32,
-	decls.launch_transpose_2D_r64,
 });
 
 pub const kernel_leaky_relu = OverloadSet(.{

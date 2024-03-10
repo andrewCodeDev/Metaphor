@@ -440,12 +440,6 @@ pub fn makeCImport(self: *Self) void {
     stringToFile(self.appendZigsrcDirectory("cimport.zig"), cimport_string);
 }
 
-pub fn reset(self: *Self) void {
-    self.source_abspaths.deinit();
-    self.target_abspaths.deinit();
-    self.system_arena.reset(.retain_capacity);
-}
-
 fn fileToString(self: *Self, filename: []const u8) []u8 {
 
     const f = std.fs.openFileAbsolute(filename, .{}) catch @panic("Cannot open file.");

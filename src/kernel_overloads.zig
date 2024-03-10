@@ -39,16 +39,16 @@ pub const kernel_subtraction = OverloadSet(.{
 	decls.launch_subtraction_c64,
 });
 
+pub const kernel_permutate_ij_jk = OverloadSet(.{
+	decls.launch_transpose_2D_r16,
+	decls.launch_transpose_2D_r32,
+	decls.launch_transpose_2D_r64,
+});
+
 pub const kernel_leaky_relu = OverloadSet(.{
 	decls.launch_leaky_relu_r16,
 	decls.launch_leaky_relu_r32,
 	decls.launch_leaky_relu_r64,
-});
-
-pub const kernel_transpose_2D = OverloadSet(.{
-	decls.launch_transpose_2D_r16,
-	decls.launch_transpose_2D_r32,
-	decls.launch_transpose_2D_r64,
 });
 
 pub const kernel_fill = OverloadSet(.{

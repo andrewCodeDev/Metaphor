@@ -170,27 +170,6 @@ EXTERN_C void launch_subtraction_c64(
   c64* c, 
   len_t N
 );
-EXTERN_C void launch_leaky_relu_r16(
-  StreamCtx stream,
-  const r16* a,
-        r16* b, 
-        r16 coef,
-  len_t N
-);
-EXTERN_C void launch_leaky_relu_r32(
-  StreamCtx stream,
-  const r32* a,
-        r32* b, 
-        r32 coef,
-  len_t N
-);
-EXTERN_C void launch_leaky_relu_r64(
-  StreamCtx stream,
-  const r64* a,
-        r64* b, 
-        r64 coef,
-  len_t N
-);
 EXTERN_C void launch_transpose_2D_r16(
     StreamCtx stream,
     const r16* src,
@@ -214,6 +193,27 @@ EXTERN_C void launch_transpose_2D_r64(
     r64 dst_coef,
     len_t row,
     len_t col
+);
+EXTERN_C void launch_leaky_relu_r16(
+  StreamCtx stream,
+  const r16* a,
+        r16* b, 
+        r16 coef,
+  len_t N
+);
+EXTERN_C void launch_leaky_relu_r32(
+  StreamCtx stream,
+  const r32* a,
+        r32* b, 
+        r32 coef,
+  len_t N
+);
+EXTERN_C void launch_leaky_relu_r64(
+  StreamCtx stream,
+  const r64* a,
+        r64* b, 
+        r64 coef,
+  len_t N
 );
 EXTERN_C void launch_fill_r16(
   StreamCtx stream,

@@ -120,14 +120,17 @@ system_arena: std.heap.ArenaAllocator,
 system_allocator: std.mem.Allocator,
 string_arena: std.heap.ArenaAllocator,
 string_allocator: std.mem.Allocator,
-current_directory: []const u8,
+
 source_abspaths: StringList,
 target_abspaths: StringList,
 source_filenames: StringList,
+object_abspaths: StringList,
+
 source_extension: []const u8,
 source_directory: []const u8,
 target_directory: []const u8,
 zigsrc_directory: []const u8,
+current_directory: []const u8,
 
 pub fn init(config: FileGenConfig) *Self {
 
@@ -144,6 +147,9 @@ pub fn init(config: FileGenConfig) *Self {
         catch @panic("Failed to allocate source files capacity.");
 
     self.target_abspaths = StringList.initCapacity(self.system_allocator, 100)
+        catch @panic("Failed to allocate targest files capacity.");
+
+    self.object_abspaths = StringList.initCapacity(self.system_allocator, 100)
         catch @panic("Failed to allocate targest files capacity.");
 
     self.source_filenames = StringList.initCapacity(self.system_allocator, 100)
@@ -231,6 +237,11 @@ pub fn isModified(source_path: []const u8, target_path: []const u8) bool {
 
 // we need to catch this error
 fn collectSources(self: *Self) !void {
+
+    // lift off of stack
+    const ObjectBuffer = struct {
+        var data: [1024]u8 = undefined;
+    };
     
     var dir: std.fs.Dir = try std.fs.openDirAbsolute(self.source_directory, .{ 
         .access_sub_paths = false, 
@@ -243,12 +254,15 @@ fn collectSources(self: *Self) !void {
     var itr = dir.iterate();
 
     while (try itr.next()) |path| {
-
+        
+        const obj_name = replaceExtension(ObjectBuffer.data[0..], path.name, "o");
         const src = self.appendSourceDirectory(path.name);
         const trg = self.appendTargetDirectory(path.name);
+        const obj = self.appendTargetDirectory(obj_name);
 
         try self.source_abspaths.append(src);
         try self.target_abspaths.append(trg);
+        try self.object_abspaths.append(obj);
         try self.source_filenames.append(try self.system_allocator.dupe(u8, path.name));
     }
 }
@@ -269,7 +283,7 @@ pub fn generate(self: *Self) void {
     self.collectSources() catch @panic("Failed to collect sources.");
 
     // determines generating declarations and overloads
-    var has_modifications: bool = false;
+    var modded_abspaths = std.ArrayListUnmanaged([]const u8){ };
 
     // buffer for generated kernel content
     var generations = std.ArrayListUnmanaged([]const u8){ };
@@ -281,8 +295,9 @@ pub fn generate(self: *Self) void {
 
         std.log.info("Generating:\n  {s}...\n", .{ src_path });
 
-        has_modifications = true;
-
+        modded_abspaths.append(self.system_allocator, trg_path)
+            catch @panic("Failed to append to modded_targets");
+        
         var gen_success: bool = false;
         
         const content = self.fileToString(src_path);
@@ -324,7 +339,7 @@ pub fn generate(self: *Self) void {
         generations.clearRetainingCapacity();    
     }    
 
-    if (has_modifications) {
+    if (modded_abspaths.items.len != 0) {
         self.makeKernelDeclarations() 
             catch @panic("Failed to make kernel declarations.");
 
@@ -333,10 +348,13 @@ pub fn generate(self: *Self) void {
         
         std.log.info("Compiling kernel library...\n", .{});
 
-        ScriptCompiler.compileSharedLibrary(.{
+        ScriptCompiler.compileStaticLibrary(.{
             .allocator = self.system_allocator,
-            .targets = self.target_abspaths.items,
-            .libname = self.appendLibraryDirectory("libmp_kernels.so")
+            .modded_abspaths = modded_abspaths.items,
+            .object_abspaths = self.object_abspaths.items,
+            .current_directory = self.current_directory,
+            .target_directory = self.target_directory,
+            .lib_name = self.appendLibraryDirectory("mp_kernels.a")
         });
     }
 }

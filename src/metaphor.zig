@@ -185,10 +185,12 @@ pub const ops = struct {
     
         const Y = graph.nodeTensor(y_sizes[0..], UT.Child(@TypeOf(X)));
         
-        TenOps.permutate(graph.stream, X, Y, expression);
+        const perm = TenOps.findPermutation(expression){ };
+
+        perm.forward(graph.stream, X, Y);
 
         return graph.appendNode(
-            TenOps.PermutateCallback(expression), .{ graph.stream, X }, Y
+            @TypeOf(perm), .{ graph.stream, X }, Y
         );
     }
 

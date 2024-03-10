@@ -46,10 +46,10 @@ pub fn setupConfig(allocator: std.mem.Allocator, cwd_path: []const u8) void {
     config.setup = true;
 }
 
-pub fn buildLibraryCompileArgv(
+pub fn buildSharedLibraryArgv(
     allocator: std.mem.Allocator,
     targets: []const [] const u8,
-    libname: []const u8
+    lib_name: []const u8
 ) ![]const []const u8 {
 
     const comp_head: []const []const u8 = &.{  
@@ -70,11 +70,11 @@ pub fn buildLibraryCompileArgv(
     };
 
     var argv = try std.ArrayListUnmanaged([]const u8).initCapacity(
-        allocator, comp_head.len + targets.len + comp_tail.len + 1 // libname
+        allocator, comp_head.len + targets.len + comp_tail.len + 1 // lib_name
     );
     
     argv.appendSliceAssumeCapacity(comp_head);
-    argv.appendAssumeCapacity(libname);
+    argv.appendAssumeCapacity(lib_name);
     argv.appendSliceAssumeCapacity(targets);
     argv.appendSliceAssumeCapacity(comp_tail);
     std.debug.assert(argv.capacity == argv.items.len);
@@ -84,7 +84,7 @@ pub fn buildLibraryCompileArgv(
 pub fn compileSharedLibrary(input: struct {
     allocator: std.mem.Allocator, 
     targets: []const []const u8,  
-    libname: []const u8
+    lib_name: []const u8
 }) void {        
 
     if (!config.setup) {
@@ -92,7 +92,7 @@ pub fn compileSharedLibrary(input: struct {
     }
 
     blk: { 
-        const argv = buildLibraryCompileArgv(input.allocator, input.targets, input.libname) 
+        const argv = buildSharedLibraryArgv(input.allocator, input.targets, input.lib_name) 
             catch @panic("concatLibraryCompileVargs: Out Of Memory");
 
         defer input.allocator.free(argv);
@@ -118,6 +118,176 @@ pub fn compileSharedLibrary(input: struct {
         );
         @panic("Failed Compilation");
     }
+}
+
+pub fn objectFilesArgv(
+    allocator: std.mem.Allocator,
+    mod_targets: []const []const u8,
+) ![]const []const u8 {
+
+    const comp_head: []const []const u8 = &.{  
+        "nvcc", "-c", 
+    };
+    const comp_tail: []const []const u8 = &.{  
+        "-O3",
+        "--allow-unsupported-compiler",
+        "-ccbin",
+        "/usr/bin/gcc",
+        config.gpu_architecture, 
+        "--compiler-options", 
+        "-I/usr/local/cuda/include", 
+        "-L/usr/local/cuda/lib", 
+        "-lcudart",
+        "-lcuda"
+    };
+
+    var argv = try std.ArrayListUnmanaged([]const u8).initCapacity(
+        allocator, comp_head.len + mod_targets.len + comp_tail.len
+    );
+    
+    argv.appendSliceAssumeCapacity(comp_head);
+    argv.appendSliceAssumeCapacity(mod_targets);
+    argv.appendSliceAssumeCapacity(comp_tail);
+    std.debug.assert(argv.capacity == argv.items.len);
+    return argv.allocatedSlice();
+}
+
+pub fn archiveFilesArgv(
+    allocator: std.mem.Allocator,
+    object_abspaths: []const []const u8,
+    lib_name: []const u8
+) ![]const []const u8 {
+
+    var argv = try std.ArrayListUnmanaged(
+        []const u8).initCapacity(allocator, 3 + object_abspaths.len
+    );
+    
+    argv.appendAssumeCapacity("ar");
+    argv.appendAssumeCapacity("-rcs");
+    argv.appendAssumeCapacity(lib_name);
+    argv.appendSliceAssumeCapacity(object_abspaths);
+    std.debug.assert(argv.capacity == argv.items.len);
+    return argv.allocatedSlice();
+}
+
+pub fn compileStaticLibrary(input: struct {
+    allocator: std.mem.Allocator, 
+    modded_abspaths: []const []const u8,
+    object_abspaths: []const []const u8,
+    current_directory: []const u8,
+    target_directory: []const u8,  
+    lib_name: []const u8
+}) void {        
+
+    if (!config.setup) {
+        @panic("Config is not setup! Call ScriptCompiler.setupConfig.");
+    }
+
+    // move to the target directory first
+    var dir = std.fs.cwd().openDir(input.target_directory, .{})
+        catch @panic("Failed to open target directory.");
+
+        defer dir.close();
+
+    dir.setAsCwd() 
+        catch @panic("Failed to move to target directory");
+
+    blk: { 
+
+        { // compile modified argument files
+            const argv = objectFilesArgv(input.allocator, input.modded_abspaths) 
+                catch @panic("Failed to create object files argv");
+
+            defer input.allocator.free(argv);
+            
+            const result = ChildProcess.run(.{
+                .allocator = input.allocator, .argv = argv,
+            }) catch |e| {
+                std.log.err("Error: {}", .{e});
+                @panic("ChildProcess.run failed");
+            };
+
+            switch (result.term) {
+                .Exited  => |e| {
+                    if (e != 0)
+                    std.log.err("Exit Code: {}", .{ e });
+                },
+                .Signal  => |s| std.log.err("Signal: {}\n",  .{s}),
+                .Stopped => |s| std.log.err("Stopped: {}\n", .{s}),
+                .Unknown => |u| std.log.err("Unknown: {}\n", .{u}),
+            }
+
+            if (result.stderr.len > 0) {
+                std.log.err("{s}\n", .{ result.stderr });
+            }
+        }
+
+        { // create indexed archive file for static library
+            const argv = archiveFilesArgv(input.allocator, input.object_abspaths, input.lib_name)
+                catch @panic("Failed to create archive argv");
+
+            defer input.allocator.free(argv);
+            
+            const result = ChildProcess.run(.{
+                .allocator = input.allocator, .argv = argv,
+            }) catch |e| {
+                std.log.err("Error: {}", .{e});
+                @panic("ChildProcess.run failed");
+            };
+
+            switch (result.term) {
+                .Exited  => |e| {
+                    if (e == 0) break :blk;
+                    std.log.err("Exit Code: {}", .{ e });
+                },
+                .Signal  => |s| std.log.err("Signal: {}\n",  .{s}),
+                .Stopped => |s| std.log.err("Stopped: {}\n", .{s}),
+                .Unknown => |u| std.log.err("Unknown: {}\n", .{u}),
+            }
+            std.log.err(
+                "{s}\n", .{ if (result.stderr.len > 0) result.stderr else "None" }
+            );
+
+            @panic("Failed to create static library");
+        }
+
+        { // create indexed archive file for static library
+            const argv = archiveFilesArgv(input.allocator, input.mod_targets, input.lib_name) 
+                catch @panic("Failed to create archive argv");
+
+            defer input.allocator.free(argv);
+            
+            const result = ChildProcess.run(.{
+                .allocator = input.allocator, .argv = argv,
+            }) catch |e| {
+                std.log.err("Error: {}", .{e});
+                @panic("ChildProcess.run failed");
+            };
+
+            switch (result.term) {
+                .Exited  => |e| {
+                    if (e == 0) break :blk;
+                    std.log.err("Exit Code: {}", .{ e });
+                },
+                .Signal  => |s| std.log.err("Signal: {}\n",  .{s}),
+                .Stopped => |s| std.log.err("Stopped: {}\n", .{s}),
+                .Unknown => |u| std.log.err("Unknown: {}\n", .{u}),
+            }
+            std.log.err(
+                "{s}\n", .{ if (result.stderr.len > 0) result.stderr else "None" }
+            );
+            @panic("Failed to create static library");
+        }
+    }
+
+    // move back to home
+    var home = std.fs.cwd().openDir(input.current_directory, .{})
+        catch @panic("Failed to open home directory.");
+
+        defer home.close();
+
+    home.setAsCwd()
+        catch @panic("Failed to move to target directory");
 }
 
 pub fn compileSingleFile(

@@ -7,6 +7,8 @@ __global__ void __kernel_hadamard_RScalar(
   RScalar *dev_c,
   len_t N
 ) {
+  // test comment
+  
   const len_t tid = (blockIdx.x * blockDim.x) + threadIdx.x;
      
   if (tid < N)

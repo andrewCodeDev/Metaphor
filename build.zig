@@ -56,7 +56,11 @@ pub fn build(b: *std.Build) void {
     exe.linkSystemLibrary("cudart");
     exe.linkSystemLibrary("nvrtc");
     exe.linkSystemLibrary("dev_utils");
-    exe.linkSystemLibrary("mp_kernels");
+
+    exe.addObjectFile(.{
+       .path = "src/lib/mp_kernels.a" 
+    });
+    
     exe.linkLibC();
 
     // This declares intent for the executable to be installed into the

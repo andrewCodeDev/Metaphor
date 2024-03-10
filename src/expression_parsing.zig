@@ -214,16 +214,6 @@ pub fn translateIndices(comptime string: []const u8) []const u8 {
 
 // optimized permutation patterns
 
-const Permutation = enum {
-    unknown, @"ij->ji",
-};
-
-const permutation_map = std.ComptimeStringMap(
-    Permutation, .{
-        .{ @tagName(Permutation.@"ij->ji"), Permutation.@"ij->ji" }
-    }
-);
-
 // Permutation parsing expects strings of the form:
 //
 //     example: ijk->jik
@@ -232,7 +222,7 @@ const permutation_map = std.ComptimeStringMap(
 // Both sides of the arrow operand must be permutations of eachother.
 //
 
-pub fn permutation(comptime str: []const u8) Permutation {
+pub fn permutationExpression(comptime str: []const u8) []const u8 {
 
     const trn = comptime translateIndices(str);
     const arrow = comptime findArrowOp(trn);
@@ -243,8 +233,7 @@ pub fn permutation(comptime str: []const u8) Permutation {
         @compileError("Permutate requires left and right operands to be permutations of eachother." ++ str);
     }
 
-    return comptime permutation_map.get(lhs ++ "->" ++ rhs)
-        orelse Permutation.unknown;
+    return comptime lhs ++ "->" ++ rhs;
 }
 
 pub fn permutateSizes(comptime str: []const u8) struct { perm: []const usize, len: usize }{

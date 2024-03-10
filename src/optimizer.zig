@@ -1,4 +1,5 @@
 const SliceUnion = @import("tensor_components.zig").SliceUnion;
+const SC = @import("scalar.zig");
 
 pub const Optimizer = struct {
     const Self = @This();
@@ -15,11 +16,11 @@ inline fn updateDispatch(
     wgt: SliceUnion,
     grd: SliceUnion) void {
     switch (wgt) {
-        f16 => opt.optimize(name, wgt.f16, grd.f16),
-        f32 => opt.optimize(name, wgt.f32, grd.f32),
-        f64 => opt.optimize(name, wgt.f64, grd.f64),
-         i8 => {
-             @panic("Quantization: TODO");
+        SC.r16 => opt.optimize(name, wgt.r16, grd.r16),
+        SC.r32 => opt.optimize(name, wgt.r32, grd.r32),
+        SC.r64 => opt.optimize(name, wgt.r64, grd.r64),
+        else => {
+             @panic("Optimizer: TODO");
         }
     }
 }
@@ -42,7 +43,7 @@ pub const NullOptimizer = struct {
 //
 //    const Self = @This();
 //
-//    rate: f16 = 0.01,
+//    rate: r16 = 0.01,
 //
 //    fn update(ptr: *anyopaque, _: []const u8, wgt: SliceUnion, grd: SliceUnion) void {
 //        const self: *Self = @ptrCast(@alignCast(ptr));

@@ -215,7 +215,7 @@ pub fn sequence(
 
 // <>--------------------------------------------------------<>
 
-pub inline fn transpose2D(
+pub inline fn permutate_ij_ji(
     stream: Stream, 
     x: anytype, 
     y: anytype,
@@ -224,12 +224,12 @@ pub inline fn transpose2D(
     const x_values = x.values();
     const y_values = y.values();
     const x_sizes = x.sizes();
-    overloads.kernel_transpose_2D.call(.{
+    overloads.kernel_permutate_ij_ji.call(.{
        stream.context, x_values.ptr, y_values.ptr, SC.asScalar(T, 0.0), x_sizes[0], x_sizes[1] 
     });
 }
 
-pub inline fn transpose2DReverse(
+pub inline fn permutate_ij_ji_Reverse(
     stream: Stream, 
     x: anytype, 
     y: anytype,
@@ -238,64 +238,29 @@ pub inline fn transpose2DReverse(
     const x_grads = x.grads().?;
     const y_grads = y.grads().?;
     const y_sizes = y.sizes();
-    overloads.kernel_transpose_2D.call(.{
+    overloads.kernel_permutate_ij_ji.call(.{
        stream.context, y_grads.ptr, x_grads.ptr, SC.asScalar(T, 1.0), y_sizes[0], y_sizes[1] 
     });
 }
 
-pub fn permutate(
-    stream: Stream, 
-    x: anytype, 
-    y: anytype,    
-    comptime expression: []const u8
-) void {
-    const permutation = comptime Parser.permutation(expression);
+const Perm_ij_ji_Impl = CallbackBuilder(
+    permutate_ij_ji, .{ .{ permutate_ij_ji, 1 } }, NoCleanup
+);
 
-    switch (permutation) {
-        .@"ij->ji" => transpose2D(stream, x, y),
-        // try to never reach this branch
-        // this is the unoptimized kernel
-        .unknown => {
-            @compileError("TODO: Declare General Permutation Kernel.");            
-        }
+const permutation_expressions = std.ComptimeStringMap(
+    type, .{
+        .{ "ij->ji", Perm_ij_ji_Impl },
+        .{ "ji->ij", Perm_ij_ji_Impl },
     }
-}
+);
 
-pub fn permutateReverse(
-    stream: Stream, 
-    x: anytype, 
-    y: anytype,    
-    comptime expression: []const u8
-) void {
-    const permutation = comptime Parser.permutation(expression);
-
-    switch (permutation) {
-        .@"ij->ji" => transpose2DReverse(stream, x, y),
-        // try to never reach this branch
-        // this is the unoptimized kernel
-        .unknown => {
-            @compileError("TODO: Declare General Permutation Kernel.");            
-        }
+pub fn findPermutation(comptime expression: []const u8) type {
+    const parsed = comptime Parser.permutationExpression(expression);
+    if (permutation_expressions.get(parsed)) |perm| {
+        return perm;
+    } else {
+        @compileError("TODO: Declare General Permutation Kernel: " ++ expression);
     }
-}
-
-// reversing a permutation means applying it again to itself
-pub fn PermutateCallback(comptime expression: []const u8) type {
-    return struct {
-        reverse: struct {
-            
-            callback: fn (Stream, anytype, anytype) void = struct {
-                // bind expression to reversal for undoing permutation
-                // this function will be called because i
-                pub fn call(stream: Stream, x: anytype, y: anytype) void {
-                    permutateReverse(stream.context, x, y, expression);
-                }
-            }.call,
-
-            edge_index: comptime_int = 1,
-
-        } = .{ },
-    };
 }
 
 // <>--------------------------------------------------------<>
@@ -634,7 +599,7 @@ inline fn innerProduct_ij_jk_ReverseArg1(
 
     const y_tran = stream.getScratch(T, y_values.len);
 
-    overloads.kernel_transpose_2D.call(.{
+    overloads.kernel_permutate_ij_ji.call(.{
         stream.context, 
         y_values.ptr, 
         y_tran.ptr, 
@@ -673,7 +638,7 @@ inline fn innerProduct_ij_jk_ReverseArg2(
 
     const x_tran = stream.getScratch(T, x_values.len);
 
-    overloads.kernel_transpose_2D.call(.{
+    overloads.kernel_permutate_ij_ji.call(.{
         stream.context, 
         x_values.ptr, 
         x_tran.ptr, 

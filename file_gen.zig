@@ -287,7 +287,7 @@ pub fn generate(self: *Self) void {
         
         const content = self.fileToString(src_path);
 
-        for (MIN_LEVEL..MAX_LEVEL) |cur_level| {
+        for (MIN_LEVEL..MAX_LEVEL + 1) |cur_level| {
 
             // to enable multiple replacements per file, recycle
             // the last replacement to our current generation

@@ -20,12 +20,6 @@ EXTERN_C void launch_tanh_r32(
         r32* b, 
   len_t N
 );
-EXTERN_C void launch_tanh_r64(
-  StreamCtx stream,
-  const r64* a,
-        r64* b, 
-  len_t N
-);
 EXTERN_C void launch_inner_product_ij_j_r16(
   StreamCtx stream,
   const r16 *A, 
@@ -43,16 +37,6 @@ EXTERN_C void launch_inner_product_ij_j_r32(
         r32 alpha, // scales product
         r32 *y,
         r32 beta, // blends C back in
-  len_t M, 
-  len_t N
-);
-EXTERN_C void launch_inner_product_ij_j_r64(
-  StreamCtx stream,
-  const r64 *A, 
-  const r64 *x,
-        r64 alpha, // scales product
-        r64 *y,
-        r64 beta, // blends C back in
   len_t M, 
   len_t N
 );
@@ -84,20 +68,6 @@ EXTERN_C void launch_hadamard_reverse_c32(
   const c32 *grads_c,
   len_t N
 );
-EXTERN_C void launch_hadamard_reverse_r64(
-  StreamCtx stream,
-  r64 *grads_a,
-  const r64 *value_b,
-  const r64 *grads_c,
-  len_t N
-);
-EXTERN_C void launch_hadamard_reverse_c64(
-  StreamCtx stream,
-  c64 *grads_a,
-  const c64 *value_b,
-  const c64 *grads_c,
-  len_t N
-);
 EXTERN_C void launch_outer_product_i_j_r16(
   StreamCtx stream,
   const r16 *x,
@@ -115,16 +85,6 @@ EXTERN_C void launch_outer_product_i_j_r32(
         r32 alpha, // scales product
         r32 *A,
         r32 beta, // blends A back in
-  len_t M, 
-  len_t N
-);
-EXTERN_C void launch_outer_product_i_j_r64(
-  StreamCtx stream,
-  const r64 *x,
-  const r64 *y, 
-        r64 alpha, // scales product
-        r64 *A,
-        r64 beta, // blends A back in
   len_t M, 
   len_t N
 );
@@ -156,20 +116,6 @@ EXTERN_C void launch_subtraction_c32(
   c32* c, 
   len_t N
 );
-EXTERN_C void launch_subtraction_r64(
-  StreamCtx stream,
-  const r64* a,
-  const r64* b, 
-  r64* c, 
-  len_t N
-);
-EXTERN_C void launch_subtraction_c64(
-  StreamCtx stream,
-  const c64* a,
-  const c64* b, 
-  c64* c, 
-  len_t N
-);
 EXTERN_C void launch_leaky_relu_r16(
   StreamCtx stream,
   const r16* a,
@@ -182,13 +128,6 @@ EXTERN_C void launch_leaky_relu_r32(
   const r32* a,
         r32* b, 
         r32 coef,
-  len_t N
-);
-EXTERN_C void launch_leaky_relu_r64(
-  StreamCtx stream,
-  const r64* a,
-        r64* b, 
-        r64 coef,
   len_t N
 );
 EXTERN_C void launch_transpose_2D_r16(
@@ -204,14 +143,6 @@ EXTERN_C void launch_transpose_2D_r32(
     const r32* src,
           r32* dst,
     r32 dst_coef,
-    len_t row,
-    len_t col
-);
-EXTERN_C void launch_transpose_2D_r64(
-    StreamCtx stream,
-    const r64* src,
-          r64* dst,
-    r64 dst_coef,
     len_t row,
     len_t col
 );
@@ -239,18 +170,6 @@ EXTERN_C void launch_fill_c32(
   c32 value, 
   len_t N
 );
-EXTERN_C void launch_fill_r64(
-  StreamCtx stream,
-  r64* dev_a,
-  r64 value, 
-  len_t N
-);
-EXTERN_C void launch_fill_c64(
-  StreamCtx stream,
-  c64* dev_a,
-  c64 value, 
-  len_t N
-);
 EXTERN_C void launch_perumutate_r16(
   RTensor16 X, RTensor16 Y, Permutation P
 );
@@ -262,12 +181,6 @@ EXTERN_C void launch_perumutate_r32(
 );
 EXTERN_C void launch_permutate_c32(
   CTensor32 X, CTensor32 Y, Permutation P
-);
-EXTERN_C void launch_perumutate_r64(
-  RTensor64 X, RTensor64 Y, Permutation P
-);
-EXTERN_C void launch_permutate_c64(
-  CTensor64 X, CTensor64 Y, Permutation P
 );
 EXTERN_C void launch_relu_leaky_reverse_r16(
   StreamCtx stream,
@@ -283,14 +196,6 @@ EXTERN_C void launch_relu_leaky_reverse_r32(
         r32 *a_grads,
   const r32 *b_grads,
         r32 coef,
-  len_t N
-);
-EXTERN_C void launch_relu_leaky_reverse_r64(
-  StreamCtx stream,
-  const r64 *a_value,
-        r64 *a_grads,
-  const r64 *b_grads,
-        r64 coef,
   len_t N
 );
 EXTERN_C void launch_addition_r16(
@@ -321,20 +226,6 @@ EXTERN_C void launch_addition_c32(
   c32* c, 
   len_t N
 );
-EXTERN_C void launch_addition_r64(
-  StreamCtx stream,
-  const r64* a,
-  const r64* b, 
-  r64* c, 
-  len_t N
-);
-EXTERN_C void launch_addition_c64(
-  StreamCtx stream,
-  const c64* a,
-  const c64* b, 
-  c64* c, 
-  len_t N
-);
 EXTERN_C void launch_inner_product_i_ij_r16(
   StreamCtx stream,
   const r16 *x,
@@ -352,16 +243,6 @@ EXTERN_C void launch_inner_product_i_ij_r32(
         r32 alpha, // scales product
         r32 *y,
         r32 beta, // blends y back in
-  len_t M, 
-  len_t N
-);
-EXTERN_C void launch_inner_product_i_ij_r64(
-  StreamCtx stream,
-  const r64 *x,
-  const r64 *A, 
-        r64 alpha, // scales product
-        r64 *y,
-        r64 beta, // blends y back in
   len_t M, 
   len_t N
 );
@@ -389,18 +270,6 @@ EXTERN_C void launch_addition_reverse_c32(
   const c32* b, 
   len_t N
 );
-EXTERN_C void launch_addition_reverse_r64(
-  StreamCtx stream,
-  r64* a, 
-  const r64* b, 
-  len_t N
-);
-EXTERN_C void launch_addition_reverse_c64(
-  StreamCtx stream,
-  c64* a, 
-  const c64* b, 
-  len_t N
-);
 EXTERN_C void launch_matmul_2D_r16(
   StreamCtx stream,
   const r16 *A, 
@@ -423,17 +292,6 @@ EXTERN_C void launch_matmul_2D_r32(
   len_t N, 
   len_t K 
 );
-EXTERN_C void launch_matmul_2D_r64(
-  StreamCtx stream,
-  const r64 *A, 
-  const r64 *B,
-        r64 alpha, // scales product
-        r64 *C,
-        r64 beta, // blends C back in
-  len_t M, 
-  len_t N, 
-  len_t K 
-);
 EXTERN_C void launch_sequence_r16(
   StreamCtx stream,
   r16* dev_a,
@@ -446,13 +304,6 @@ EXTERN_C void launch_sequence_r32(
   r32* dev_a,
   r32 init,
   r32 step,
-  len_t N
-);
-EXTERN_C void launch_sequence_r64(
-  StreamCtx stream,
-  r64* dev_a,
-  r64 init,
-  r64 step,
   len_t N
 );
 EXTERN_C void launch_subtraction_reverse_r16(
@@ -483,20 +334,6 @@ EXTERN_C void launch_subtraction_reverse_c32(
   const r32 coef,
   len_t N
 );
-EXTERN_C void launch_subtraction_reverse_r64(
-  StreamCtx stream,
-  r64* a, 
-  const r64* b, 
-  const r64 coef,
-  len_t N
-);
-EXTERN_C void launch_subtraction_reverse_c64(
-  StreamCtx stream,
-  c64* a, 
-  const c64* b, 
-  const r64 coef,
-  len_t N
-);
 EXTERN_C void launch_tanh_reverse_r16(
   StreamCtx stream,
         r16 *a_grads,
@@ -509,13 +346,6 @@ EXTERN_C void launch_tanh_reverse_r32(
         r32 *a_grads,
   const r32 *b_value,
   const r32 *b_grads,
-  len_t N
-);
-EXTERN_C void launch_tanh_reverse_r64(
-  StreamCtx stream,
-        r64 *a_grads,
-  const r64 *b_value,
-  const r64 *b_grads,
   len_t N
 );
 EXTERN_C void launch_hadamard_r16(
@@ -544,19 +374,5 @@ EXTERN_C void launch_hadamard_c32(
   const c32* a,
   const c32* b, 
   c32* c, 
-  len_t N
-);
-EXTERN_C void launch_hadamard_r64(
-  StreamCtx stream,
-  const r64* a,
-  const r64* b, 
-  r64* c, 
-  len_t N
-);
-EXTERN_C void launch_hadamard_c64(
-  StreamCtx stream,
-  const c64* a,
-  const c64* b, 
-  c64* c, 
   len_t N
 );

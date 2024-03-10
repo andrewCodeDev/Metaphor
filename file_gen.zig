@@ -66,7 +66,7 @@ const MAX_LEN: usize = blk: {
 };
 
 /////////////////////////////////////////////////
-//// DECLARATIONS ///////////////////////////////
+//// INCLUDE HEADERS ////////////////////////////
 
 // used to find and measure externed declarations
 const EXTERN_C: []const u8 = "extern \"C\"";
@@ -84,6 +84,18 @@ const EXTERN_HEADER_MACRO =
     \\
     \\
 ;
+
+const OVERLOAD_IMPORT: []const u8 = 
+    \\
+    \\const OverloadSet = @import("overloadset.zig").OverloadSet;
+    \\
+    \\const decls = @import("cimport.zig").C;
+    \\
+    \\
+;
+
+////////////////////////////////////////////////////
+//// FILE GENERATOR IMPLEMENTATION /////////////////
 
 const FileInfo = struct {
     path: []const u8,  
@@ -104,8 +116,10 @@ const FileGenConfig = struct {
 
 const Self = @This();
 
-arena: std.heap.ArenaAllocator,
-allocator: std.mem.Allocator,
+system_arena: std.heap.ArenaAllocator,
+system_allocator: std.mem.Allocator,
+string_arena: std.heap.ArenaAllocator,
+string_allocator: std.mem.Allocator,
 current_directory: []const u8,
 source_abspaths: StringList,
 target_abspaths: StringList,
@@ -120,30 +134,33 @@ pub fn init(config: FileGenConfig) *Self {
     const self: *Self = std.heap.page_allocator.create(Self) 
         catch @panic("Out of Memory");
 
-    self.arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);    
-    self.allocator = self.arena.allocator();
+    self.system_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);    
+    self.system_allocator = self.system_arena.allocator();
 
-    self.source_abspaths = StringList.initCapacity(self.allocator, 100)
+    self.string_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);    
+    self.string_allocator = self.string_arena.allocator();
+
+    self.source_abspaths = StringList.initCapacity(self.system_allocator, 100)
         catch @panic("Failed to allocate source files capacity.");
 
-    self.target_abspaths = StringList.initCapacity(self.allocator, 100)
+    self.target_abspaths = StringList.initCapacity(self.system_allocator, 100)
         catch @panic("Failed to allocate targest files capacity.");
 
-    self.source_filenames = StringList.initCapacity(self.allocator, 100)
+    self.source_filenames = StringList.initCapacity(self.system_allocator, 100)
         catch @panic("Failed to allocate filenames capacity.");
 
-    const cwd_path = std.fs.cwd().realpathAlloc(self.allocator, ".")
+    const cwd_path = std.fs.cwd().realpathAlloc(self.system_allocator, ".")
         catch @panic("Out of Memory");
 
     self.current_directory = cwd_path;
 
-    self.source_directory = std.fs.path.join(self.allocator, &.{ cwd_path, config.source_directory })
+    self.source_directory = std.fs.path.join(self.system_allocator, &.{ cwd_path, config.source_directory })
         catch @panic("Out of Memory");
 
-    self.target_directory = std.fs.path.join(self.allocator, &.{ cwd_path, config.target_directory })
+    self.target_directory = std.fs.path.join(self.system_allocator, &.{ cwd_path, config.target_directory })
         catch @panic("Out of Memory");
 
-    self.zigsrc_directory = std.fs.path.join(self.allocator, &.{ cwd_path, config.zigsrc_directory })
+    self.zigsrc_directory = std.fs.path.join(self.system_allocator, &.{ cwd_path, config.zigsrc_directory })
         catch @panic("Out of Memory");
 
     self.source_extension = config.source_extension;
@@ -152,42 +169,43 @@ pub fn init(config: FileGenConfig) *Self {
 }
 
 pub fn deinit(self: *Self) void {
-    self.arena.deinit();
+    self.system_arena.deinit();
+    self.string_arena.deinit();
     std.heap.page_allocator.destroy(self);
 }
 
 pub fn appendSourceDirectory(self: *Self, source_name: []const u8) []const u8 {
-    return std.fs.path.join(self.allocator, &.{ self.source_directory, source_name })
+    return std.fs.path.join(self.system_allocator, &.{ self.source_directory, source_name })
         catch @panic("Out of Memory");
 }
 
 pub fn appendLibraryDirectory(self: *Self, source_name: []const u8) []const u8 {
-    return std.fs.path.join(self.allocator, &.{ self.zigsrc_directory, "lib", source_name })
+    return std.fs.path.join(self.system_allocator, &.{ self.zigsrc_directory, "lib", source_name })
         catch @panic("Out of Memory");
 }
 
 pub fn appendCudaDirectory(self: *Self, source_name: []const u8) []const u8 {
-    return std.fs.path.join(self.allocator, &.{ self.zigsrc_directory, "cuda", source_name })
+    return std.fs.path.join(self.system_allocator, &.{ self.zigsrc_directory, "cuda", source_name })
         catch @panic("Out of Memory");
 }
 
 pub fn appendTargetDirectory(self: *Self, target_name: []const u8) []const u8 {
-    return std.fs.path.join(self.allocator, &.{ self.target_directory, target_name })
+    return std.fs.path.join(self.system_allocator, &.{ self.target_directory, target_name })
         catch @panic("Out of Memory");
 }
 
 pub fn appendZigsrcDirectory(self: *Self, zigsrc_name: []const u8) []const u8 {
-    return std.fs.path.join(self.allocator, &.{ self.zigsrc_directory, zigsrc_name })
+    return std.fs.path.join(self.system_allocator, &.{ self.zigsrc_directory, zigsrc_name })
         catch @panic("Out of Memory");
 }
 
 fn joinSourceAbsPaths(self: *Self) []const u8 {
-    return std.mem.join(self.allocator, " ", self.source_abspaths.items)
+    return std.mem.join(self.system_allocator, " ", self.source_abspaths.items)
         catch @panic("Out of Memory");
 }
 
 fn joinTargetAbsPaths(self: *Self) []const u8 {
-    return std.mem.join(self.allocator, " ", self.target_abspaths.items)
+    return std.mem.join(self.system_allocator, " ", self.target_abspaths.items)
         catch @panic("Out of Memory");
 }
 
@@ -212,10 +230,8 @@ pub fn isModified(source_path: []const u8, target_path: []const u8) bool {
 }
 
 // we need to catch this error
-fn collectSources(self: *Self) !bool {
-
-    var modified: bool = false;
-
+fn collectSources(self: *Self) !void {
+    
     var dir: std.fs.Dir = try std.fs.openDirAbsolute(self.source_directory, .{ 
         .access_sub_paths = false, 
         .iterate = true, 
@@ -231,17 +247,10 @@ fn collectSources(self: *Self) !bool {
         const src = self.appendSourceDirectory(path.name);
         const trg = self.appendTargetDirectory(path.name);
 
-        if (isModified(src, trg)) {
-            std.log.info("Modified: {s}", .{ src });
-            modified = true;
-        }
-
         try self.source_abspaths.append(src);
         try self.target_abspaths.append(trg);
-        try self.source_filenames.append(try self.allocator.dupe(u8, path.name));
+        try self.source_filenames.append(try self.system_allocator.dupe(u8, path.name));
     }
-
-    return modified;
 }
 
 
@@ -253,106 +262,83 @@ pub fn generate(self: *Self) void {
     // this replacement algorithm works based on the structure
     // of the replacers up above. It will need to be done away
     // with if the replacement plan ever changes.
-
     std.log.info("Checking kernel source status...\n", .{});
-
-    var declarations: []const u8 = EXTERN_HEADER_MACRO;
 
     // iterate each source, replace the strings, then
     // save it to a target in the target directory
-    const modified = self.collectSources() 
-        catch @panic("Failed to collect sources");
+    self.collectSources() catch @panic("Failed to collect sources.");
 
-    if (!modified) return; // we're all up to date
+    // determines generating declarations and overloads
+    var has_modifications: bool = false;
 
-    std.log.info("Generating kernel source files...\n", .{});
-
-    // get max replacement value to determine what the worst case
-    // size needs to be for strings being replaced.
+    // buffer for generated kernel content
+    var generations = std.ArrayListUnmanaged([]const u8){ };
 
     for (self.source_abspaths.items, self.target_abspaths.items) |src_path, trg_path| {
-        
-        // give some size for the buffer to work
 
+        if (!isModified(src_path, trg_path))
+            continue;
+
+        std.log.info("Generating:\n  {s}...\n", .{ src_path });
+
+        has_modifications = true;
+
+        var gen_success: bool = false;
+        
         const content = self.fileToString(src_path);
 
-        // could be more sparing here, but it doesn't really matter.
-        const repl_buffer: []u8 = self.allocator.alloc(u8, 2 * content.len)
-            catch @panic("Failed to allocate the replace buffer");  
+        for (MIN_LEVEL..MAX_LEVEL) |cur_level| {
 
-        defer self.allocator.free(repl_buffer);
-        @memset(repl_buffer, 0);
-
-        // could be more sparing here, but it doesn't really matter.
-        const swap_buffer: []u8 = self.allocator.alloc(u8, 2 * content.len)
-            catch @panic("Failed to allocate the swap buffer");  
-
-        defer self.allocator.free(swap_buffer);
-        @memset(swap_buffer, 0);
-
-        // since sizes are always paired even across real and complex,
-        // the number of generated functions is the same as a replacement
-        // of a single numeric category
-        const trg_buffer: []u8 = self.allocator.alloc(u8, 4 * repl_buffer.len)
-            catch @panic("Failed to allocate the content buffer");  
-
-        defer self.allocator.free(trg_buffer);
-        @memset(trg_buffer, 0);
-
-        var cur_level = MIN_LEVEL;
-        var end_index: usize = 0;
-
-        while (cur_level <= MAX_LEVEL) : (cur_level += 1) {
-            
-            @memcpy(swap_buffer[0..content.len], content);
+            // to enable multiple replacements per file, recycle
+            // the last replacement to our current generation
+            var current_gen: []const u8 = content;
 
             for (&replacer_sets) |*replacer_set| {
                 for (replacer_set.replacers) |*replacer| {
 
-                    if (replacer.level == cur_level)
-                        if (replaceToBuffer(swap_buffer, replacer_set.indicator, replacer.symbol, repl_buffer))
-                            @memcpy(swap_buffer, repl_buffer);
+                    if (replacer.level != cur_level)
+                        continue;
+                    
+                    if (self.replace(current_gen, replacer_set.indicator, replacer.symbol)) |next_gen| {
+                        current_gen = next_gen;
+                        gen_success = true;
+                    }
                 }
             }
-            end_index = appendTargetBuffer(trg_buffer, end_index, swap_buffer);
+
+            if (!gen_success) @panic("Generation failed.");
+
+            generations.append(self.system_allocator, current_gen)
+                catch @panic("Failed to append generation.");
         }
 
-        var start: usize = 0;
+        // join generations and write to file
+        const file_content = std.mem.join(self.string_allocator, "\n", generations.items)
+            catch @panic("Failed to join generations.");
 
-        while (true) { // break if we don't find another extern "C"
+        stringToFile(trg_path, file_content);
 
-            start = std.mem.indexOfPos(u8, trg_buffer, start, EXTERN_C)
-                orelse break;
+        // free our string capacity for next file set
+        _ = self.string_arena.reset(.retain_capacity);
 
-            // get the end of the declaration
-            const stop = std.mem.indexOfPos(u8, trg_buffer, start, ")")
-                orelse @panic("Invalid declaration.");
-
-            // we need to replace this with "EXTERN_C" for the macros to work
-            start += EXTERN_C.len;
-
-            const new_decl = trg_buffer[start..stop];
-            
-            declarations = std.mem.join(self.allocator, "", &.{ declarations, "EXTERN_C", new_decl, ");\n" })
-                catch @panic("Join Declaration: Out Of Memory");
-
-            start = stop;
-        }
-
-        stringToFile(trg_path, trg_buffer);
+        generations.clearRetainingCapacity();    
     }    
-    stringToFile(self.appendCudaDirectory("kernel_decls.h"), declarations);
 
-    self.makeKernelOverloads() 
-        catch @panic("Failed to make overloads.");
+    if (has_modifications) {
+        self.makeKernelDeclarations() 
+            catch @panic("Failed to make kernel declarations.");
+
+        self.makeKernelOverloads() 
+            catch @panic("Failed to make overload sets.");
         
-    std.log.info("Compiling kernel library...\n", .{});
+        std.log.info("Compiling kernel library...\n", .{});
 
-    ScriptCompiler.compileSharedLibrary(.{
-        .allocator = self.allocator,
-        .targets = self.target_abspaths.items,
-        .libname  = self.appendLibraryDirectory("libmp_kernels.so")
-    });
+        ScriptCompiler.compileSharedLibrary(.{
+            .allocator = self.system_allocator,
+            .targets = self.target_abspaths.items,
+            .libname = self.appendLibraryDirectory("libmp_kernels.so")
+        });
+    }
 }
 
 fn makeKernelOverloads(self: *Self) !void {
@@ -382,37 +368,68 @@ fn makeKernelOverloads(self: *Self) !void {
                 orelse @panic("Incomplete declaration.");
 
             overloadset_args = try std.mem.join(
-                self.allocator, "", &.{ overloadset_args, "\tdecls.", content[start..last], ",\n" }
+                self.string_allocator, "", &.{ overloadset_args, "\tdecls.", content[start..last], ",\n" }
             );                
         }
 
         const name_stop = std.mem.indexOfScalar(u8, name, '.')
             orelse @panic("Target file does not have extension.");
 
-        overloadset_decls = try std.mem.join(self.allocator, 
+        overloadset_decls = try std.mem.join(self.string_allocator, 
             "", &.{ overloadset_decls, "pub const ", name[0..name_stop], " = OverloadSet(.{\n", overloadset_args, "});\n\n"
         });
     }
 
-    const import_head: []const u8 = 
-        \\
-        \\const OverloadSet = @import("overloadset.zig").OverloadSet;
-        \\
-        \\const decls = @import("cimport.zig").C;
-        \\
-        \\
-    ;
-
-    overloadset_decls = try std.mem.join(self.allocator, 
-        "", &.{ import_head, overloadset_decls }
+    overloadset_decls = try std.mem.join(self.string_allocator, 
+        "", &.{ OVERLOAD_IMPORT, overloadset_decls }
     );
 
     stringToFile(self.appendZigsrcDirectory("kernel_overloads.zig"), overloadset_decls);
+
+    _ = self.string_arena.reset(.retain_capacity);
+}
+
+
+pub fn makeKernelDeclarations(self: *Self) !void {
+
+    var declarations: []const u8 = EXTERN_HEADER_MACRO;
+
+    for (self.target_abspaths.items) |trg_path| {    
+        
+        const trg_buffer = self.fileToString(trg_path);
+
+        var start: usize = 0;
+
+        while (true) { // break if we don't find another extern "C"
+
+            start = std.mem.indexOfPos(u8, trg_buffer, start, EXTERN_C)
+                orelse break;
+
+            // get the end of the declaration
+            const stop = std.mem.indexOfPos(u8, trg_buffer, start, ")")
+                orelse @panic("Invalid declaration.");
+
+            // we need to replace this with "EXTERN_C" for the macros to work
+            start += EXTERN_C.len;
+
+            const new_decl = trg_buffer[start..stop];
+            
+            declarations = std.mem.join(self.string_allocator, "", &.{ declarations, "EXTERN_C", new_decl, ");\n" })
+                catch @panic("Join Declaration: Out Of Memory");
+
+            start = stop;
+        }
+        stringToFile(trg_path, trg_buffer);
+    }
+
+    stringToFile(self.appendCudaDirectory("kernel_decls.h"), declarations);
+
+    _ = self.string_arena.reset(.retain_capacity);
 }
 
 pub fn makeCImport(self: *Self) void {
 
-    const cimport_string = std.mem.join(self.allocator, "", &.{
+    const cimport_string = std.mem.join(self.string_allocator, "", &.{
         "pub const C = @cImport({\n",
             "\t@cInclude(\"", self.appendCudaDirectory("device_utils.h"), "\");\n",
             "\t@cInclude(\"", self.appendCudaDirectory("tensor_types.h"), "\");\n",
@@ -426,7 +443,7 @@ pub fn makeCImport(self: *Self) void {
 pub fn reset(self: *Self) void {
     self.source_abspaths.deinit();
     self.target_abspaths.deinit();
-    self.arena.reset(.retain_capacity);
+    self.system_arena.reset(.retain_capacity);
 }
 
 fn fileToString(self: *Self, filename: []const u8) []u8 {
@@ -436,7 +453,7 @@ fn fileToString(self: *Self, filename: []const u8) []u8 {
     
     const f_len = f.getEndPos() catch @panic("Could not get end position.");
 
-    const string = self.allocator.alloc(u8, f_len) catch @panic("Out of memory.");
+    const string = self.string_allocator.alloc(u8, f_len) catch @panic("Out of memory.");
 
     _ = f.readAll(string) catch @panic("Could not read file.");
 
@@ -457,24 +474,24 @@ fn stringToFile(path: []const u8, string: []const u8) void {
     _ = writer.writeAll(string[0..end]) catch @panic("Failed to write file.");
 }
 
-fn appendTargetBuffer(
-    buffer: []u8,
-    start: usize,
-    tail: []const u8,
-) usize {
-
-    const end = std.mem.indexOfScalar(u8, tail, 0)
-        orelse tail.len;
-
-    if ((buffer.len - start) < end)
-        @panic("Buffer size too small");
-
-    const slice = buffer[start..start + end];
-
-    @memcpy(slice, tail[0..end]);
-
-    return start + end;
-}
+//fn appendTargetBuffer(
+//    buffer: []u8,
+//    start: usize,
+//    tail: []const u8,
+//) usize {
+//
+//    const end = std.mem.indexOfScalar(u8, tail, 0)
+//        orelse tail.len;
+//
+//    if ((buffer.len - start) < end)
+//        @panic("Buffer size too small");
+//
+//    const slice = buffer[start..start + end];
+//
+//    @memcpy(slice, tail[0..end]);
+//
+//    return start + end;
+//}
 
 fn replaceExtension(
     buffer: []u8,
@@ -526,27 +543,31 @@ pub fn indicatorInSource(
     }
 }
 
-pub fn replaceToBuffer(
+pub fn replace(
+    self: *Self,
     haystack: []const u8,
     needle: []const u8,
-    replacement: []const u8,
-    buffer: []u8,
-) bool {
+    replacement: []const u8
+) ?[]const u8 {
 
-    const end = std.mem.indexOfScalar(u8, haystack, 0)
-        orelse haystack.len;
+    if (std.mem.indexOf(u8, haystack, needle) == null)
+        return null;
 
-    // probably overkill, we calculate the buffer size before replacing
-    const needed = std.mem.replacementSize(u8, haystack[0..end], needle, replacement);
+    const needed = std.mem.replacementSize(
+        u8, haystack, needle, replacement
+    );
 
-    if (buffer.len < needed)
-        @panic("Buffer size too small");
+    const buffer = self.string_allocator.alloc(u8, needed) 
+        catch @panic("Failed to allocate replacement buffer");
 
-    const replacements = std.mem.replace(u8, haystack[0..end], needle, replacement, buffer);
+    const replacements = std.mem.replace(
+        u8, haystack, needle, replacement, buffer
+    );
 
-    @memset(buffer[needed..], 0); // set new indicator for where stop
+    if (replacements == 0) 
+        @panic("Failed to replace indicator in file.");
 
-    return replacements != 0; // indicate if we replaced something
+    return buffer; // indicate if we replaced something
 }
 
 pub fn sameExtension(

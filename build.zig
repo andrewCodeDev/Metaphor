@@ -10,8 +10,8 @@ pub fn build(b: *std.Build) void {
 
     const gen: *FileGen = FileGen.init(.{
         .source_extension = ".cu",
-        .source_directory = "src/cuda/nvcc_source",
-        .target_directory = "src/cuda/nvcc_target",
+        .source_directory = b.pathJoin(&.{"src", "cuda", "nvcc_source"}),
+        .target_directory = b.pathJoin(&.{"src", "cuda", "nvcc_target"}),
         .zigsrc_directory = "src",
     });
 
@@ -45,27 +45,31 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const mp_module = b.addModule("metaphor", .{
-        .root_source_file = .{ .path = "src/metaphor.zig" }
+        .root_source_file = .{ .path = b.pathJoin(&.{ "src", "metaphor.zig" }) }
     });
 
-    const EXAMPLE_NAMES = &[_][]const u8{
-        "basic",
-    };
+    // reusable paths for linking libraries to source files
+    // TODO: make a flag for x86-x64-linux to support different OS's
+    const cuda_stubs = b.pathJoin(&.{ "dependencies", "cuda", "targets", "x86_64-linux", "lib", "stubs" });
+    const cuda_lib64 = b.pathJoin(&.{ "dependencies", "cuda", "lib64" });
+    const mp_kernels = b.pathJoin(&.{ "src", "lib", "mp_kernels.a" });
+    const mp_src_lib = b.pathJoin(&.{ "src", "lib" });
 
+    // create options for each example in src/examples/
     inline for (EXAMPLE_NAMES) |EXAMPLE_NAME| {
 
         const examples_step = b.step("example-" ++ EXAMPLE_NAME, "Run example \"" ++ EXAMPLE_NAME ++ "\"");
         
         const example = b.addExecutable(.{
             .name = EXAMPLE_NAME,
-            .root_source_file = std.Build.LazyPath.relative("src/examples/" ++ EXAMPLE_NAME ++ ".zig"),
+            .root_source_file = .{ .path = b.pathJoin(&.{"src", "examples", EXAMPLE_NAME ++ ".zig"}) },
             .target = target,
             .optimize = optimize,
         });
 
         example.root_module.addImport("metaphor", mp_module);
 
-        linkLibraries(example, gen);
+        linkLibraries(example, mp_src_lib, cuda_lib64, cuda_stubs, mp_kernels);
 
         const example_run = b.addRunArtifact(example);
         // This allows the user to pass arguments to the application in the build
@@ -103,16 +107,27 @@ pub fn build(b: *std.Build) void {
     //test_step.dependOn(&run_exe_unit_tests.step);
 }
 
-fn linkLibraries(step: *std.Build.Step.Compile, gen: *FileGen) void {    
-    step.addLibraryPath(.{ .path = gen.appendZigsrcDirectory("lib") });
-    step.addLibraryPath(.{ .path = "dependencies/cuda/lib64" });
-    step.addLibraryPath(.{ .path = "dependencies/cuda/targets/x86_64-linux/lib/stubs" });
+const EXAMPLE_NAMES = &[_][]const u8{
+    "basic",
+};
+
+fn linkLibraries(
+    step: *std.Build.Step.Compile, 
+    mp_src_lib: []const u8,
+    cuda_lib64: []const u8,
+    cuda_stubs: []const u8,
+    mp_kernels: []const u8
+) void {    
+    step.addLibraryPath(.{ .path = mp_src_lib });
+    step.addLibraryPath(.{ .path = cuda_lib64 });
+    step.addLibraryPath(.{ .path = cuda_stubs });
+
     step.linkSystemLibrary("cuda");
     step.linkSystemLibrary("cudart");
     step.linkSystemLibrary("nvrtc");
     step.linkSystemLibrary("dev_utils");
-    step.addObjectFile(
-       std.Build.LazyPath.relative("src/lib/mp_kernels.a"),
-    );
+
+    step.addObjectFile(.{ .path = mp_kernels });
+
     step.linkLibC();
 }

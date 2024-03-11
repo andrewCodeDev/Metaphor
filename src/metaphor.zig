@@ -44,6 +44,7 @@ pub const mem = struct {
     pub const free = DU.free;
     pub const fill = CG.fill;
     pub const sequence = TenOps.sequence;
+    pub const randomize = TenOps.randomize;
 };
 
 pub const types = struct {
@@ -58,6 +59,7 @@ pub const types = struct {
     pub const SizeType = TC.SizeType;
     pub const Strides = TC.Strides;
     pub const Sizes = TC.Sizes;
+    pub const Stream = DU.Stream;
 };
 
 pub const Graph = CG.Graph;

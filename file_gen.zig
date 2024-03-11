@@ -185,13 +185,18 @@ pub fn appendSourceDirectory(self: *Self, source_name: []const u8) []const u8 {
         catch @panic("Out of Memory");
 }
 
-pub fn appendLibraryDirectory(self: *Self, source_name: []const u8) []const u8 {
-    return std.fs.path.join(self.system_allocator, &.{ self.zigsrc_directory, "lib", source_name })
+pub fn appendLibraryDirectory(self: *Self, library_name: []const u8) []const u8 {
+    return std.fs.path.join(self.system_allocator, &.{ self.zigsrc_directory, "lib", library_name })
         catch @panic("Out of Memory");
 }
 
 pub fn appendCudaDirectory(self: *Self, source_name: []const u8) []const u8 {
     return std.fs.path.join(self.system_allocator, &.{ self.zigsrc_directory, "cuda", source_name })
+        catch @panic("Out of Memory");
+}
+
+pub fn appendExampleDirectory(self: *Self, example_name: []const u8) []const u8 {
+    return std.fs.path.join(self.system_allocator, &.{ self.zigsrc_directory, "examples", example_name })
         catch @panic("Out of Memory");
 }
 

@@ -215,6 +215,31 @@ pub fn sequence(
 
 // <>--------------------------------------------------------<>
 
+pub fn randomize(
+    x: anytype,
+    stream: DU.Stream
+) void {
+
+    //TODO: replace this with a kernel call
+    
+    var backing = std.rand.DefaultPrng.init(42);
+
+    var random = backing.random();
+    
+    const mem = std.heap.c_allocator.alloc(@TypeOf(x).DataType, x.len())
+        catch @panic("randomize out of memory");
+
+        defer std.heap.c_allocator.free(mem);
+
+    for (0..x.len()) |i|
+        mem[i] = random.float(@TypeOf(x).DataType);
+
+    DU.copyToDevice(mem, x.values(), stream);
+
+    DU.synchronizeStream(stream);
+}
+// <>--------------------------------------------------------<>
+
 pub inline fn permutate_ij_ji(
     stream: Stream, 
     x: anytype, 

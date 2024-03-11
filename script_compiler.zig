@@ -250,34 +250,6 @@ pub fn compileStaticLibrary(input: struct {
 
             @panic("Failed to create static library");
         }
-
-        { // create indexed archive file for static library
-            const argv = archiveFilesArgv(input.allocator, input.mod_targets, input.lib_name) 
-                catch @panic("Failed to create archive argv");
-
-            defer input.allocator.free(argv);
-            
-            const result = ChildProcess.run(.{
-                .allocator = input.allocator, .argv = argv,
-            }) catch |e| {
-                std.log.err("Error: {}", .{e});
-                @panic("ChildProcess.run failed");
-            };
-
-            switch (result.term) {
-                .Exited  => |e| {
-                    if (e == 0) break :blk;
-                    std.log.err("Exit Code: {}", .{ e });
-                },
-                .Signal  => |s| std.log.err("Signal: {}\n",  .{s}),
-                .Stopped => |s| std.log.err("Stopped: {}\n", .{s}),
-                .Unknown => |u| std.log.err("Unknown: {}\n", .{u}),
-            }
-            std.log.err(
-                "{s}\n", .{ if (result.stderr.len > 0) result.stderr else "None" }
-            );
-            @panic("Failed to create static library");
-        }
     }
 
     // move back to home

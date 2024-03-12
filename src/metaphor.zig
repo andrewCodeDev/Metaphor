@@ -87,7 +87,7 @@ pub const ops = struct {
         const callback = Impl{ };  // instance for comptime fields
         callback.forward(graph.stream, X, Y, Z);
         return if (graph.mode == .eval)
-            Z else graph.appendNode(Impl, .{ graph.stream, X, Y }, Z);
+            Z else graph.appendNode(Impl, .{ X, Y }, Z);
     }
 
     inline fn activationDispatch(comptime Impl: type,  X: anytype) NodeTensor(Child(@TypeOf(X))) {
@@ -96,7 +96,7 @@ pub const ops = struct {
         const callback = Impl{ };  // instance for comptime fields
         callback.forward(graph.stream, X, Y);
         return if (graph.mode == .eval)
-            Y else graph.appendNode(Impl, .{ graph.stream, X }, Y);
+            Y else graph.appendNode(Impl, .{ X }, Y);
     }
 
 // <>--------------------------------------------------------<>
@@ -145,7 +145,7 @@ pub const ops = struct {
         TenOps.leakyReluForward(graph.stream, X, coef, Y);
 
         return if (graph.mode == .eval)
-            Y else graph.appendNode(TenOps.LeakyReluImpl, .{ graph.stream, X }, Y);
+            Y else graph.appendNode(TenOps.LeakyReluImpl, .{ X }, Y);
     }
 
 // <>--------------------------------------------------------<>
@@ -195,7 +195,7 @@ pub const ops = struct {
         perm.forward(graph.stream, X, Y);
 
         return if (graph.mode == .eval)
-            Y else graph.appendNode(@TypeOf(perm), .{ graph.stream, X }, Y);
+            Y else graph.appendNode(@TypeOf(perm), .{ X }, Y);
     }
 
 // <>--------------------------------------------------------<>
@@ -234,7 +234,7 @@ pub const ops = struct {
         ip.forward(graph.stream, X, Y, Z);
 
         return if (graph.mode == .eval)
-            Z else graph.appendNode(@TypeOf(ip), .{ graph.stream, X, Y }, Z);
+            Z else graph.appendNode(@TypeOf(ip), .{ X, Y }, Z);
     }
 };
 

@@ -26,7 +26,7 @@ pub fn additionForward(stream: Stream, x: anytype, y: anytype, z: anytype) void 
     });
 }
 
-pub fn additionReverseArg1(stream: Stream, X: anytype, _: anytype, Z: anytype) void {
+pub fn additionReverseArg0(stream: Stream, X: anytype, _: anytype, Z: anytype) void {
     const x_grads = UT.assertGrads(X);
     const z_grads = UT.assertGrads(Z);
 
@@ -35,7 +35,7 @@ pub fn additionReverseArg1(stream: Stream, X: anytype, _: anytype, Z: anytype) v
     });
 }
 
-pub fn additionReverseArg2(stream: Stream, _: anytype, Y: anytype, Z: anytype) void {
+pub fn additionReverseArg1(stream: Stream, _: anytype, Y: anytype, Z: anytype) void {
     const y_grads = UT.assertGrads(Y);
     const z_grads = UT.assertGrads(Z);
 
@@ -46,8 +46,8 @@ pub fn additionReverseArg2(stream: Stream, _: anytype, Y: anytype, Z: anytype) v
 
 pub const AddImpl = CallbackBuilder(
     additionForward, .{
-        .{ additionReverseArg1, 1 },
-        .{ additionReverseArg2, 2 }
+        .{ additionReverseArg0, 0 },
+        .{ additionReverseArg1, 1 }
     }, NoCleanup
 );
 
@@ -63,7 +63,7 @@ pub fn subtractionForward(stream: Stream, x: anytype, y: anytype, z: anytype) vo
     });
 }
 
-pub fn subtractionReverseArg1(stream: Stream, X: anytype, _: anytype, Z: anytype) void {
+pub fn subtractionReverseArg0(stream: Stream, X: anytype, _: anytype, Z: anytype) void {
     const x_grads = UT.assertGrads(X);
     const z_grads = UT.assertGrads(Z);
 
@@ -75,7 +75,7 @@ pub fn subtractionReverseArg1(stream: Stream, X: anytype, _: anytype, Z: anytype
     });
 }
 
-pub fn subtractionReverseArg2(stream: Stream, _: anytype, Y: anytype, Z: anytype) void {
+pub fn subtractionReverseArg1(stream: Stream, _: anytype, Y: anytype, Z: anytype) void {
     const y_grads = UT.assertGrads(Y);
     const z_grads = UT.assertGrads(Z);
 
@@ -89,8 +89,8 @@ pub fn subtractionReverseArg2(stream: Stream, _: anytype, Y: anytype, Z: anytype
 
 pub const SubImpl = CallbackBuilder(
     subtractionForward, .{
-        .{ subtractionReverseArg1, 1 },
-        .{ subtractionReverseArg2, 2 }
+        .{ subtractionReverseArg0, 0 },
+        .{ subtractionReverseArg1, 1 }
     }, NoCleanup
 );
 
@@ -106,7 +106,7 @@ pub fn hadamardForward(stream: Stream, x: anytype, y: anytype, z: anytype) void 
     });
 }
 
-pub fn hadamardReverseArg1(stream: Stream, X: anytype, Y: anytype, Z: anytype) void {
+pub fn hadamardReverseArg0(stream: Stream, X: anytype, Y: anytype, Z: anytype) void {
     const x_grads = UT.assertGrads(X);
     const y_value = Y.values();
     const z_grads = UT.assertGrads(Z);
@@ -116,7 +116,7 @@ pub fn hadamardReverseArg1(stream: Stream, X: anytype, Y: anytype, Z: anytype) v
     });
 }
 
-pub fn hadamardReverseArg2(stream: Stream, X: anytype, Y: anytype, Z: anytype) void {
+pub fn hadamardReverseArg1(stream: Stream, X: anytype, Y: anytype, Z: anytype) void {
     const x_value = X.values();
     const y_grads = UT.assertGrads(Y);
     const z_grads = UT.assertGrads(Z);
@@ -128,8 +128,8 @@ pub fn hadamardReverseArg2(stream: Stream, X: anytype, Y: anytype, Z: anytype) v
 
 pub const HadamardImpl = CallbackBuilder(
     hadamardForward, .{
+        .{ hadamardReverseArg0, 0 },
         .{ hadamardReverseArg1, 1 },
-        .{ hadamardReverseArg2, 2 },
     }, NoCleanup
 );
 
@@ -165,7 +165,7 @@ pub fn leakyReluReverse(stream: Stream, x: anytype, coef: anytype, y: anytype) v
 
 pub const LeakyReluImpl = CallbackBuilder(
     leakyReluForward, .{
-        .{ leakyReluReverse, 1 },
+        .{ leakyReluReverse, 0 },
     }, NoCleanup
 );
 
@@ -192,7 +192,7 @@ pub fn tanhReverse(stream: Stream, x: anytype, y: anytype) void {
 
 pub const TanhImpl = CallbackBuilder(
     tanhForward, .{
-        .{ tanhReverse, 1 },
+        .{ tanhReverse, 0 },
     }, NoCleanup
 );
 
@@ -269,7 +269,7 @@ pub inline fn permutate_ij_ji_Reverse(
 }
 
 const Perm_ij_ji_Impl = CallbackBuilder(
-    permutate_ij_ji, .{ .{ permutate_ij_ji, 1 } }, NoCleanup
+    permutate_ij_ji, .{ .{ permutate_ij_ji, 0 } }, NoCleanup
 );
 
 const permutation_expressions = std.ComptimeStringMap(
@@ -345,7 +345,7 @@ pub inline fn innerProduct_ij_j(
     );
 }
 
-pub inline fn innerProduct_ij_j_ReverseArg1(
+pub inline fn innerProduct_ij_j_ReverseArg0(
     stream: Stream, 
     x: anytype, 
     y: anytype,
@@ -373,7 +373,7 @@ pub inline fn innerProduct_ij_j_ReverseArg1(
     );
 }
 
-pub inline fn innerProduct_ij_j_ReverseArg2(
+pub inline fn innerProduct_ij_j_ReverseArg1(
     stream: Stream, 
     x: anytype, 
     y: anytype,
@@ -426,8 +426,8 @@ inline fn __innerProduct_i_ij(
 
 const IP_i_ij_Impl = CallbackBuilder(
     innerProduct_i_ij, .{
+        .{ innerProduct_i_ij_ReverseArg0, 0 },   
         .{ innerProduct_i_ij_ReverseArg1, 1 },   
-        .{ innerProduct_i_ij_ReverseArg2, 2 },   
     }, NoCleanup
 );
 
@@ -460,7 +460,7 @@ pub inline fn innerProduct_i_ij(
 }
 
 
-pub inline fn innerProduct_i_ij_ReverseArg1(
+pub inline fn innerProduct_i_ij_ReverseArg0(
     stream: Stream, 
     x: anytype, 
     y: anytype,
@@ -488,7 +488,7 @@ pub inline fn innerProduct_i_ij_ReverseArg1(
     );
 }
 
-pub inline fn innerProduct_i_ij_ReverseArg2(
+pub inline fn innerProduct_i_ij_ReverseArg1(
     stream: Stream, 
     x: anytype, 
     y: anytype,
@@ -520,40 +520,40 @@ pub inline fn innerProduct_i_ij_ReverseArg2(
 
 const IP_ij_j_Impl = CallbackBuilder(
     innerProduct_ij_j, .{
+        .{ innerProduct_ij_j_ReverseArg0, 0 },
         .{ innerProduct_ij_j_ReverseArg1, 1 },
-        .{ innerProduct_ij_j_ReverseArg2, 2 },
     }, NoCleanup
 );
 
 pub fn innerProduct_i_ji(stream: Stream, x: anytype, y: anytype, z: anytype) void {
     return innerProduct_ij_j(stream, y, x, z);
 }
+pub fn innerProduct_i_ji_ReverseArg0(stream: Stream, x: anytype, y: anytype, z: anytype) void {
+    return innerProduct_ij_j_ReverseArg0(stream, y, x, z);
+}
 pub fn innerProduct_i_ji_ReverseArg1(stream: Stream, x: anytype, y: anytype, z: anytype) void {
     return innerProduct_ij_j_ReverseArg1(stream, y, x, z);
 }
-pub fn innerProduct_i_ji_ReverseArg2(stream: Stream, x: anytype, y: anytype, z: anytype) void {
-    return innerProduct_ij_j_ReverseArg2(stream, y, x, z);
-}
 const IP_i_ji_Impl = CallbackBuilder(
     innerProduct_i_ji, .{
+        .{ innerProduct_i_ji_ReverseArg0, 0 },
         .{ innerProduct_i_ji_ReverseArg1, 1 },
-        .{ innerProduct_i_ji_ReverseArg2, 2 },
     }, NoCleanup
 );
 
 pub fn innerProduct_ij_i(stream: Stream, x: anytype, y: anytype, z: anytype) void {
     return innerProduct_i_ij(stream, y, x, z);
 }
+pub fn innerProduct_ij_i_ReverseArg0(stream: Stream, x: anytype, y: anytype, z: anytype) void {
+    return innerProduct_i_ij_ReverseArg0(stream, y, x, z);
+}
 pub fn innerProduct_ij_i_ReverseArg1(stream: Stream, x: anytype, y: anytype, z: anytype) void {
     return innerProduct_i_ij_ReverseArg1(stream, y, x, z);
 }
-pub fn innerProduct_ij_i_ReverseArg2(stream: Stream, x: anytype, y: anytype, z: anytype) void {
-    return innerProduct_i_ij_ReverseArg2(stream, y, x, z);
-}
 const IP_ij_i_Impl = CallbackBuilder(
     innerProduct_ij_i, .{
+        .{ innerProduct_ij_i_ReverseArg0, 0 },
         .{ innerProduct_ij_i_ReverseArg1, 1 },
-        .{ innerProduct_ij_i_ReverseArg2, 2 },
     }, NoCleanup
 );
 //////////////////////////////
@@ -609,7 +609,7 @@ pub inline fn innerProduct_ij_jk(
     );
 }
 
-inline fn innerProduct_ij_jk_ReverseArg1(
+inline fn innerProduct_ij_jk_ReverseArg0(
     stream: Stream, 
     x: anytype, 
     y: anytype,
@@ -646,7 +646,7 @@ inline fn innerProduct_ij_jk_ReverseArg1(
     );
 }
 
-inline fn innerProduct_ij_jk_ReverseArg2(
+inline fn innerProduct_ij_jk_ReverseArg1(
     stream: Stream, 
     x: anytype, 
     y: anytype,
@@ -687,8 +687,8 @@ inline fn innerProduct_ij_jk_ReverseArg2(
 
 const IP_ij_jk_Impl = CallbackBuilder(
     innerProduct_ij_jk, .{
+        .{ innerProduct_ij_jk_ReverseArg0, 0 },
         .{ innerProduct_ij_jk_ReverseArg1, 1 },
-        .{ innerProduct_ij_jk_ReverseArg2, 2 },
     }, NoCleanup,
 );
 

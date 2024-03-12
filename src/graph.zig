@@ -123,6 +123,9 @@ pub fn LeafTensor(comptime T: type, comptime class: TensorClass) type {
         pub fn free(self: Self) void {
             self.ptr.freeTensor(self);
         }
+        pub fn stream(self: Self) Stream {
+            return self.ptr.leaves.streams.items[self.idx];
+        }
         fn adjustDependencies(self: Self, comptime direction: i8) i8 {
             return self.ptr.adjustDependencies(Class, self.idx, direction);
         }
@@ -164,6 +167,9 @@ pub fn NodeTensor(comptime T: type) type {
         }
         pub fn len(self: Self) SizeType {
             return self.values().len;
+        }
+        pub fn stream(self: Self) Stream {
+            return self.ptr.nodes.streams.items[self.idx];
         }
         pub fn attach(self: Self) void {
             self.ptr.setAttachment(self.idx, true);
@@ -253,6 +259,7 @@ pub const Graph = struct {
         sizes: ArrayList(Sizes),
         strides: ArrayList(Strides),
         dependencies: ArrayList(i8),
+        streams: ArrayList(Stream),
         pub fn init(allocator: std.mem.Allocator, block_size: usize) !Leaves {
             return @This() {
                 .names = try ArrayList([]const u8).initCapacity(allocator, block_size),
@@ -262,6 +269,7 @@ pub const Graph = struct {
                 .sizes = try ArrayList(Sizes).initCapacity(allocator, block_size),
                 .strides = try ArrayList(Strides).initCapacity(allocator, block_size),
                 .dependencies = try ArrayList(i8).initCapacity(allocator, block_size),
+                .streams = try ArrayList(Stream).initCapacity(allocator, block_size),
             };
         }
     };
@@ -274,6 +282,7 @@ pub const Graph = struct {
         strides: ArrayList(Strides),
         dependencies: ArrayList(i8),
         attached: ArrayList(bool),
+        streams: ArrayList(Stream),
         pub fn init(allocator: std.mem.Allocator, block_size: usize) !Nodes {
             return @This() {
                 .callbacks = try ArrayList(Closure).initCapacity(allocator, block_size),
@@ -283,6 +292,7 @@ pub const Graph = struct {
                 .strides = try ArrayList(Strides).initCapacity(allocator, block_size),
                 .dependencies = try ArrayList(i8).initCapacity(allocator, block_size),
                 .attached = try ArrayList(bool).initCapacity(allocator, block_size),
+                .streams = try ArrayList(Stream).initCapacity(allocator, block_size),
             };
         }
     };
@@ -412,6 +422,7 @@ pub const Graph = struct {
             try self.nodes.grads.append(null);
             try self.nodes.dependencies.append(0);
             try self.nodes.attached.append(true);
+            try self.leaves.streams.append(self.stream);
             self.node_count += 1;
         } else {
             if (name) |_name| {
@@ -423,6 +434,7 @@ pub const Graph = struct {
                 try self.leaves.strides.append(strides);
                 try self.leaves.grads.append(null);
                 try self.leaves.dependencies.append(0);            
+                try self.leaves.streams.append(self.stream);
                 self.leaf_count += 1;
             } else {
                 @panic("Leaf tensors cannot have null names.");
@@ -652,21 +664,21 @@ fn reverseEdge(
     const arg = edge_tuple[edge];
     const DataType = @TypeOf(arg).DataType;
     const Class = @TypeOf(arg).Class;
-    const graph_ptr = arg.ptr;
+    const graph = arg.ptr;
 
     // why calculate the input gradient if we are
     // freeing it immediately after creating it?
-    if ((Class == .inp) and graph_ptr.auto_free_inp_grads) {
+    if ((Class == .inp) and graph.auto_free_inp_grads) {
         return null;
     }
 
     // enable gradients if we don't have them
     if (arg.grads() == null) {
-        const grd = graph_ptr.enableGradient(DataType, Class, arg.idx);
-        fillSlice(DataType, grd, SC.asScalar(DataType, 0), graph_ptr.stream);
+        const grd = graph.enableGradient(DataType, Class, arg.idx);
+        fillSlice(DataType, grd, SC.asScalar(DataType, 0), arg.stream());
     }
 
-    @call(.auto, func, edge_tuple);   
+    @call(.auto, func, .{ arg.stream() } ++ edge_tuple);   
 
     // this portion deals with whether or not we can
     // return the next reverse node up the tree. We
@@ -680,12 +692,15 @@ fn reverseEdge(
 
             // by optimizing as we go along, we can free
             // gradients as soon as we're done using them
-            graph_ptr.optimizer.update(
+            graph.optimizer.update(
                 arg.name(), arg.raw_values(), arg.raw_grads().?
             );
 
-            if (graph_ptr.auto_free_wgt_grads) {
-                graph_ptr.disableGradient(DataType, Class, arg.idx);
+            if (graph.auto_free_wgt_grads) {
+                // TODO: determine if this synchronization is necessary
+                DU.synchronizeStream(arg.stream());
+
+                graph.disableGradient(DataType, Class, arg.idx);
             }
 
         // since we've collected all of our dependencies,
@@ -749,16 +764,16 @@ fn reverseNext(
     // the last argument is always the reverse-parent node.
     const N = comptime UT.tupleSize(@TypeOf(edge_tuple)) - 1;
 
-    const graph_ptr = edge_tuple[N].ptr;
+    const graph = edge_tuple[N].ptr;
 
     // Free unnecessary data as we go along...
-    if (graph_ptr.auto_free_hid_nodes) {
+    if (graph.auto_free_hid_nodes) {
         // we need to synchronize here to prevent the parent
         // node from being released before the other children
         // have a chance to collect their gradients
-        DU.synchronizeStream(edge_tuple[0]);
+        DU.synchronizeStream(edge_tuple[N].stream());
 
-        graph_ptr.freeTensor(edge_tuple[N]);
+        graph.freeTensor(edge_tuple[N]);
     }
 
     // this node's reversals are now exhausted
@@ -786,9 +801,9 @@ const ClosureBuffer = struct {
 
     const Self = @This();
 
-    // we want to hold at least 4 graph tensors and a stream
+    // we want to hold at least 4 graph tensors
     // and a graph tensor is (ptr, idx)
-    const BufferSize = @sizeOf(usize) * 8 + @sizeOf(usize);
+    const BufferSize = @sizeOf(NodeTensor(SC.q8)) * 4;
 
     items: extern union {
         inplace: [BufferSize]u8 align(@alignOf(usize)),  

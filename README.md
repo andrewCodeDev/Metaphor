@@ -14,8 +14,6 @@ Open the "Metaphor/config.json" file and specify your GPU's compute architecture
 
 You can now use Metaphor!
 
-Currently, "Metaphor/build.zig" is pointed to a "Metaphor/src/main.zig". This is a sandbox for the early period of this library's development that will be removed in future releases.
-
 # Examples:
 
 ```zig
@@ -53,8 +51,8 @@ pub fn main() !void {
     const X2 = G.tensor("X2", .wgt, .r32, mp.Dims(2){ 2, 2 });
         defer X2.free();
 
-    mp.ops.fill(X1, 2);
-    mp.ops.fill(X2, 1);
+    mp.mem.fill(X1, 2);
+    mp.mem.fill(X2, 1);
 
     for (0..10) |i| {
 

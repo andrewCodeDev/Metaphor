@@ -54,6 +54,7 @@ pub fn isGraphTensor(comptime T: type) bool {
     }
 }
 
+// TODO: move this function?
 fn fillSlice(
     comptime T: type,
     x_slice: []T,
@@ -227,11 +228,16 @@ const TypeOption = enum {
     }
 };
 
+const Mode = enum {
+    train, eval
+};
+
 pub const GraphConfig = struct {
     optimizer: Optimizer,
     auto_free_wgt_grads: bool = false,
     auto_free_inp_grads: bool = false,
     auto_free_hid_nodes: bool = true,
+    mode: Mode = .train, // good default?
     stream: Stream,
 };
 
@@ -301,6 +307,8 @@ pub const Graph = struct {
     auto_free_inp_grads: bool,
     auto_free_hid_nodes: bool,
 
+    mode: Mode,
+
     stream: Stream,
 
     // this function ensures the correct allocator
@@ -340,6 +348,8 @@ pub const Graph = struct {
         self.auto_free_wgt_grads = config.auto_free_wgt_grads;
         self.auto_free_inp_grads = config.auto_free_inp_grads;
         self.auto_free_hid_nodes = config.auto_free_hid_nodes;
+
+        self.mode = config.mode;
 
         return self;
     }

@@ -86,7 +86,8 @@ pub const ops = struct {
         const Z = graph.nodeTensor(X.sizes(), DataType);        
         const callback = Impl{ };  // instance for comptime fields
         callback.forward(graph.stream, X, Y, Z);
-        return graph.appendNode(Impl, .{ graph.stream, X, Y }, Z);
+        return if (graph.mode == .eval)
+            Z else graph.appendNode(Impl, .{ graph.stream, X, Y }, Z);
     }
 
     inline fn activationDispatch(comptime Impl: type,  X: anytype) NodeTensor(Child(@TypeOf(X))) {
@@ -94,7 +95,8 @@ pub const ops = struct {
         const Y = graph.nodeTensor(X.sizes(), @TypeOf(X).DataType);        
         const callback = Impl{ };  // instance for comptime fields
         callback.forward(graph.stream, X, Y);
-        return graph.appendNode(Impl, .{ graph.stream, X }, Y);
+        return if (graph.mode == .eval)
+            Y else graph.appendNode(Impl, .{ graph.stream, X }, Y);
     }
 
 // <>--------------------------------------------------------<>
@@ -142,7 +144,8 @@ pub const ops = struct {
 
         TenOps.leakyReluForward(graph.stream, X, coef, Y);
 
-        return graph.appendNode(TenOps.LeakyReluImpl, .{ graph.stream, X, coef }, Y);        
+        return if (graph.mode == .eval)
+            Y else graph.appendNode(TenOps.LeakyReluImpl, .{ graph.stream, X }, Y);
     }
 
 // <>--------------------------------------------------------<>
@@ -191,9 +194,8 @@ pub const ops = struct {
 
         perm.forward(graph.stream, X, Y);
 
-        return graph.appendNode(
-            @TypeOf(perm), .{ graph.stream, X }, Y
-        );
+        return if (graph.mode == .eval)
+            Y else graph.appendNode(@TypeOf(perm), .{ graph.stream, X }, Y);
     }
 
 // <>--------------------------------------------------------<>
@@ -231,9 +233,8 @@ pub const ops = struct {
 
         ip.forward(graph.stream, X, Y, Z);
 
-        return graph.appendNode(
-            @TypeOf(ip), .{ graph.stream, X, Y }, Z
-        );
+        return if (graph.mode == .eval)
+            Z else graph.appendNode(@TypeOf(ip), .{ graph.stream, X, Y }, Z);
     }
 };
 

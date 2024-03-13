@@ -109,6 +109,7 @@ pub fn build(b: *std.Build) void {
 
 const EXAMPLE_NAMES = &[_][]const u8{
     "basic",
+    "scalar",
 };
 
 fn linkLibraries(

@@ -1,5 +1,6 @@
 const std = @import("std");
 const C = @import("cimport.zig").C;
+const SC = @This();
 
   ////////////////////////////////////////////////
  ///// Scalar Types /////////////////////////////
@@ -34,6 +35,33 @@ pub fn scalarName(comptime T: type) []const u8 {
     };
 }
 
+pub const ScalarTag = enum {
+    q8, r16, r32, r64, c16, c32, c64,
+
+    pub fn asType(comptime opt: ScalarTag) type {
+        return switch (opt) {
+             .q8 => SC.q8,
+            .r16 => SC.r16,
+            .r32 => SC.r32,
+            .r64 => SC.r64,
+            .c16 => SC.c16,
+            .c32 => SC.c32,
+            .c64 => SC.c64,
+        };
+    }
+    pub fn asOption(comptime T: type) ScalarTag {
+        return switch (T) {
+             SC.q8 => ScalarTag.q8,
+            SC.r16 => ScalarTag.r16,
+            SC.r32 => ScalarTag.r32,
+            SC.r64 => ScalarTag.r64,
+            SC.c16 => ScalarTag.c16,
+            SC.c32 => ScalarTag.c32,
+            SC.c64 => ScalarTag.c64,
+            else => @compileError("Invalid type for asOptoin: " ++ @typeName(T)),
+        };
+    }
+};
   ////////////////////////////////////////////////
  ///// Constraints //////////////////////////////
 ////////////////////////////////////////////////
@@ -113,7 +141,7 @@ pub fn DemoteComplex(comptime T: type) type {
 
 pub fn DeduceComplex(comptime ctype: type, comptime rtype: type) type {
     if (@sizeOf(rtype) <= (@sizeOf(ctype) / 2)) {
-        return C; // 2x means the inidivdual members are sized appropriately
+        return ctype; // 2x means the inidivdual members are sized appropriately
     }
     else return PromoteComplex(rtype);
 }
@@ -188,6 +216,9 @@ inline fn __r16_as(comptime T: type, u: r16) T {
     else if (comptime isFloat(T) or isReal(T)) {
         return @floatCast(@as(*const f16, @ptrCast(@alignCast(&u.__x))).*);
     }
+    else if (comptime isInteger(T)) {
+        return @intFromFloat(@as(*const f16, @ptrCast(@alignCast(&u.__x))).*);
+    }
     else if (comptime isComplex(T)) {
         if (comptime T == c16) {
             return c16{ .r = u, .i = r16{ .__x = 0 } };
@@ -207,7 +238,6 @@ pub fn asScalar(comptime T: type, x: anytype) T {
     // This is complicated because of the inclusion of "half"
     // types that use integral types to internally represent
     // floating point numbers. That's our main concern here.
-
     const U = @TypeOf(x);
 
     if (comptime !(isInteger(T) or isFloat(T) or isReal(T) or isComplex(T))) {   
@@ -218,16 +248,26 @@ pub fn asScalar(comptime T: type, x: anytype) T {
         return x;
     }
 
-    else if(comptime isFloat(T) and isFloat(U)) {
-        return @floatCast(x);
+    // casting to float or integer from float/r16
+    else if(comptime isFloat(T) and (isFloat(U) or U == r16)) {
+        return if (comptime U == r16) __r16_as(T, x) else @floatCast(x);
+    }
+    else if(comptime isInteger(T) and (isFloat(U) or U == r16)) {
+        return if (comptime U == r16) __r16_as(T, x) else @intFromFloat(x);
     }
 
+    // native casting operations between types
     else if(comptime isFloat(T) and isInteger(U)) {
         return @floatFromInt(x);
+    }
+    else if(comptime isInteger(T) and isInteger(U)) {
+        return @intCast(x);
     }
 
     /////////////////////////////////////////////
     ///// Real type casting /////////////////////
+
+    // TODO: inspect if we ever reach this branch for r32, r64?
 
     else if (comptime isReal(T) and isInteger(U)) {
         return switch (T) {

@@ -21,6 +21,7 @@ const isScalar = SC.isScalar;
 const c16 = SC.c16;
 const c32 = SC.c32;
 const c64 = SC.c64;
+const ScalarTag = SC.ScalarTag;
 
 const Contract = UT.Contract;
 const Returns = UT.Returns;
@@ -206,33 +207,6 @@ fn GraphTensor(comptime data_type: type, comptime class: TensorClass) type {
     }
 }
 
-const TypeOption = enum {
-    q8, r16, r32, r64, c16, c32, c64,
-
-    pub fn asType(comptime opt: TypeOption) type {
-        return switch (opt) {
-             .q8 => SC.q8,
-            .r16 => SC.r16,
-            .r32 => SC.r32,
-            .r64 => SC.r64,
-            .c16 => SC.c16,
-            .c32 => SC.c32,
-            .c64 => SC.c64,
-        };
-    }
-    pub fn asOption(comptime T: type) TypeOption {
-        return switch (T) {
-             SC.q8 => TypeOption.q8,
-            SC.r16 => TypeOption.r16,
-            SC.r32 => TypeOption.r32,
-            SC.r64 => TypeOption.r64,
-            SC.c16 => TypeOption.c16,
-            SC.c32 => TypeOption.c32,
-            SC.c64 => TypeOption.c64,
-            else => @compileError("Invalid type for asOptoin: " ++ @typeName(T)),
-        };
-    }
-};
 
 const Mode = enum {
     train, eval
@@ -514,13 +488,13 @@ pub const Graph = struct {
         self: *Self, 
         name: []const u8,
         comptime class: enum { inp, wgt }, 
-        comptime data_type: TypeOption,
+        comptime data_type: ScalarTag,
         dimensions: anytype, // either fixed-length array or slice
-    ) LeafTensor(TypeOption.asType(data_type), userTensor(class)) {
+    ) LeafTensor(ScalarTag.asType(data_type), userTensor(class)) {
 
         const _class = comptime userTensor(class);
 
-        const _data_type = comptime TypeOption.asType(data_type);
+        const _data_type = comptime ScalarTag.asType(data_type);
 
         return self.constructTensor(
             name, _class, dimensions[0..], _data_type, self.leaf_arena.allocator()

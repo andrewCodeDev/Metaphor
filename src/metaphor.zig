@@ -48,18 +48,22 @@ pub const mem = struct {
 };
 
 pub const types = struct {
-    pub const r16 = SC.r16;
-    pub const r32 = SC.r32;
-    pub const r64 = SC.r64;
-    pub const c16 = SC.c16;
-    pub const c32 = SC.c32;
-    pub const c64 = SC.c64;
     pub const SliceUnion = TC.SliceUnion;
     pub const IndexType = TC.IndexType;
     pub const SizeType = TC.SizeType;
     pub const Strides = TC.Strides;
     pub const Sizes = TC.Sizes;
     pub const Stream = DU.Stream;
+};
+
+pub const scalar = struct {
+    pub const r16 = SC.r16;
+    pub const r32 = SC.r32;
+    pub const r64 = SC.r64;
+    pub const c16 = SC.c16;
+    pub const c32 = SC.c32;
+    pub const c64 = SC.c64;
+    pub const as = SC.asScalar;
 };
 
 pub const Graph = CG.Graph;

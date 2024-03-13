@@ -55,7 +55,7 @@ pub fn main() !void {
     const f: f16 = 16.0;
 
     // casting float-to-int
-    const i_to_f = mp.scalar.as(f32, i);
+    const i_to_f = mp.scalar.as(f16, i);
     const f_to_i = mp.scalar.as(i32, f);
 
     std.log.info("Value from i32 -> f16: {}", .{ i_to_f });

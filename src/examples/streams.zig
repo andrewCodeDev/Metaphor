@@ -39,12 +39,12 @@ pub fn main() !void {
     const M: usize = 2096;
     const N: usize = 2096;
 
-    // A get created using the stream in the graph. The
+    // A gets created using the stream in the graph. The
     // graph remembers what stream that A was created with.
     const A = G.tensor("A", .wgt, .r32, mp.Rank(2){ M, N });  
 
-    // X get created using the stream in the graph. The
-    // graph remembers what stream that A was created with.
+    // x gets created using the stream in the graph. The
+    // graph remembers what stream that x was created with.
     const x = G.tensor("x", .wgt, .r32, mp.Rank(1){ M });  
 
     // both of these fill calls use the currently assigned

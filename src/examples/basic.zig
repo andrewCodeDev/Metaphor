@@ -1,6 +1,8 @@
 const mp = @import("metaphor");
 const EU = @import("example_utils.zig");
 
+//TODO: actually explain the basics here
+
 pub fn main() !void {
 
     mp.device.init(0);
@@ -15,7 +17,7 @@ pub fn main() !void {
         .auto_free_inp_grads = false,
         .auto_free_hid_nodes = false,
         .stream = stream,
-        .mode = .eval
+        .mode = .train
     });
 
     defer G.deinit();
@@ -40,11 +42,11 @@ pub fn main() !void {
 
     Z1.reverse();
 
-    try EU.copyAndPrintMatrix("X2: value", X2.values(),  row_x, col_x, stream);
-    try EU.copyAndPrintMatrix("X1: grads", X1.grads().?,     1, row_x, stream);
+    //try EU.copyAndPrintMatrix("X2: value", X2.values(),  row_x, col_x, stream);
+    //try EU.copyAndPrintMatrix("X1: grads", X1.grads().?,     1, row_x, stream);
 
-    try EU.copyAndPrintMatrix("X1: value", X1.values(),      1, row_x, stream);
-    try EU.copyAndPrintMatrix("X2: grads", X2.grads().?, row_x, col_x, stream);
+    //try EU.copyAndPrintMatrix("X1: value", X1.values(),      1, row_x, stream);
+    //try EU.copyAndPrintMatrix("X2: grads", X2.grads().?, row_x, col_x, stream);
 
     ////////////////////////////////////////////
 }

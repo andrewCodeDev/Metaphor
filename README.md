@@ -45,11 +45,9 @@ pub fn main() !void {
 
     /////////////////////////////////////////////////
 
+    // tensors are freed on graph.deinit()
     const X1 = G.tensor("X1", .wgt, .r32, mp.Rank(2){ 2, 2 });  
-        defer X1.free();
-    
     const X2 = G.tensor("X2", .wgt, .r32, mp.Rank(2){ 2, 2 });
-        defer X2.free();
 
     mp.mem.fill(X1, 2);
     mp.mem.fill(X2, 1);

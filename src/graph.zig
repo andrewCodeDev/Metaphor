@@ -121,9 +121,6 @@ pub fn LeafTensor(comptime T: type, comptime class: TensorClass) type {
         pub fn len(self: Self) SizeType {
             return self.values().len;
         }
-        pub fn free(self: Self) void {
-            self.ptr.freeTensor(self);
-        }
         pub fn stream(self: Self) Stream {
             return self.ptr.leaves.streams.items[self.idx];
         }
@@ -339,10 +336,14 @@ pub const Graph = struct {
     }
 
     pub fn deinit(self: *Self) void {
+        // hand our memory back to the allocator
+        self.reset(.all);
+
+        // free our memory from the allocator
+        self.tensor_allocator.deinit(self.stream);
+
         self.node_arena.deinit();
         self.leaf_arena.deinit();
-
-        self.tensor_allocator.deinit(self.stream);
 
         // this must always be last
         std.heap.c_allocator.destroy(self);
@@ -355,7 +356,16 @@ pub const Graph = struct {
     // this function helps defragment the arenas and
     // preps the graph - called by reverse conditionally
     pub fn reset(self: *Self, mode: ResetMode) void {
+
         if (mode == .all or mode == .leaf) {
+
+            for (self.leaves.values.items) |raw| {
+                if (0 < raw.len()) self.tensor_allocator.freeTensorRaw(raw, self.stream);
+            }
+            for (self.leaves.grads.items) |opt| {
+                if (opt) |raw| { if (0 < raw.len()) self.tensor_allocator.freeTensorRaw(raw, self.stream); }
+            }
+            
             // drop all of our values out of play
             _ = self.leaf_arena.reset(.retain_capacity);
 
@@ -366,6 +376,14 @@ pub const Graph = struct {
             self.leaf_count = 0;
         }
         if (mode == .all or mode == .node) {
+
+            for (self.nodes.values.items) |raw| {
+                if (0 < raw.len()) self.tensor_allocator.freeTensorRaw(raw, self.stream);
+            }
+            for (self.nodes.grads.items) |opt| {
+                if (opt) |raw| { if (0 < raw.len()) self.tensor_allocator.freeTensorRaw(raw, self.stream); }
+            }
+
             // drop all of our values out of play
             _ = self.node_arena.reset(.retain_capacity);
 
@@ -375,6 +393,13 @@ pub const Graph = struct {
             // this will stack up otherwise
             self.node_count = 0;
         }
+
+        DU.synchronizeStream(self.stream);
+    }
+
+    // load precache values for the tensor allocator to use
+    pub fn precache(self: *Self, comptime T: type, size: usize, count: usize) void {
+        self.tensor_allocator.precache(T, size, count, self.stream);
     }
 
     fn tensorFromComponents(
@@ -533,7 +558,15 @@ pub const Graph = struct {
 
     fn freeTensor(self: *Self, X: anytype) void {
         const T = @TypeOf(X);
+        
         self.tensor_allocator.freeTensor(X.values(), self.stream);
+
+        const ptr: *SliceUnion = if (comptime T.Class == .hid)
+            &self.nodes.values.items[X.idx] else &self.leaves.values.items[X.idx];
+
+        // signals that the tensor has been freed
+        @field(ptr.*, SC.scalarName(T.DataType)).len = 0;
+
         self.disableGradient(T.DataType, T.Class, X.idx);
     }
 

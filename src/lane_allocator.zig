@@ -5,6 +5,7 @@ const Stream = cuda.Stream;
 
 const SCL = @import("scalar.zig");
 const SizeType = @import("tensor_components.zig").SizeType;
+const SliceUnion = @import("tensor_components.zig").SliceUnion;
 
 // debug stuff -- not particularly important
 
@@ -183,6 +184,33 @@ pub const LaneAllocator = struct {
         }) catch {
             cuda.free(tensor, stream); // StackOverflow
         };
+    }
+
+    // load precache values for the tensor allocator to use
+    pub fn precache(self: *Self, comptime T: type, size: usize, count: usize, stream: Stream) void {
+        for (0..count) |_| {
+            self.freeTensor(cuda.alloc(T, size, stream), stream);
+        }
+    }
+
+    pub fn used(self: *const Self) usize {
+        var count: usize = 0;
+        for (self.node_buffer[0..]) |node| {
+            if (node.data != sentinelPtr()) count += 1;
+        }
+        return count;
+    }
+
+    pub fn freeTensorRaw(self: *Self, raw: SliceUnion, stream: Stream) void {
+        switch (raw) {
+             .q8 => self.freeTensor(raw.q8,  stream),  
+            .r16 => self.freeTensor(raw.r16, stream),  
+            .r32 => self.freeTensor(raw.r32, stream),  
+            .r64 => self.freeTensor(raw.r64, stream),  
+            .c16 => self.freeTensor(raw.c16, stream), 
+            .c32 => self.freeTensor(raw.c32, stream), 
+            .c64 => self.freeTensor(raw.c64, stream), 
+        }
     }
 
     ///////////////////////////////////////////

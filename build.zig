@@ -111,6 +111,7 @@ const EXAMPLE_NAMES = &[_][]const u8{
     "basic",
     "scalar",
     "linear_maps",
+    "streams"
 };
 
 fn linkLibraries(

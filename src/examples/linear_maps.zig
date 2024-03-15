@@ -31,13 +31,8 @@ pub fn main() !void {
     /////////////////////////////////////////////////////
 
     const x = G.tensor("x", .wgt, .r32, mp.Rank(1){ M });  
-        defer x.free();
-
     const A = G.tensor("A", .wgt, .r32, mp.Rank(2){ M, N });  
-        defer A.free();
-
     const b = G.tensor("b", .wgt, .r32, mp.Rank(1){ N });  
-        defer b.free();
 
     mp.mem.randomize(x, stream);
     mp.mem.randomize(A, stream);

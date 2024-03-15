@@ -45,10 +45,10 @@ pub fn main() !void {
 
     /////////////////////////////////////////////////
 
-    const X1 = G.tensor("X1", .wgt, .r32, mp.Dims(2){ 2, 2 });  
+    const X1 = G.tensor("X1", .wgt, .r32, mp.Rank(2){ 2, 2 });  
         defer X1.free();
     
-    const X2 = G.tensor("X2", .wgt, .r32, mp.Dims(2){ 2, 2 });
+    const X2 = G.tensor("X2", .wgt, .r32, mp.Rank(2){ 2, 2 });
         defer X2.free();
 
     mp.mem.fill(X1, 2);

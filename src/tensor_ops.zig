@@ -9,10 +9,13 @@ const DU = @import("device_utils.zig");
 const Child = UT.Child;
 
 const CallbackBuilder = CB.CallbackBuilder;
+const CallbackDropReverse = CB.CallbackDropReverse;
 const NoCleanup = CB.NoCleanup;
 const overloads = @import("kernel_overloads.zig");
 const Parser = @import("expression_parsing.zig");
 const Stream = DU.Stream;
+
+const None = opaque{ };
 
 // <>--------------------------------------------------------<>
 
@@ -268,14 +271,14 @@ pub inline fn permutate_ij_ji_Reverse(
     });
 }
 
-const Perm_ij_ji_Impl = CallbackBuilder(
+const Perm_ij_ji_Callback = CallbackBuilder(
     permutate_ij_ji, .{ .{ permutate_ij_ji, 0 } }, NoCleanup
 );
 
 const permutation_expressions = std.ComptimeStringMap(
     type, .{
-        .{ "ij->ji", Perm_ij_ji_Impl },
-        .{ "ji->ij", Perm_ij_ji_Impl },
+        .{ "ij->ji", Perm_ij_ji_Callback },
+        .{ "ji->ij", Perm_ij_ji_Callback },
     }
 );
 
@@ -290,272 +293,288 @@ pub fn findPermutation(comptime expression: []const u8) type {
 
 // <>--------------------------------------------------------<>
 
+// to drastically simplify our lives, we can treat all inner products
+// as a special case of linear where the bias is skipped. To signal
+// this in the reversal process, we drop the bias reversal from the
+// linear callback type and pass it a zero beta value.
+
+pub fn LinearType(comptime callback: type, comptime bias: bool) type {
+    return if (comptime bias) callback else CallbackDropReverse(callback, 3);
+}
+
 //////////////////////////////
 // ---- matrix-to-vector -----
 
-
-inline fn __innerProduct_ij_j(
-    stream: Stream,
+inline fn __linear_i_ij(
+        stream: Stream,
     x_values: anytype,
+    A_values: anytype,
+        alpha: f16,
+    b_values: anytype,
+        beta: f16,
     y_values: anytype,
-    alpha: f16,
-    z_values: anytype,
-    beta: f16,
     m: TC.SizeType,
     n: TC.SizeType,
 ) void {
-    const T = UT.Child(@TypeOf(z_values));
+    const T = UT.Child(@TypeOf(y_values));
     
-    overloads.kernel_inner_product_ij_j.call(.{
-        stream.context, 
+    overloads.kernel_linear_i_ij.call(.{
+            stream.context, 
         x_values.ptr, 
-        y_values.ptr, 
-        SC.asScalar(T, alpha),
-        z_values.ptr,
-        SC.asScalar(T, beta), 
+        A_values.ptr, 
+            SC.asScalar(T, alpha),
+        b_values.ptr,
+            SC.asScalar(T, beta),
+        y_values.ptr,
         m, n
     });
 }
 
-pub inline fn innerProduct_ij_j(
+inline fn __linear_ij_j(
+        stream: Stream,
+    A_values: anytype,
+    x_values: anytype,
+        alpha: f16,
+    b_values: anytype,
+        beta: f16,
+    y_values: anytype,
+        m: TC.SizeType,
+        n: TC.SizeType,
+) void {
+    const T = UT.Child(@TypeOf(y_values));
+    
+    overloads.kernel_linear_ij_j.call(.{
+            stream.context, 
+        A_values.ptr, 
+        x_values.ptr, 
+            SC.asScalar(T, alpha),
+        b_values.ptr,
+            SC.asScalar(T, beta), 
+        y_values.ptr,
+        m, n
+    });
+}
+
+pub fn linear_ij_j(
     stream: Stream, 
-    x: anytype, 
+    A: anytype, 
+    x: anytype,
+    alpha: f16,
+    b: anytype,
+    beta: f16,
     y: anytype,
-    z: anytype,
 ) void {
 
-    std.debug.assert(x.sizes().len == 2);
+    std.debug.assert(A.sizes().len == 2);
+    std.debug.assert(x.sizes().len == 1);
+    std.debug.assert(b.sizes().len == 1);
     std.debug.assert(y.sizes().len == 1);
-    std.debug.assert(z.sizes().len == 1);
 
-    const x_sizes = x.sizes();
+    const A_sizes = A.sizes();
+    const m = A_sizes[0];
+    const n = A_sizes[1];
 
-    std.debug.assert(x_sizes[0] == z.len());
-    std.debug.assert(x_sizes[1] == y.len());
+    std.debug.assert(n == x.len());
+    std.debug.assert(m == b.len());
+    std.debug.assert(m == y.len());
 
-    __innerProduct_ij_j(
-        stream,
-        x.values(),
-        y.values(),
-        1.0, // alpha
-        z.values(),
-        0.0, //beta
-        x_sizes[0],
-        x_sizes[1],
+    __linear_ij_j(
+        stream, A.values(), x.values(), alpha, b.values(), beta, y.values(), m, n
     );
 }
 
-pub inline fn innerProduct_ij_j_ReverseArg0(
+pub fn linear_ij_j_ReverseArg0(
     stream: Stream, 
-    x: anytype, 
+    A: anytype, 
+    x: anytype,
+    alpha: f16,
+    _: anytype,
+    _: f16,
     y: anytype,
-    z: anytype,
 ) void {
     // outer product i,j to get ij
-    std.debug.assert(x.sizes().len == 2);
+    std.debug.assert(A.sizes().len == 2);
+    std.debug.assert(x.sizes().len == 1);
     std.debug.assert(y.sizes().len == 1);
-    std.debug.assert(z.sizes().len == 1);
 
-    const x_sizes = x.sizes();
+    const A_sizes = A.sizes();
+    const m = A_sizes[0];
+    const n = A_sizes[1];
 
-    std.debug.assert(x_sizes[0] == z.len());
-    std.debug.assert(x_sizes[1] == y.len());
+    std.debug.assert(m == x.len());
+    std.debug.assert(n == y.len());
 
     __outerProduct_i_j(
-        stream,
-        z.grads().?,
-        y.values(),
-        1.0, // alpha
-        x.grads().?,
-        1.0, //beta
-        x_sizes[0],
-        x_sizes[1],
+        stream, y.grads().?, x.values(), alpha, A.grads().?, 1.0, m, n
     );
 }
 
-pub inline fn innerProduct_ij_j_ReverseArg1(
+pub fn linear_ij_j_ReverseArg1(
     stream: Stream, 
-    x: anytype, 
+    A: anytype, 
+    x: anytype,
+    alpha: f16,
+    _: anytype,
+    _: f16,
     y: anytype,
-    z: anytype,
 ) void {
     // inner product i,ij to get j
-    std.debug.assert(x.sizes().len == 2);
+    std.debug.assert(A.sizes().len == 2);
+    std.debug.assert(x.sizes().len == 1);
     std.debug.assert(y.sizes().len == 1);
-    std.debug.assert(z.sizes().len == 1);
 
-    const x_sizes = x.sizes();
+    const A_sizes = A.sizes();
+    const m = A_sizes[0];
+    const n = A_sizes[1];
 
-    std.debug.assert(x_sizes[0] == z.len());
-    std.debug.assert(x_sizes[1] == y.len());
+    std.debug.assert(m == y.len());
+    std.debug.assert(n == x.len());
 
-    __innerProduct_i_ij(
-        stream,
-        z.grads().?,
-        x.values(),
-        1.0, // alpha
-        y.grads().?,
-        0.0, //beta
-        x_sizes[0],
-        x_sizes[1],
+    __linear_i_ij(
+        stream, y.grads().?, A.values(), alpha, x.grads().?, 1.0, x.grads().?, m, n
     );
 }
 
-inline fn __innerProduct_i_ij(
-    stream: Stream,
-    x_values: anytype,
-    y_values: anytype,
-    alpha: f16,
-    z_values: anytype,
-    beta: f16,
-    m: TC.SizeType,
-    n: TC.SizeType,
+pub inline fn linear_bias_ReverseArg3(
+    stream: Stream, 
+    _: anytype, 
+    _: anytype,
+    _: f16,
+    b: anytype,
+    _: f16,
+    y: anytype,
 ) void {
-    const T = UT.Child(@TypeOf(z_values));
-    
-    overloads.kernel_inner_product_i_ij.call(.{
-        stream.context, 
-        x_values.ptr, 
-        y_values.ptr, 
-        SC.asScalar(T, alpha),
-        z_values.ptr,
-        SC.asScalar(T, beta), 
-        m, n
-    });
+    additionReverseArg0(stream, b, None, y);
 }
 
-const IP_i_ij_Impl = CallbackBuilder(
-    innerProduct_i_ij, .{
-        .{ innerProduct_i_ij_ReverseArg0, 0 },   
-        .{ innerProduct_i_ij_ReverseArg1, 1 },   
+const Linear_ij_j_Callback = CallbackBuilder(
+    linear_ij_j, .{
+        .{ linear_ij_j_ReverseArg0, 0 },   
+        .{ linear_ij_j_ReverseArg1, 1 },   
+        .{ linear_bias_ReverseArg3, 3 },   
     }, NoCleanup
 );
 
-pub inline fn innerProduct_i_ij(
+pub fn linear_i_ij(
     stream: Stream, 
     x: anytype, 
+    A: anytype,
+    alpha: f16,
+    b: anytype,
+    beta: f16,
     y: anytype,
-    z: anytype,
 ) void {
-
     std.debug.assert(x.sizes().len == 1);
-    std.debug.assert(y.sizes().len == 2);
-    std.debug.assert(z.sizes().len == 1);
+    std.debug.assert(A.sizes().len == 2);
+    std.debug.assert(y.sizes().len == 1);
 
-    const y_sizes = y.sizes();
+    const A_sizes = A.sizes();
+    const m = A_sizes[0];
+    const n = A_sizes[1];
 
-    std.debug.assert(y_sizes[0] == x.len());
-    std.debug.assert(y_sizes[1] == z.len());
+    std.debug.assert(m == x.len());
+    std.debug.assert(n == y.len());
 
-    __innerProduct_ij_j(
-        stream,
-        x.values(),
-        y.values(),
-        1.0, // alpha
-        z.values(),
-        1.0, //beta
-        y_sizes[0],
-        y_sizes[1],
+    __linear_i_ij(
+        stream, x.values(), A.values(), alpha, b.values(), beta, y.values(), m, n
     );
 }
 
-
-pub inline fn innerProduct_i_ij_ReverseArg0(
+pub fn linear_i_ij_ReverseArg0(
     stream: Stream, 
     x: anytype, 
+    A: anytype,
+    alpha: f16,
+    _: anytype,
+    _: f16,
     y: anytype,
-    z: anytype,
 ) void {
     // inner product ij,j to get i
     std.debug.assert(x.sizes().len == 1);
-    std.debug.assert(y.sizes().len == 2);
-    std.debug.assert(z.sizes().len == 1);
+    std.debug.assert(A.sizes().len == 2);
+    std.debug.assert(y.sizes().len == 1);
 
-    const y_sizes = y.sizes();
+    const A_sizes = A.sizes();
+    const m = A_sizes[0];
+    const n = A_sizes[1];
 
-    std.debug.assert(y_sizes[0] == x.len());
-    std.debug.assert(y_sizes[1] == z.len());
+    std.debug.assert(m == x.len());
+    std.debug.assert(n == y.len());
 
-    __innerProduct_ij_j(
-        stream,
-        y.values(),
-        z.grads().?,
-        1.0, // alpha
-        x.grads().?,
-        0.0, //beta
-        y_sizes[0],
-        y_sizes[1],
+    __linear_ij_j(
+        stream, A.values(), y.grads().?, alpha, x.grads().?, 1.0, x.grads().?, m, n,
     );
 }
 
-pub inline fn innerProduct_i_ij_ReverseArg1(
+pub fn linear_i_ij_ReverseArg1(
     stream: Stream, 
     x: anytype, 
+    A: anytype,
+    alpha: f16,
+    _: anytype,
+    _: f16,
     y: anytype,
-    z: anytype,
 ) void {
     // outer product i,j to get ij
     std.debug.assert(x.sizes().len == 1);
-    std.debug.assert(y.sizes().len == 2);
-    std.debug.assert(z.sizes().len == 1);
+    std.debug.assert(A.sizes().len == 2);
+    std.debug.assert(y.sizes().len == 1);
 
-    const y_sizes = y.sizes();
+    const A_sizes = A.sizes();
+    const m = A_sizes[0];
+    const n = A_sizes[1];
 
-    std.debug.assert(y_sizes[0] == x.len());
-    std.debug.assert(y_sizes[1] == z.len());
-
-    _ = &stream;
+    std.debug.assert(m == x.len());
+    std.debug.assert(n == y.len());
 
     __outerProduct_i_j(
-        stream,
-        x.values(),
-        z.grads().?,
-        1.0, // alpha
-        y.grads().?,
-        1.0, //beta
-        y_sizes[0],
-        y_sizes[1],
+        stream, x.values(), y.grads().?, alpha, A.grads().?, 1.0, m, n
     );
 }
 
-const IP_ij_j_Impl = CallbackBuilder(
-    innerProduct_ij_j, .{
-        .{ innerProduct_ij_j_ReverseArg0, 0 },
-        .{ innerProduct_ij_j_ReverseArg1, 1 },
+const Linear_i_ij_Callback = CallbackBuilder(
+    linear_i_ij, .{
+        .{ linear_i_ij_ReverseArg0, 0 },   
+        .{ linear_i_ij_ReverseArg1, 1 },   
+        .{ linear_bias_ReverseArg3, 3 },   
     }, NoCleanup
 );
 
-pub fn innerProduct_i_ji(stream: Stream, x: anytype, y: anytype, z: anytype) void {
-    return innerProduct_ij_j(stream, y, x, z);
+pub fn linear_i_ji(stream: Stream, x: anytype, A: anytype, alpha: f16, b: anytype, beta: f16, y: anytype) void {
+    return linear_ij_j(stream, A, x, alpha, b, beta, y);
 }
-pub fn innerProduct_i_ji_ReverseArg0(stream: Stream, x: anytype, y: anytype, z: anytype) void {
-    return innerProduct_ij_j_ReverseArg0(stream, y, x, z);
+pub fn linear_i_ji_ReverseArg0(stream: Stream, x: anytype, A: anytype, alpha: f16, b: anytype, beta: f16, y: anytype) void {
+    return linear_ij_j_ReverseArg0(stream, A, x, alpha, b, beta, y);
 }
-pub fn innerProduct_i_ji_ReverseArg1(stream: Stream, x: anytype, y: anytype, z: anytype) void {
-    return innerProduct_ij_j_ReverseArg1(stream, y, x, z);
+pub fn linear_i_ji_ReverseArg1(stream: Stream, x: anytype, A: anytype, alpha: f16, b: anytype, beta: f16, y: anytype) void {
+    return linear_ij_j_ReverseArg1(stream, A, x, alpha, b, beta, y);
 }
-const IP_i_ji_Impl = CallbackBuilder(
-    innerProduct_i_ji, .{
-        .{ innerProduct_i_ji_ReverseArg0, 0 },
-        .{ innerProduct_i_ji_ReverseArg1, 1 },
+const Linear_i_ji_Callback = CallbackBuilder(
+    linear_i_ji, .{
+        .{ linear_i_ji_ReverseArg0, 0 },
+        .{ linear_i_ji_ReverseArg1, 1 },
+        .{ linear_bias_ReverseArg3, 3 },
     }, NoCleanup
 );
 
-pub fn innerProduct_ij_i(stream: Stream, x: anytype, y: anytype, z: anytype) void {
-    return innerProduct_i_ij(stream, y, x, z);
+pub fn linear_ij_i(stream: Stream, x: anytype, A: anytype, alpha: f16, b: anytype, beta: f16, y: anytype) void {
+    return linear_i_ij(stream, A, x, alpha, b, beta, y);
 }
-pub fn innerProduct_ij_i_ReverseArg0(stream: Stream, x: anytype, y: anytype, z: anytype) void {
-    return innerProduct_i_ij_ReverseArg0(stream, y, x, z);
+pub fn linear_ij_i_ReverseArg0(stream: Stream, x: anytype, A: anytype, alpha: f16, b: anytype, beta: f16, y: anytype) void {
+    return linear_i_ij_ReverseArg0(stream, A, x, alpha, b, beta, y);
 }
-pub fn innerProduct_ij_i_ReverseArg1(stream: Stream, x: anytype, y: anytype, z: anytype) void {
-    return innerProduct_i_ij_ReverseArg1(stream, y, x, z);
+pub fn linear_ij_i_ReverseArg1(stream: Stream, x: anytype, A: anytype, alpha: f16, b: anytype, beta: f16, y: anytype) void {
+    return linear_i_ij_ReverseArg1(stream, A, x, alpha, b, beta, y);
 }
-const IP_ij_i_Impl = CallbackBuilder(
-    innerProduct_ij_i, .{
-        .{ innerProduct_ij_i_ReverseArg0, 0 },
-        .{ innerProduct_ij_i_ReverseArg1, 1 },
+
+const Linear_ij_i_Callback = CallbackBuilder(
+    linear_ij_i, .{
+        .{ linear_ij_i_ReverseArg0, 0 },
+        .{ linear_ij_i_ReverseArg1, 1 },
+        .{ linear_bias_ReverseArg3, 3 },
     }, NoCleanup
 );
+
 //////////////////////////////
 // ---- matrix-to-matrix -----
 
@@ -685,7 +704,7 @@ inline fn innerProduct_ij_jk_ReverseArg1(
     );
 }
 
-const IP_ij_jk_Impl = CallbackBuilder(
+const IP_ij_jk_Callback = CallbackBuilder(
     innerProduct_ij_jk, .{
         .{ innerProduct_ij_jk_ReverseArg0, 0 },
         .{ innerProduct_ij_jk_ReverseArg1, 1 },
@@ -695,26 +714,26 @@ const IP_ij_jk_Impl = CallbackBuilder(
 const inner_product_expressions = std.ComptimeStringMap(
     type, .{
         // Rank-1-to-Rank-2
-        .{ "i,ij->j", IP_i_ij_Impl },
-        .{ "i,ji->j", IP_i_ji_Impl },
-        .{ "j,ij->i", IP_i_ji_Impl },
-        .{ "j,ji->i", IP_i_ij_Impl },
+        .{ "i,ij->j", Linear_i_ij_Callback },
+        .{ "i,ji->j", Linear_i_ji_Callback },
+        .{ "j,ij->i", Linear_i_ji_Callback },
+        .{ "j,ji->i", Linear_i_ij_Callback },
 
         // Rank-2-to-Rank-1
-        .{ "ij,j->i", IP_ij_j_Impl },
-        .{ "ij,i->j", IP_ij_i_Impl },
-        .{ "ji,i->j", IP_ij_j_Impl },
-        .{ "ji,j->i", IP_ij_i_Impl },
+        .{ "ij,j->i", Linear_ij_j_Callback },
+        .{ "ij,i->j", Linear_ij_i_Callback },
+        .{ "ji,i->j", Linear_ij_j_Callback },
+        .{ "ji,j->i", Linear_ij_i_Callback },
 
         // Rank-2-to-Rank-2
-        .{ "ij,jk->ik", IP_ij_jk_Impl }
+        .{ "ij,jk->ik", IP_ij_jk_Callback }
     }
 );
 
-pub fn findInnerProduct(comptime expression: []const u8) type {
+pub fn findLinear(comptime expression: []const u8, comptime bias: bool) type {
     const parsed = comptime Parser.innerProductExpression(expression);
     if (inner_product_expressions.get(parsed)) |ip| {
-        return ip;
+        return LinearType(ip, bias);
     } else {
         @compileError("TODO: Declare General Inner Product Kernel: " ++ expression);            
     }

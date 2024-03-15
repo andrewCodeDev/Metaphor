@@ -182,25 +182,18 @@ inline fn __r16_init(x: anytype) r16 {
     if (comptime @TypeOf(x) == r16) {
         return x;
     }
-
+    
     // r16 internally uses unsigned short, so
     // to get our bit pattern correct, first 
     // we go to an f16 first and cast to u16 
 
     switch (@typeInfo(@TypeOf(x))) {
         .Int, .ComptimeInt => {
-            const u: f16 = @floatFromInt(x);            
-
-            return r16 { 
-                .__x = @as(*const u16, @ptrCast(@alignCast(&u))).* 
-            };
+            return r16 { .__x = @intCast(x) };
         },
         .Float, .ComptimeFloat => {
-            const u: f16 = @floatCast(x);
-
-            return r16 { 
-                .__x = @as(*const u16, @ptrCast(@alignCast(&u))).* 
-            };
+            const u: f16 = x;
+            return r16 { .__x = @bitCast(u) };
         },
         else => @compileError(
           "Invalid Type for r16 Conversion: " ++ @typeName(@TypeOf(x))  
@@ -214,18 +207,18 @@ inline fn __r16_as(comptime T: type, u: r16) T {
         return u;
     }
     else if (comptime isFloat(T) or isReal(T)) {
-        return @floatCast(@as(*const f16, @ptrCast(@alignCast(&u.__x))).*);
+        return @floatCast(@as(f16, @bitCast(u.__x)));
     }
     else if (comptime isInteger(T)) {
-        return @intFromFloat(@as(*const f16, @ptrCast(@alignCast(&u.__x))).*);
+        return @intFromFloat(@as(f16, @bitCast(u.__x)));
     }
     else if (comptime isComplex(T)) {
         if (comptime T == c16) {
-            return c16{ .r = u, .i = r16{ .__x = 0 } };
+            return c16{ .r = u, .i = r16{ .__x = 0.0 } };
         }
         return T {
-            .r = @floatCast(@as(*const f16, @ptrCast(@alignCast(&u.__x))).*),
-            .i = 0,
+            .r = @floatCast(@as(f16, @bitCast(u.__x))),
+            .i = 0.0,
         };        
     }
     else {

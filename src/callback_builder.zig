@@ -93,8 +93,56 @@ pub fn CallbackBuilder(
 
     return @Type(.{
         .Struct = .{
-            .layout = .Auto,
+            .layout = .auto,
             .fields = fields[0..],
+            .decls = &.{},
+            .is_tuple = false,
+            .backing_integer = null
+        },
+    });
+}
+
+pub fn CallbackDropReverse(
+    comptime callback: type,
+    comptime drop_index: usize,
+) type {
+
+    if (comptime drop_index == 0)
+        @compileError("Dropping field zero removes forward function.");
+
+    const fields = @typeInfo(callback).Struct.fields;
+
+    if (comptime fields.len <= 2)
+        @compileError("Dropping fields will result in empty callback or no reversals.");
+
+    // all - dropped
+    const N = fields.len - 1;
+
+    comptime var mod_fields: [N]std.builtin.Type.StructField = undefined;
+
+    mod_fields[0] = fields[0];
+
+    comptime var org_idx: usize = 1;
+    comptime var mod_idx: usize = 1;
+
+    while (mod_idx < N) {
+
+        // we offset by -1 to only consider reversals
+        if (org_idx == drop_index) {
+            org_idx += 1;
+            continue;
+        }
+        
+        mod_fields[mod_idx] = fields[org_idx];
+
+        mod_idx += 1;
+        org_idx += 1;
+    }
+
+    return @Type(.{
+        .Struct = .{
+            .layout = .auto,
+            .fields = mod_fields[0..],
             .decls = &.{},
             .is_tuple = false,
             .backing_integer = null
@@ -130,7 +178,7 @@ fn ReversibleField(
 
     return @Type(.{
         .Struct = .{
-            .layout = .Auto,
+            .layout = .auto,
             .fields = fields[0..],
             .decls = &.{},
             .is_tuple = false,
@@ -138,3 +186,4 @@ fn ReversibleField(
         },
     });
 }
+

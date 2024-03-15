@@ -24,10 +24,10 @@ pub fn main() !void {
 
     /////////////////////////////////////////////////////
 
-    const X1 = G.tensor("X1", .wgt, .r32, mp.Dims(1){ row_x });  
+    const X1 = G.tensor("X1", .wgt, .r32, mp.Rank(1){ row_x });  
         defer X1.free();
 
-    const X2 = G.tensor("X2", .wgt, .r32, mp.Dims(2){ row_x, col_x });  
+    const X2 = G.tensor("X2", .wgt, .r32, mp.Rank(2){ row_x, col_x });  
         defer X2.free();
 
     mp.mem.sequence(X1, 0.0, 1.0);

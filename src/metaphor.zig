@@ -70,8 +70,8 @@ pub const Graph = CG.Graph;
 
 pub const null_optimizer = Optimizer.NullOptimizer.optimizer();
 
-pub fn Dims(comptime Rank: usize) type {
-    return [Rank]types.SizeType;
+pub fn Rank(comptime rank: usize) type {
+    return [rank]types.SizeType;
 }
 
  /////////////////////////////////////////////
@@ -210,7 +210,7 @@ pub const ops = struct {
         comptime expression: []const u8
     ) NodeTensor(Child(@TypeOf(X))) {
 
-        if (comptime !isGraphTensor(@TypeOf(X)) and !isGraphTensor(@TypeOf(Y)))
+        if (comptime !isGraphTensor(@TypeOf(X)) or !isGraphTensor(@TypeOf(Y)))
             @compileError("innerProduct requires graph tensors.");
         
         const graph = X.ptr;
@@ -233,12 +233,55 @@ pub const ops = struct {
         const Z = graph.nodeTensor(z_sizes[0..], UT.Child(@TypeOf(X)));
         
         // locate inner product by expression
-        const ip = TenOps.findInnerProduct(expression){ };
+        const ip = TenOps.findLinear(expression, false){ };
 
-        ip.forward(graph.stream, X, Y, Z);
+        // cancel out addition using 0.0 for beta
+        ip.forward(graph.stream, X, Y, 1.0, Z, 0.0, Z);
 
         return if (graph.mode == .eval)
-            Z else graph.appendNode(@TypeOf(ip), .{ X, Y }, Z);
+            Z else graph.appendNode(@TypeOf(ip), .{ X, Y, 1.0, Z, 0.0 }, Z);
+    }
+
+    pub fn linear(
+        X: anytype,
+        Y: anytype,
+        B: anytype,
+        comptime expression: []const u8
+    ) NodeTensor(Child(@TypeOf(X))) {
+
+        if (comptime !isGraphTensor(@TypeOf(X)) or !isGraphTensor(@TypeOf(Y)) or !isGraphTensor(@TypeOf(B)))
+            @compileError("Linear requires graph tensors.");
+        
+        const graph = X.ptr;
+
+        // tells us which size index to map from x to y
+        const maps = comptime Parser.innerProductSizes(expression);
+
+        std.debug.assert(X.sizes().len == maps.x_map.len);
+        std.debug.assert(Y.sizes().len == maps.y_map.len);
+
+        var z_sizes: [maps.len]types.SizeType = undefined;
+
+        for (X.sizes(), 0..) |elem, i| {
+            if (maps.x_map[i]) |idx| { z_sizes[idx] = elem; }
+        }
+        for (Y.sizes(), 0..) |elem, i| {
+            if (maps.y_map[i]) |idx| { z_sizes[idx] = elem; }
+        }
+
+        // bias needs to have the same dimensions as output
+        std.debug.assert(std.mem.eql(types.SizeType, z_sizes[0..], B.sizes()));
+    
+        const Z = graph.nodeTensor(z_sizes[0..], UT.Child(@TypeOf(X)));
+        
+        // locate inner product by expression
+        const ip = TenOps.findLinear(expression, true){ };
+
+        // cancel out addition using 0.0 for beta
+        ip.forward(graph.stream, X, Y, 1.0, B, 1.0, Z);
+
+        return if (graph.mode == .eval)
+            Z else graph.appendNode(@TypeOf(ip), .{ X, Y, 1.0, B, 1.0 }, Z);
     }
 };
 

@@ -50,36 +50,6 @@ EXTERN_C void launch_tanh_r64(
         r64* b, 
   len_t N
 );
-EXTERN_C void launch_inner_product_ij_j_r16(
-  StreamCtx stream,
-  const r16 *A, 
-  const r16 *x,
-        r16 alpha, // scales product
-        r16 *y,
-        r16 beta, // blends C back in
-  len_t M, 
-  len_t N
-);
-EXTERN_C void launch_inner_product_ij_j_r32(
-  StreamCtx stream,
-  const r32 *A, 
-  const r32 *x,
-        r32 alpha, // scales product
-        r32 *y,
-        r32 beta, // blends C back in
-  len_t M, 
-  len_t N
-);
-EXTERN_C void launch_inner_product_ij_j_r64(
-  StreamCtx stream,
-  const r64 *A, 
-  const r64 *x,
-        r64 alpha, // scales product
-        r64 *y,
-        r64 beta, // blends C back in
-  len_t M, 
-  len_t N
-);
 EXTERN_C void launch_hadamard_reverse_r16(
   StreamCtx stream,
   r16 *grads_a,
@@ -192,6 +162,39 @@ EXTERN_C void launch_subtraction_c64(
   const c64* a,
   const c64* b, 
   c64* c, 
+  len_t N
+);
+EXTERN_C void launch_inner_product_i_ij_r16(
+  StreamCtx stream,
+  const r16 *x,
+  const r16 *A, 
+        r16 alpha, // scales product
+  const r16 *b,
+        r16 beta, // blends y back in
+        r16 *y,
+  len_t M, 
+  len_t N
+);
+EXTERN_C void launch_inner_product_i_ij_r32(
+  StreamCtx stream,
+  const r32 *x,
+  const r32 *A, 
+        r32 alpha, // scales product
+  const r32 *b,
+        r32 beta, // blends y back in
+        r32 *y,
+  len_t M, 
+  len_t N
+);
+EXTERN_C void launch_inner_product_i_ij_r64(
+  StreamCtx stream,
+  const r64 *x,
+  const r64 *A, 
+        r64 alpha, // scales product
+  const r64 *b,
+        r64 beta, // blends y back in
+        r64 *y,
+  len_t M, 
   len_t N
 );
 EXTERN_C void launch_leaky_relu_r16(
@@ -333,36 +336,6 @@ EXTERN_C void launch_addition_c64(
   const c64* a,
   const c64* b, 
   c64* c, 
-  len_t N
-);
-EXTERN_C void launch_inner_product_i_ij_r16(
-  StreamCtx stream,
-  const r16 *x,
-  const r16 *A, 
-        r16 alpha, // scales product
-        r16 *y,
-        r16 beta, // blends y back in
-  len_t M, 
-  len_t N
-);
-EXTERN_C void launch_inner_product_i_ij_r32(
-  StreamCtx stream,
-  const r32 *x,
-  const r32 *A, 
-        r32 alpha, // scales product
-        r32 *y,
-        r32 beta, // blends y back in
-  len_t M, 
-  len_t N
-);
-EXTERN_C void launch_inner_product_i_ij_r64(
-  StreamCtx stream,
-  const r64 *x,
-  const r64 *A, 
-        r64 alpha, // scales product
-        r64 *y,
-        r64 beta, // blends y back in
-  len_t M, 
   len_t N
 );
 EXTERN_C void launch_addition_reverse_r16(
@@ -559,4 +532,58 @@ EXTERN_C void launch_hadamard_c64(
   const c64* b, 
   c64* c, 
   len_t N
+);
+EXTERN_C void launch_inner_product_ij_j_r16(
+  StreamCtx stream,
+  const r16 *x,
+  const r16 *A, 
+        r16 alpha, // scales product
+  const r16 *b,
+        r16 beta, // blends y back in
+        r16 *y,
+  len_t M, 
+  len_t N
+);
+EXTERN_C void launch_inner_product_ij_j_r32(
+  StreamCtx stream,
+  const r32 *x,
+  const r32 *A, 
+        r32 alpha, // scales product
+  const r32 *b,
+        r32 beta, // blends y back in
+        r32 *y,
+  len_t M, 
+  len_t N
+);
+EXTERN_C void launch_inner_product_ij_j_r64(
+  StreamCtx stream,
+  const r64 *x,
+  const r64 *A, 
+        r64 alpha, // scales product
+  const r64 *b,
+        r64 beta, // blends y back in
+        r64 *y,
+  len_t M, 
+  len_t N
+);
+EXTERN_C void launch_softmax_ij_j_r16(
+  StreamCtx stream,
+  const r16* A, 
+        r16* B, 
+  len_t m, 
+  len_t n
+);
+EXTERN_C void launch_softmax_ij_j_r32(
+  StreamCtx stream,
+  const r32* A, 
+        r32* B, 
+  len_t m, 
+  len_t n
+);
+EXTERN_C void launch_softmax_ij_j_r64(
+  StreamCtx stream,
+  const r64* A, 
+        r64* B, 
+  len_t m, 
+  len_t n
 );

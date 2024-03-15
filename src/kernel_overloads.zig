@@ -15,12 +15,6 @@ pub const kernel_tanh = OverloadSet(.{
 	decls.launch_tanh_r64,
 });
 
-pub const kernel_inner_product_ij_j = OverloadSet(.{
-	decls.launch_inner_product_ij_j_r16,
-	decls.launch_inner_product_ij_j_r32,
-	decls.launch_inner_product_ij_j_r64,
-});
-
 pub const kernel_hadamard_reverse = OverloadSet(.{
 	decls.launch_hadamard_reverse_r16,
 	decls.launch_hadamard_reverse_c16,
@@ -43,6 +37,12 @@ pub const kernel_subtraction = OverloadSet(.{
 	decls.launch_subtraction_c32,
 	decls.launch_subtraction_r64,
 	decls.launch_subtraction_c64,
+});
+
+pub const kernel_linear_i_ij = OverloadSet(.{
+	decls.launch_inner_product_i_ij_r16,
+	decls.launch_inner_product_i_ij_r32,
+	decls.launch_inner_product_i_ij_r64,
 });
 
 pub const kernel_leaky_relu = OverloadSet(.{
@@ -82,12 +82,6 @@ pub const kernel_addition = OverloadSet(.{
 	decls.launch_addition_c32,
 	decls.launch_addition_r64,
 	decls.launch_addition_c64,
-});
-
-pub const kernel_inner_product_i_ij = OverloadSet(.{
-	decls.launch_inner_product_i_ij_r16,
-	decls.launch_inner_product_i_ij_r32,
-	decls.launch_inner_product_i_ij_r64,
 });
 
 pub const kernel_addition_reverse = OverloadSet(.{
@@ -133,5 +127,17 @@ pub const kernel_hadamard = OverloadSet(.{
 	decls.launch_hadamard_c32,
 	decls.launch_hadamard_r64,
 	decls.launch_hadamard_c64,
+});
+
+pub const kernel_linear_ij_j = OverloadSet(.{
+	decls.launch_inner_product_ij_j_r16,
+	decls.launch_inner_product_ij_j_r32,
+	decls.launch_inner_product_ij_j_r64,
+});
+
+pub const softmax_ij_j = OverloadSet(.{
+	decls.launch_softmax_ij_j_r16,
+	decls.launch_softmax_ij_j_r32,
+	decls.launch_softmax_ij_j_r64,
 });
 

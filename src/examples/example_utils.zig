@@ -10,27 +10,55 @@ pub fn copyAndPrintFlat(
     const dst = try std.heap.c_allocator.alloc(std.meta.Child(@TypeOf(src)), src.len);
         defer std.heap.c_allocator.free(dst);
 
-    mp.mem.copyFromDevice(dst, src, stream);
+    mp.stream.synchronize(stream);
 
-    mp.mem.synchronize(stream);
+    mp.mem.copyFromDevice(src, dst, stream);
+
+    mp.stream.synchronize(stream);
 
     std.debug.print("\n{s}: {any} " , .{ name, dst });
 }
 
-pub fn cpu_print_matrix(
+pub fn copyToCPU(
+    src: anytype,
+    stream: anytype
+) ![]std.meta.Child(@TypeOf(src)) {
+    
+    const dst = try std.heap.c_allocator.alloc(std.meta.Child(@TypeOf(src)), src.len);
+
+    mp.stream.synchronize(stream);
+
+    mp.mem.copyFromDevice(src, dst, stream);
+
+    mp.stream.synchronize(stream);
+
+    return dst;
+}
+
+pub fn freeCPU(
+    src: anytype,
+) void {
+    std.heap.c_allocator.free(src);
+}
+
+pub fn allocCPU(
+    comptime T: type,
+    N: usize
+) ![]T {    
+    return try std.heap.c_allocator.alloc(T, N);
+}
+
+pub fn cpuPrintMatrix(
     name: []const u8, 
     src: anytype, 
     row: usize,
     col: usize,
-) !void {    
+) void {    
     std.debug.print("\nName: {s}:\n", .{ name });
-
-    const dst = try std.heap.c_allocator.alloc(std.meta.Child(@TypeOf(src)), row * col);
-        defer std.heap.c_allocator.free(dst);
 
     for (0..row) |i| {
         for (0..col) |j| {
-            std.debug.print("{d:.1} ", .{ dst[i * col + j]});
+            std.debug.print("{d:.1} ", .{ src[i * col + j]});
         }
         std.debug.print("\n", .{});
     }
@@ -48,21 +76,16 @@ pub fn copyAndPrintMatrix(
     const dst = try std.heap.c_allocator.alloc(std.meta.Child(@TypeOf(src)), src.len);
         defer std.heap.c_allocator.free(dst);
 
+    mp.stream.synchronize(stream);
+
     mp.mem.copyFromDevice(src, dst, stream);
 
     mp.stream.synchronize(stream);
 
-    std.debug.print("\nName: {s}:\n", .{ name });
-
-    for (0..row) |i| {
-        for (0..col) |j| {
-            std.debug.print("{d:.1} ", .{ dst[i * col + j] });
-        }
-        std.debug.print("\n", .{});
-    }
+    cpuPrintMatrix(name, dst, row, col);
 }
 
-pub fn cpu_matmul(
+pub fn cpuMatmul(
     x: anytype,
     y: @TypeOf(x),
     z: @TypeOf(x),
@@ -88,7 +111,20 @@ pub fn cpu_matmul(
     }
 }
 
-pub fn verify_results(
+pub fn cpuAdd(
+    x: anytype,
+    y: @TypeOf(x),
+    z: @TypeOf(x)
+) void {
+    std.debug.assert(x.len == y.len);
+    std.debug.assert(y.len == z.len);
+
+    for (0..x.len) |i| {
+        z[i] = x[i] + y[i];
+    }
+}
+
+pub fn verifyResults(
     name: []const u8,
     x: anytype,
     y: @TypeOf(x),

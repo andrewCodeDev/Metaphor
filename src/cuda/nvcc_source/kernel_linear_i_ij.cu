@@ -1,11 +1,12 @@
 #include "../kernel_header.h"
 
 __global__ void __kernel_inner_product_i_ij_RScalar(
-  const RScalar* x,
-  const RScalar* A,
-  RScalar alpha,
+  const RScalar* x, // vector
+  const RScalar* A, // matrix
+  RScalar alpha, // scale x.A
+  const RScalar* b, // bias
+  RScalar beta,  // scale b
         RScalar* y,
-  RScalar beta,
   len_t M,
   len_t N
 ) {
@@ -36,6 +37,8 @@ __global__ void __kernel_inner_product_i_ij_RScalar(
 
   // locate the correct col on vector y
   y += (blockIdx.x * WARP_SIZE);
+
+  b += (blockIdx.x * WARP_SIZE);
 
   // reload our warp tile and coalesce tile values
   auto tc = reinterpret_cast<coalesce<RScalar>::c_ptr>(tile_A[t_row]);
@@ -78,7 +81,6 @@ __global__ void __kernel_inner_product_i_ij_RScalar(
 
       } else { // remainder
 
-        //printf("Stop: %zu\n", stop);
         // load what you can in first/last block
         for (len_t i = idx, j = (step + idx); j < M; ++i, ++j)
           out += tile_A[t_row][i] * x[j];         
@@ -109,7 +111,8 @@ __global__ void __kernel_inner_product_i_ij_RScalar(
     }
 
     // write results out
-    y[t_row] = out * alpha + y[t_row] * beta;
+
+    y[t_row] = out * alpha + b[t_row] * beta;
   }
 }
 
@@ -118,8 +121,9 @@ extern "C" void launch_inner_product_i_ij_RScalar(
   const RScalar *x,
   const RScalar *A, 
         RScalar alpha, // scales product
-        RScalar *y,
+  const RScalar *b,
         RScalar beta, // blends y back in
+        RScalar *y,
   len_t M, 
   len_t N
 ) {
@@ -133,5 +137,5 @@ extern "C" void launch_inner_product_i_ij_RScalar(
     );
 
     __kernel_inner_product_i_ij_RScalar
-        <<<grid_block, tile_block, 0, getCtx(stream)>>>(x, A, alpha, y, beta, M, N);
+        <<<grid_block, tile_block, 0, getCtx(stream)>>>(x, A, alpha, b, beta, y, M, N);
 }

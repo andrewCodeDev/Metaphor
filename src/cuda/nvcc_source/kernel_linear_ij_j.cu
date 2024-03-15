@@ -1,12 +1,13 @@
 #include "../kernel_header.h"
 
 __global__ void __kernel_inner_product_ij_j_RScalar(
-  const RScalar* A,
-  const RScalar* x,
-  RScalar alpha,
-        RScalar* y,
-  RScalar beta,
-  len_t M,
+  const RScalar *x,
+  const RScalar *A, 
+        RScalar alpha, // scales product
+  const RScalar *b,
+        RScalar beta, // blends y back in
+        RScalar *y,
+  len_t M, 
   len_t N
 ) {
   constexpr len_t WARP_STEP = coalesce<RScalar>::warp_step;
@@ -31,6 +32,8 @@ __global__ void __kernel_inner_product_ij_j_RScalar(
 
   // locate the correct row on vector y
   y += (blockIdx.y * WARP_SIZE);
+
+  b += (blockIdx.y * WARP_SIZE);
 
   // reload our warp tile and coalesce tile values
   auto tc = reinterpret_cast<coalesce<RScalar>::c_ptr>(tile_A[t_row]);
@@ -59,9 +62,10 @@ __global__ void __kernel_inner_product_ij_j_RScalar(
       // make sure our calculation is in-bounds
       const len_t stop = min(min_n, N - step);
 
-      // we have another warp
-      if (stop == WARP_SIZE) {
+      const len_t idx = t_col * 4;
 
+      // we have another warp
+      if ((stop == WARP_SIZE) || ((idx + 4) < stop)) {
         const auto u = tc[t_col];
         const auto v = xc[t_col];
         out += u.w * v.w;
@@ -71,39 +75,9 @@ __global__ void __kernel_inner_product_ij_j_RScalar(
 
       } else { // remainder
 
-        //printf("Stop: %zu\n", stop);
-        
-        // any block remainder will always be
-        // the first or last block based on the
-        // column. The middle is excluded.
-
-        // case of only 1 block (first has remainder):
-
-        // |------b1------|      
-        // [x1, x2, x3] __
-
-        // case of N blocks (last has remainder):
-        
-        // |------b1------|------b2------|      
-        // [x1, x2, x3, x4, x5, x6] __ __
-
-        // each thread is still responsible
-        // for attempting to load 4 values
-        const len_t idx = t_col * 4;
-
-        // try to coalesce one more time
-        if ((idx + 4) <= stop) {
-            const auto u = tc[t_col];
-            const auto v = xc[t_col];
-            out += u.w * v.w;
-            out += u.x * v.x;
-            out += u.y * v.y;
-            out += u.z * v.z;
-        } else {
-            // load what you can in first/last block
-            for (len_t i = idx, j = (step + idx); j < N; ++i, ++j) { 
-              out += tile_A[t_row][i] * x[j]; 
-          }
+        // load what you can in first/last block
+        for (len_t i = idx, j = (step + idx); j < N; ++i, ++j) { 
+          out += tile_A[t_row][i] * x[j]; 
         }
       }
     }
@@ -131,18 +105,18 @@ __global__ void __kernel_inner_product_ij_j_RScalar(
       out += output[t_row][i];
     }
 
-    // write results out
-    y[t_row] = out * alpha + y[t_row] * beta;
+    y[t_row] = out * alpha + b[t_row] * beta;
   }
 }
 
 extern "C" void launch_inner_product_ij_j_RScalar(
   StreamCtx stream,
-  const RScalar *A, 
   const RScalar *x,
+  const RScalar *A, 
         RScalar alpha, // scales product
+  const RScalar *b,
+        RScalar beta, // blends y back in
         RScalar *y,
-        RScalar beta, // blends C back in
   len_t M, 
   len_t N
 ) {
@@ -156,5 +130,5 @@ extern "C" void launch_inner_product_ij_j_RScalar(
     );
 
     __kernel_inner_product_ij_j_RScalar
-        <<<grid_block, tile_block, 0, getCtx(stream)>>>(A, x, alpha, y, beta, M, N);
+        <<<grid_block, tile_block, 0, getCtx(stream)>>>(A, x, alpha, b, beta, y, M, N);
 }

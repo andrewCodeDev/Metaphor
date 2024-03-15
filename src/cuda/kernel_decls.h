@@ -164,7 +164,7 @@ EXTERN_C void launch_subtraction_c64(
   c64* c, 
   len_t N
 );
-EXTERN_C void launch_inner_product_i_ij_r16(
+EXTERN_C void launch_linear_i_ij_r16(
   StreamCtx stream,
   const r16 *x,
   const r16 *A, 
@@ -175,7 +175,7 @@ EXTERN_C void launch_inner_product_i_ij_r16(
   len_t M, 
   len_t N
 );
-EXTERN_C void launch_inner_product_i_ij_r32(
+EXTERN_C void launch_linear_i_ij_r32(
   StreamCtx stream,
   const r32 *x,
   const r32 *A, 
@@ -186,7 +186,7 @@ EXTERN_C void launch_inner_product_i_ij_r32(
   len_t M, 
   len_t N
 );
-EXTERN_C void launch_inner_product_i_ij_r64(
+EXTERN_C void launch_linear_i_ij_r64(
   StreamCtx stream,
   const r64 *x,
   const r64 *A, 
@@ -533,7 +533,7 @@ EXTERN_C void launch_hadamard_c64(
   c64* c, 
   len_t N
 );
-EXTERN_C void launch_inner_product_ij_j_r16(
+EXTERN_C void launch_linear_ij_j_r16(
   StreamCtx stream,
   const r16 *x,
   const r16 *A, 
@@ -544,7 +544,7 @@ EXTERN_C void launch_inner_product_ij_j_r16(
   len_t M, 
   len_t N
 );
-EXTERN_C void launch_inner_product_ij_j_r32(
+EXTERN_C void launch_linear_ij_j_r32(
   StreamCtx stream,
   const r32 *x,
   const r32 *A, 
@@ -555,7 +555,7 @@ EXTERN_C void launch_inner_product_ij_j_r32(
   len_t M, 
   len_t N
 );
-EXTERN_C void launch_inner_product_ij_j_r64(
+EXTERN_C void launch_linear_ij_j_r64(
   StreamCtx stream,
   const r64 *x,
   const r64 *A, 

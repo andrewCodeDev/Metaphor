@@ -1,6 +1,6 @@
 #include "../kernel_header.h"
 
-__global__ void __kernel_inner_product_i_ij_RScalar(
+__global__ void __kernel_linear_i_ij_RScalar(
   const RScalar* x, // vector
   const RScalar* A, // matrix
   RScalar alpha, // scale x.A
@@ -116,7 +116,7 @@ __global__ void __kernel_inner_product_i_ij_RScalar(
   }
 }
 
-extern "C" void launch_inner_product_i_ij_RScalar(
+extern "C" void launch_linear_i_ij_RScalar(
   StreamCtx stream,
   const RScalar *x,
   const RScalar *A, 
@@ -136,6 +136,6 @@ extern "C" void launch_inner_product_i_ij_RScalar(
         WARP_SIZE
     );
 
-    __kernel_inner_product_i_ij_RScalar
+    __kernel_linear_i_ij_RScalar
         <<<grid_block, tile_block, 0, getCtx(stream)>>>(x, A, alpha, b, beta, y, M, N);
 }

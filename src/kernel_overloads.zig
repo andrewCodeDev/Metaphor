@@ -45,6 +45,12 @@ pub const kernel_linear_i_ij = OverloadSet(.{
 	decls.launch_linear_i_ij_r64,
 });
 
+pub const kernel_selu_reverse = OverloadSet(.{
+	decls.launch_selu_reverse_r16,
+	decls.launch_selu_reverse_r32,
+	decls.launch_selu_reverse_r64,
+});
+
 pub const kernel_leaky_relu = OverloadSet(.{
 	decls.launch_leaky_relu_r16,
 	decls.launch_leaky_relu_r32,
@@ -127,6 +133,12 @@ pub const kernel_hadamard = OverloadSet(.{
 	decls.launch_hadamard_c32,
 	decls.launch_hadamard_r64,
 	decls.launch_hadamard_c64,
+});
+
+pub const kernel_selu = OverloadSet(.{
+	decls.launch_selu_r16,
+	decls.launch_selu_r32,
+	decls.launch_selu_r64,
 });
 
 pub const kernel_linear_ij_j = OverloadSet(.{

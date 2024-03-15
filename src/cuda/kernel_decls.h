@@ -197,6 +197,27 @@ EXTERN_C void launch_linear_i_ij_r64(
   len_t M, 
   len_t N
 );
+EXTERN_C void launch_selu_reverse_r16(
+  StreamCtx stream,
+        r16 *a_grads,
+  const r16 *b_value,
+  const r16 *b_grads,
+  len_t N
+);
+EXTERN_C void launch_selu_reverse_r32(
+  StreamCtx stream,
+        r32 *a_grads,
+  const r32 *b_value,
+  const r32 *b_grads,
+  len_t N
+);
+EXTERN_C void launch_selu_reverse_r64(
+  StreamCtx stream,
+        r64 *a_grads,
+  const r64 *b_value,
+  const r64 *b_grads,
+  len_t N
+);
 EXTERN_C void launch_leaky_relu_r16(
   StreamCtx stream,
   const r16* a,
@@ -531,6 +552,24 @@ EXTERN_C void launch_hadamard_c64(
   const c64* a,
   const c64* b, 
   c64* c, 
+  len_t N
+);
+EXTERN_C void launch_selu_r16(
+  StreamCtx stream,
+  const r16* a,
+        r16* b, 
+  len_t N
+);
+EXTERN_C void launch_selu_r32(
+  StreamCtx stream,
+  const r32* a,
+        r32* b, 
+  len_t N
+);
+EXTERN_C void launch_selu_r64(
+  StreamCtx stream,
+  const r64* a,
+        r64* b, 
   len_t N
 );
 EXTERN_C void launch_linear_ij_j_r16(

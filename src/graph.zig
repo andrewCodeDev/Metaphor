@@ -217,8 +217,8 @@ pub const GraphConfig = struct {
     auto_free_wgt_grads: bool = false,
     auto_free_inp_grads: bool = false,
     auto_free_hid_nodes: bool = true,
-    mode: Mode = .train, // good default?
     stream: Stream,
+    mode: Mode,
 };
 
 pub const Graph = struct {
@@ -574,6 +574,8 @@ pub const Graph = struct {
 
     // trampoline loop for reversing graph
     fn reverse(self: *Self, idx: SizeType) void {
+
+        std.debug.assert(self.mode != .eval);
 
         const total = self.nodes.callbacks.items.len;
 

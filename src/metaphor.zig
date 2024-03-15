@@ -80,7 +80,7 @@ pub fn Rank(comptime rank: usize) type {
 pub const ops = struct {
 
     inline fn elementwiseDispatch(
-        comptime Impl: type, 
+        comptime Callback: type, 
         X: anytype, 
         Y: anytype
     ) NodeTensor(SC.ScalarResult(@TypeOf(X), @TypeOf(Y))) {
@@ -88,19 +88,19 @@ pub const ops = struct {
         const graph = X.ptr;
         const DataType = SC.ScalarResult(@TypeOf(X).DataType, @TypeOf(Y).DataType);
         const Z = graph.nodeTensor(X.sizes(), DataType);        
-        const callback = Impl{ };  // instance for comptime fields
+        const callback = Callback{ };  // instance for comptime fields
         callback.forward(graph.stream, X, Y, Z);
         return if (graph.mode == .eval)
-            Z else graph.appendNode(Impl, .{ X, Y }, Z);
+            Z else graph.appendNode(Callback, .{ X, Y }, Z);
     }
 
-    inline fn activationDispatch(comptime Impl: type,  X: anytype) NodeTensor(Child(@TypeOf(X))) {
+    inline fn activationDispatch(comptime Callback: type,  X: anytype) NodeTensor(Child(@TypeOf(X))) {
         const graph = X.ptr;
         const Y = graph.nodeTensor(X.sizes(), @TypeOf(X).DataType);        
-        const callback = Impl{ };  // instance for comptime fields
+        const callback = Callback{ };  // instance for comptime fields
         callback.forward(graph.stream, X, Y);
         return if (graph.mode == .eval)
-            Y else graph.appendNode(Impl, .{ X }, Y);
+            Y else graph.appendNode(Callback, .{ X }, Y);
     }
 
 // <>--------------------------------------------------------<>
@@ -110,7 +110,7 @@ pub const ops = struct {
         if (comptime !isGraphTensor(@TypeOf(X)) or !isGraphTensor(@TypeOf(Y)))
             @compileError("Addition requires graph tensor.");
 
-        return @call(.always_inline, elementwiseDispatch, .{ TenOps.AddImpl, X, Y});
+        return @call(.always_inline, elementwiseDispatch, .{ TenOps.AddCallback, X, Y});
     }
     
 // <>--------------------------------------------------------<>
@@ -120,7 +120,7 @@ pub const ops = struct {
         if (comptime !isGraphTensor(@TypeOf(X)) or !isGraphTensor(@TypeOf(Y)))
             @compileError("Hadamard requires graph tensor.");
 
-        return @call(.always_inline, elementwiseDispatch, .{ TenOps.HadamardImpl, X, Y});
+        return @call(.always_inline, elementwiseDispatch, .{ TenOps.HadamardCallback, X, Y});
     }
     
 // <>--------------------------------------------------------<>
@@ -130,7 +130,7 @@ pub const ops = struct {
         if (comptime !isGraphTensor(@TypeOf(X)) or !isGraphTensor(@TypeOf(Y)))
             @compileError("Subtract requires graph tensor.");
 
-        return @call(.always_inline, elementwiseDispatch, .{ TenOps.SubImpl, X, Y});    
+        return @call(.always_inline, elementwiseDispatch, .{ TenOps.SubCallback, X, Y});    
     }
     
 // <>--------------------------------------------------------<>
@@ -149,7 +149,7 @@ pub const ops = struct {
         TenOps.leakyReluForward(graph.stream, X, coef, Y);
 
         return if (graph.mode == .eval)
-            Y else graph.appendNode(TenOps.LeakyReluImpl, .{ X }, Y);
+            Y else graph.appendNode(TenOps.LeakyReluCallback, .{ X }, Y);
     }
 
 // <>--------------------------------------------------------<>
@@ -169,7 +169,17 @@ pub const ops = struct {
         if (comptime !isGraphTensor(@TypeOf(X)))
             @compileError("Tanh requires graph tensor.");
 
-        return @call(.always_inline, activationDispatch, .{ TenOps.TanhImpl, X, 0.0 });
+        return @call(.always_inline, activationDispatch, .{ TenOps.TanhCallback, X });
+    }    
+
+// <>--------------------------------------------------------<>
+
+    pub fn selu(X: anytype) NodeTensor(Child(@TypeOf(X))) {
+
+        if (comptime !isGraphTensor(@TypeOf(X)))
+            @compileError("Selu requires graph tensor.");
+
+        return @call(.always_inline, activationDispatch, .{ TenOps.SeluCallback, X });
     }    
 
 // <>--------------------------------------------------------<>

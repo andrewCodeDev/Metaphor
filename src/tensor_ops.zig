@@ -47,7 +47,7 @@ pub fn additionReverseArg1(stream: Stream, _: anytype, Y: anytype, Z: anytype) v
     });
 }
 
-pub const AddImpl = CallbackBuilder(
+pub const AddCallback = CallbackBuilder(
     additionForward, .{
         .{ additionReverseArg0, 0 },
         .{ additionReverseArg1, 1 }
@@ -90,7 +90,7 @@ pub fn subtractionReverseArg1(stream: Stream, _: anytype, Y: anytype, Z: anytype
     });
 }
 
-pub const SubImpl = CallbackBuilder(
+pub const SubCallback = CallbackBuilder(
     subtractionForward, .{
         .{ subtractionReverseArg0, 0 },
         .{ subtractionReverseArg1, 1 }
@@ -129,7 +129,7 @@ pub fn hadamardReverseArg1(stream: Stream, X: anytype, Y: anytype, Z: anytype) v
     });
 }
 
-pub const HadamardImpl = CallbackBuilder(
+pub const HadamardCallback = CallbackBuilder(
     hadamardForward, .{
         .{ hadamardReverseArg0, 0 },
         .{ hadamardReverseArg1, 1 },
@@ -166,7 +166,7 @@ pub fn leakyReluReverse(stream: Stream, x: anytype, coef: anytype, y: anytype) v
     });
 }
 
-pub const LeakyReluImpl = CallbackBuilder(
+pub const LeakyReluCallback = CallbackBuilder(
     leakyReluForward, .{
         .{ leakyReluReverse, 0 },
     }, NoCleanup
@@ -193,9 +193,29 @@ pub fn tanhReverse(stream: Stream, x: anytype, y: anytype) void {
     });
 }
 
-pub const TanhImpl = CallbackBuilder(
+pub const TanhCallback = CallbackBuilder(
     tanhForward, .{
         .{ tanhReverse, 0 },
+    }, NoCleanup
+);
+
+// <>--------------------------------------------------------<>
+
+pub fn seluForward(stream: Stream, x: anytype, y: anytype) void {
+    overloads.kernel_selu.call(.{
+        stream.context, x.values().ptr, y.values().ptr, y.len()
+    });
+}
+
+pub fn seluReverse(stream: Stream, x: anytype, y: anytype) void {
+    overloads.kernel_selu_reverse.call(.{
+        stream.context, x.grads().?.ptr, y.values().ptr, y.grads().?.ptr, y.len()
+    });
+}
+
+pub const SeluCallback = CallbackBuilder(
+    seluForward, .{
+        .{ seluReverse, 0 },
     }, NoCleanup
 );
 
@@ -223,7 +243,8 @@ pub fn randomize(
     stream: DU.Stream
 ) void {
 
-    //TODO: replace this with a kernel call
+    //TODO: replace this with a kernel call...?
+    //      really though, how often is this called?
     
     var backing = std.rand.DefaultPrng.init(42);
 

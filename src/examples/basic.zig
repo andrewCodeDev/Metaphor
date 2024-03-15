@@ -15,6 +15,7 @@ pub fn main() !void {
         .auto_free_inp_grads = false,
         .auto_free_hid_nodes = false,
         .stream = stream,
+        .mode = .eval
     });
 
     defer G.deinit();

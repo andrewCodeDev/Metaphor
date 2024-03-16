@@ -9,6 +9,12 @@ pub const kernel_permutate_ij_ji = OverloadSet(.{
 	decls.launch_transpose_2D_r64,
 });
 
+pub const kernel_logistic_reverse = OverloadSet(.{
+	decls.launch_logistic_reverse_r16,
+	decls.launch_logistic_reverse_r32,
+	decls.launch_logistic_reverse_r64,
+});
+
 pub const kernel_tanh = OverloadSet(.{
 	decls.launch_tanh_r16,
 	decls.launch_tanh_r32,
@@ -43,6 +49,12 @@ pub const kernel_linear_i_ij = OverloadSet(.{
 	decls.launch_linear_i_ij_r16,
 	decls.launch_linear_i_ij_r32,
 	decls.launch_linear_i_ij_r64,
+});
+
+pub const kernel_softmax_i_i = OverloadSet(.{
+	decls.launch_softmax_i_i_r16,
+	decls.launch_softmax_i_i_r32,
+	decls.launch_softmax_i_i_r64,
 });
 
 pub const kernel_selu_reverse = OverloadSet(.{
@@ -151,11 +163,5 @@ pub const kernel_linear_ij_j = OverloadSet(.{
 	decls.launch_linear_ij_j_r16,
 	decls.launch_linear_ij_j_r32,
 	decls.launch_linear_ij_j_r64,
-});
-
-pub const softmax_ij_j = OverloadSet(.{
-	decls.launch_softmax_ij_j_r16,
-	decls.launch_softmax_ij_j_r32,
-	decls.launch_softmax_ij_j_r64,
 });
 

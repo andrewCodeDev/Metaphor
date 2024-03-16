@@ -58,7 +58,7 @@ pub fn cpuPrintMatrix(
 
     for (0..row) |i| {
         for (0..col) |j| {
-            std.debug.print("{d:.1} ", .{ src[i * col + j]});
+            std.debug.print("{d:.4} ", .{ src[i * col + j]});
         }
         std.debug.print("\n", .{});
     }

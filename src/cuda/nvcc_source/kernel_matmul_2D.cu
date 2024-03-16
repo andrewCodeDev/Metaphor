@@ -1,11 +1,12 @@
 #include "../kernel_header.h"
 
-__global__ void __kernel_matmul_2D_RScalar(
+__global__ void __kernel_linear_ij_jk_RScalar(
     const RScalar *A,
     const RScalar *B, 
           RScalar alpha, 
-          RScalar *C,
+    const RScalar *C,
           RScalar beta, 
+          RScalar *Y,
     len_t M, 
     len_t N, 
     len_t K 
@@ -26,6 +27,7 @@ __global__ void __kernel_matmul_2D_RScalar(
 
   const len_t offset_C = (WARP_SIZE * blockIdx.y * K) + (blockIdx.x * WARP_SIZE);
   C += offset_C;
+  Y += offset_C;
 
   // these boundaries don't change, calculate once
   const len_t m_pos = blockIdx.y * WARP_SIZE + t_row;
@@ -75,7 +77,7 @@ __global__ void __kernel_matmul_2D_RScalar(
   C += (K * t_row);
   
   if ((m_pos < M) && (k_pos < K)) {
-    C[t_col] = out * alpha + C[t_col] * beta;
+    Y[t_col] = out * alpha + C[t_col] * beta;
   }
 }
 
@@ -84,8 +86,9 @@ extern "C" void launch_matmul_2D_RScalar(
   const RScalar *A, 
   const RScalar *B,
         RScalar alpha, // scales product
-        RScalar *C,
+  const RScalar *C,
         RScalar beta, // blends C back in
+        RScalar *Y,
   len_t M, 
   len_t N, 
   len_t K 
@@ -100,6 +103,6 @@ extern "C" void launch_matmul_2D_RScalar(
         WARP_SIZE
     );
 
-    __kernel_matmul_2D_RScalar
-        <<<grid_block, tile_block, 0, getCtx(stream)>>>(A, B, alpha, C, beta, M, N, K);
+    __kernel_linear_ij_jk_RScalar
+        <<<grid_block, tile_block, 0, getCtx(stream)>>>(A, B, alpha, C, beta, Y, M, N, K);
 }

@@ -42,7 +42,9 @@ pub fn build(b: *std.Build) void {
     // Standard optimization options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
     // set a preferred release mode, allowing the user to decide how to optimize.
-    const optimize = b.standardOptimizeOption(.{});
+    const optimize = b.standardOptimizeOption(.{
+        .preferred_optimize_mode = .ReleaseFast
+    });
 
     const mp_module = b.addModule("metaphor", .{
         .root_source_file = .{ .path = b.pathJoin(&.{ "src", "metaphor.zig" }) }
@@ -50,8 +52,8 @@ pub fn build(b: *std.Build) void {
 
     // reusable paths for linking libraries to source files
     // TODO: make a flag for x86-x64-linux to support different OS's
-    const cuda_stubs = b.pathJoin(&.{ "dependencies", "cuda", "targets", "x86_64-linux", "lib", "stubs" });
-    const cuda_lib64 = b.pathJoin(&.{ "dependencies", "cuda", "lib64" });
+    const cuda_stubs = b.pathJoin(&.{ "deps", "cuda", "targets", "x86_64-linux", "lib", "stubs" });
+    const cuda_lib64 = b.pathJoin(&.{ "deps", "cuda", "lib64" });
     const mp_kernels = b.pathJoin(&.{ "src", "lib", "mp_kernels.a" });
     const mp_src_lib = b.pathJoin(&.{ "src", "lib" });
 
@@ -108,11 +110,13 @@ pub fn build(b: *std.Build) void {
 }
 
 const EXAMPLE_NAMES = &[_][]const u8{
-    "basic",
     "scalar",
     "linear_maps",
     "streams",
     "subgraphs",
+
+    // this is for development purposes
+    "experimental",
 };
 
 fn linkLibraries(

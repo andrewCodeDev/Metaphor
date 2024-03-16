@@ -12,7 +12,7 @@ __global__ void __kernel_selu_reverse_RScalar(
     const RScalar b = b_value[tid];    
     const RScalar g = b_grads[tid];
     // for (x < 0) -> e^x - 1, dx is e^x. To recover e^x, add 1 to x
-    a_grads[tid] += (b >= RScalar(0.0f)) ? RScalar(1.0f) : b + RScalar(1.0f);
+    a_grads[tid] += g * ((b >= RScalar(0.0f)) ? RScalar(1.0f) : b + RScalar(1.0f));
   }
 }
 

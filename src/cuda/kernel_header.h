@@ -16,7 +16,7 @@ typedef struct {
 #define RTensor RTensor32
 #define CTensor CTensor32
 
-#define DIMPAD(M, N) ((M + (N - 1)) / N)
+#define DIMPAD(M, N) (((M) + ((N) - 1)) / (N))
 
 #if defined(__cplusplus)
 ////////////////////////////////
@@ -24,9 +24,11 @@ typedef struct {
 #include <cmath>
 #include <algorithm>
 #include <stdio.h>
-#include "../../dependencies/cuda/include/cuda.h"
-#include "../../dependencies/cuda/include/cuda_runtime.h"
-#include "../../dependencies/cuda/include/cooperative_groups.h"
+#include <numeric>
+#include <limits>
+#include "../../deps/cuda/include/cuda.h"
+#include "../../deps/cuda/include/cuda_runtime.h"
+#include "../../deps/cuda/include/cooperative_groups.h"
 
 #if defined(__CUDACC__)
 
@@ -108,10 +110,10 @@ __device__ __inline__ T cmul(T x, T y) {
 }
 
 struct MaxOP {
-  template<class T> static __inline__ __device__ T apply(T x, T y) { return (x < y) ? y: x; }
+  template<class T> static __inline__ __device__ T apply(T x, T y) { return (x > y) ? x: y; }
 };
 struct MinOP {
-  template<class T> static __inline__ __device__ T apply(T x, T y) { return (y < x) ? y: x; }
+  template<class T> static __inline__ __device__ T apply(T x, T y) { return (x < y) ? x: y; }
 };
 struct AddOP {
   template<class T> static __inline__ __device__ T apply(T x, T y) { return x + y; }
@@ -125,25 +127,68 @@ struct DivOP {
 struct SubOP {
   template<class T> static __inline__ __device__ T apply(T x, T y) { return x - y; }
 };
-
 struct ClipOP {
-template<class T> static __inline__ __device__ T apply(T x, T lower, T upper) {
-  return MinOP::apply(MaxOP::apply(x, lower), upper);
-}
+  template<class T> static __inline__ __device__ T apply(T x, T lower, T upper) {
+    return MinOP::apply(MaxOP::apply(x, lower), upper);
+  }
 };
 
+template<class T> struct Init;
 
-template <class OP, int NUM, typename T>
-__inline__ __device__ void warpReduce(T* val) {
-#pragma unroll
-  for (int i = 0; i < NUM; ++i) {
-#pragma unroll
-    for (int mask = WARP_SIZE >> 1; mask > 0; mask >>= 1) {
-      val[i] = OP::apply(val[i], __shfl_xor_sync(0xffffffff, val[i], mask, WARP_SIZE));
-    }
+template<> struct Init<r16> {
+  static __device__ __inline__ r16 infinity() {
+    const unsigned short x = 31744;
+    return *reinterpret_cast<const r16*>(&x);
   }
+};
+template<> struct Init<r32> {
+  static constexpr r32 result = std::numeric_limits<r32>::infinity();
+  static __device__ __inline__ r32 infinity() {
+    return Init<r32>::result;
+  }
+};
+template<> struct Init<r64> {
+  static constexpr r64 result = std::numeric_limits<r64>::infinity();
+  static __device__ __inline__ r64 infinity() {
+    return Init<r64>::result;
+  }
+};
+
+template <class OP, typename T>
+__inline__ __device__ T warpReduce(T value) {
+    __syncthreads();
+
+    for (int mask = WARP_SIZE >> 1; mask > 0; mask >>= 1) {
+      value = OP::apply(value, __shfl_xor_sync(0xffffffff, value, mask, WARP_SIZE));
+  }
+  return value;
 }
 
+template <class OP, len_t N, typename T>
+__inline__ __device__ T blockReduce(
+  T value,
+  len_t idx,
+  len_t ctrl
+) {
+  __shared__ T cache[N];
+  
+  const T rdx = warpReduce<OP>(value);
+
+  if (ctrl == 0) {
+    cache[idx] = rdx;
+  }
+  __syncthreads();
+
+  if (ctrl == 0 && idx == 0) {
+    T tmp = cache[0];
+    for (len_t i = 1; i < N; ++i) { 
+      tmp = OP::apply(tmp, cache[i]);
+    }
+    cache[0] = tmp;
+  }
+  __syncthreads();
+  return cache[0];
+}
 
 #endif // nvcc stuff
 #endif // header guard

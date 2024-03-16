@@ -32,6 +32,27 @@ EXTERN_C void launch_transpose_2D_r64(
     len_t row,
     len_t col
 );
+EXTERN_C void launch_logistic_reverse_r16(
+  StreamCtx stream,
+        r16 *a_grads,
+  const r16 *b_value,
+  const r16 *b_grads,
+  len_t N
+);
+EXTERN_C void launch_logistic_reverse_r32(
+  StreamCtx stream,
+        r32 *a_grads,
+  const r32 *b_value,
+  const r32 *b_grads,
+  len_t N
+);
+EXTERN_C void launch_logistic_reverse_r64(
+  StreamCtx stream,
+        r64 *a_grads,
+  const r64 *b_value,
+  const r64 *b_grads,
+  len_t N
+);
 EXTERN_C void launch_tanh_r16(
   StreamCtx stream,
   const r16* a,
@@ -196,6 +217,27 @@ EXTERN_C void launch_linear_i_ij_r64(
         r64 *y,
   len_t M, 
   len_t N
+);
+EXTERN_C void launch_softmax_i_i_r16(
+  StreamCtx stream,
+  const r16* A, 
+        r16* B, 
+        r16* scratch,
+  len_t m
+);
+EXTERN_C void launch_softmax_i_i_r32(
+  StreamCtx stream,
+  const r32* A, 
+        r32* B, 
+        r32* scratch,
+  len_t m
+);
+EXTERN_C void launch_softmax_i_i_r64(
+  StreamCtx stream,
+  const r64* A, 
+        r64* B, 
+        r64* scratch,
+  len_t m
 );
 EXTERN_C void launch_selu_reverse_r16(
   StreamCtx stream,
@@ -400,8 +442,9 @@ EXTERN_C void launch_matmul_2D_r16(
   const r16 *A, 
   const r16 *B,
         r16 alpha, // scales product
-        r16 *C,
+  const r16 *C,
         r16 beta, // blends C back in
+        r16 *Y,
   len_t M, 
   len_t N, 
   len_t K 
@@ -411,8 +454,9 @@ EXTERN_C void launch_matmul_2D_r32(
   const r32 *A, 
   const r32 *B,
         r32 alpha, // scales product
-        r32 *C,
+  const r32 *C,
         r32 beta, // blends C back in
+        r32 *Y,
   len_t M, 
   len_t N, 
   len_t K 
@@ -422,8 +466,9 @@ EXTERN_C void launch_matmul_2D_r64(
   const r64 *A, 
   const r64 *B,
         r64 alpha, // scales product
-        r64 *C,
+  const r64 *C,
         r64 beta, // blends C back in
+        r64 *Y,
   len_t M, 
   len_t N, 
   len_t K 
@@ -631,25 +676,4 @@ EXTERN_C void launch_linear_ij_j_r64(
         r64 *y,
   len_t M, 
   len_t N
-);
-EXTERN_C void launch_softmax_ij_j_r16(
-  StreamCtx stream,
-  const r16* A, 
-        r16* B, 
-  len_t m, 
-  len_t n
-);
-EXTERN_C void launch_softmax_ij_j_r32(
-  StreamCtx stream,
-  const r32* A, 
-        r32* B, 
-  len_t m, 
-  len_t n
-);
-EXTERN_C void launch_softmax_ij_j_r64(
-  StreamCtx stream,
-  const r64* A, 
-        r64* B, 
-  len_t m, 
-  len_t n
 );

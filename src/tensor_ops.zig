@@ -221,6 +221,59 @@ pub const SeluCallback = CallbackBuilder(
 
 // <>--------------------------------------------------------<>
 
+pub fn softmaxForward_i_i(stream: Stream, x: anytype, y: anytype) void {
+    const x_values = x.values();
+    const y_values = y.values();
+    const T = @TypeOf(x);
+
+    std.debug.assert(x_values.len == y_values.len);
+    std.debug.assert(x.sizes().len == 1);
+    std.debug.assert(y.sizes().len == 1);
+
+    // make a proper utility for this
+    const n = ((x_values.len / (32 * 32 * 4)) + 2);
+
+    const scratch = stream.getScratch(Child(T), n);
+
+    overloads.kernel_softmax_i_i.call(.{
+        stream.context, x_values.ptr, y_values.ptr, scratch.ptr, y_values.len
+    });
+}
+
+
+pub fn logisticReverse(stream: Stream, x: anytype, y: anytype) void {
+    const x_grads = x.values();
+    const y_values = y.values();
+    const y_grads = UT.assertGrads(y);
+
+    overloads.kernel_logistic_reverse.call(.{
+        stream.context, x_grads.ptr, y_values.ptr, y_grads.ptr, y_values.len
+    });
+}
+
+pub const SM_i_i_Callback = CallbackBuilder(
+    softmaxForward_i_i, .{
+        .{ logisticReverse, 0 },
+    }, NoCleanup
+);
+
+const softmax_expressions = std.ComptimeStringMap(
+    type, .{
+        // Rank-1-to-Rank-2
+        .{ "i|i", SM_i_i_Callback },
+    }
+);
+
+pub fn findSoftmax(comptime expression: []const u8) type {
+    const parsed = comptime Parser.softmaxExpression(expression);
+    if (softmax_expressions.get(parsed)) |sm| {
+        return sm;
+    } else {
+        @compileError("TODO: invalid softmax expression:" ++ expression);
+    }
+}
+// <>--------------------------------------------------------<>
+
 pub fn sequence(
     tensor: anytype, 
     init: anytype,
@@ -598,136 +651,154 @@ const Linear_ij_i_Callback = CallbackBuilder(
 //////////////////////////////
 // ---- matrix-to-matrix -----
 
-inline fn __innerProduct_ij_jk(
+inline fn __linear_ij_jk(
     stream: Stream,
-    x_values: anytype,
-    y_values: anytype,
+    A_values: anytype,
+    B_values: anytype,
     alpha: f16,
-    z_values: anytype,
+    C_values: anytype,
     beta: f16,
+    Y_values: anytype,
     m: TC.SizeType,
     n: TC.SizeType,
     k: TC.SizeType,
 ) void {
-    const T = UT.Child(@TypeOf(z_values));
+    const T = UT.Child(@TypeOf(Y_values));
     
-    overloads.kernel_matmul_2D.call(.{
+    overloads.kernel_linear_ij_jk.call(.{
         stream.context, 
-        x_values.ptr, 
-        y_values.ptr, 
+        A_values.ptr, 
+        B_values.ptr, 
         SC.asScalar(T, alpha),
-        z_values.ptr,
+        C_values.ptr,
         SC.asScalar(T, beta), 
+        Y_values.ptr,
         m, n, k
     });
 }
 
-pub inline fn innerProduct_ij_jk(
+pub inline fn linear_ij_jk(
     stream: Stream, 
-    x: anytype, 
-    y: anytype,
-    z: anytype,
+    A: anytype, 
+    B: anytype,
+    alpha: f16,
+    C: anytype,
+    beta: f16,
+    Y: anytype,
 ) void {
-    const x_sizes = x.sizes();
-    const y_sizes = y.sizes();
+    const A_sizes = A.sizes();
+    const B_sizes = B.sizes();
+    const m = A_sizes[0];
+    const n = A_sizes[1];
+    const k = B_sizes[1];
 
-    std.debug.assert(x_sizes.len == 2);
-    std.debug.assert(y_sizes.len == 2);
-    std.debug.assert(x_sizes[1] == y_sizes[0]);
+    std.debug.assert(A_sizes.len == 2);
+    std.debug.assert(B_sizes.len == 2);
+    std.debug.assert(n == B_sizes[0]);
+    std.debug.assert(Y.len() == m * k);
+    std.debug.assert(C.len() == Y.len());
 
-    __innerProduct_ij_jk(
+    __linear_ij_jk(
         stream,
-        x.values(),
-        y.values(),
-        1.0, // alpha
-        z.values(),
-        0.0, //beta
-        x_sizes[0],
-        x_sizes[1],
-        y_sizes[1],
+        A.values(),
+        B.values(),
+        alpha,
+        C.values(),
+        beta, //beta
+        Y.values(),
+        m, n, k
     );
 }
 
-inline fn innerProduct_ij_jk_ReverseArg0(
+inline fn linear_ij_jk_ReverseArg0(
     stream: Stream, 
-    x: anytype, 
-    y: anytype,
-    z: anytype,
+    A: anytype, 
+    B: anytype,
+    alpha: f16,
+    _: anytype,
+    _: f16,
+    Y: anytype,
 ) void {
-    const T = Child(@TypeOf(x));
-    const x_grads = x.grads().?;
-    const y_values = y.values();
-    const z_grads = z.grads().?;
-    const z_sizes = z.sizes();
-    const y_sizes = y.sizes();
+    const T = Child(@TypeOf(A));
+    const A_grads = A.grads().?;
+    const B_values = B.values();
+    const Y_grads = Y.grads().?;
+    const Y_sizes = Y.sizes();
+    const B_sizes = B.sizes();
 
-    const y_tran = stream.getScratch(T, y_values.len);
+    const B_tran = stream.getScratch(T, B_values.len);
 
     overloads.kernel_permutate_ij_ji.call(.{
         stream.context, 
-        y_values.ptr, 
-        y_tran.ptr, 
+        B_values.ptr, 
+        B_tran.ptr, 
         SC.asScalar(T, 0.0), 
-        y_sizes[0], 
-        y_sizes[1] 
+        B_sizes[0], 
+        B_sizes[1] 
     });
 
-    __innerProduct_ij_jk(
+    __linear_ij_jk(
         stream, 
-        z_grads,
-        y_tran,
-        1.0, // alpha
-        x_grads,
+        Y_grads,
+        B_tran,
+        alpha, // alpha
+        A_grads,
         1.0, // beta
-        z_sizes[0],
-        z_sizes[1],
-        y_sizes[0],
+        A_grads,
+        Y_sizes[0],
+        Y_sizes[1],
+        B_sizes[0],
     );
 }
 
-inline fn innerProduct_ij_jk_ReverseArg1(
+inline fn linear_ij_jk_ReverseArg1(
     stream: Stream, 
-    x: anytype, 
-    y: anytype,
-    z: anytype,
+    A: anytype, 
+    B: anytype,
+    alpha: f16,
+    _: anytype,
+    _: f16,
+    Y: anytype,
 ) void {
-    const T = Child(@TypeOf(x));
+    const T = Child(@TypeOf(A));
 
-    const x_values = x.values();
-    const y_grads = y.grads().?;
-    const z_grads = z.grads().?;
+    const A_values = A.values();
+    const B_grads = B.grads().?;
+    const Y_grads = Y.grads().?;
 
-    const z_sizes = z.sizes();
-    const x_sizes = x.sizes();
+    const Y_sizes = Y.sizes();
+    const A_sizes = A.sizes();
 
-    const x_tran = stream.getScratch(T, x_values.len);
+    const A_tran = stream.getScratch(T, A_values.len);
 
     overloads.kernel_permutate_ij_ji.call(.{
         stream.context, 
-        x_values.ptr, 
-        x_tran.ptr, 
+        A_values.ptr, 
+        A_tran.ptr, 
         SC.asScalar(T, 0.0), 
-        x_sizes[0], 
-        x_sizes[1] 
+        A_sizes[0], 
+        A_sizes[1] 
     });
 
-    __innerProduct_ij_jk(
+    __linear_ij_jk(
         stream, 
-        x_tran,
-        z_grads,
-        1.0, // alpha
-        y_grads,
+        A_tran,
+        Y_grads,
+        alpha,
+        B_grads,
         1.0, // beta
-        x_sizes[1],
-        x_sizes[0],
-        z_sizes[1],
+        B_grads,
+        A_sizes[1],
+        A_sizes[0],
+        Y_sizes[1],
     );
 }
 
-const IP_ij_jk_Callback = CallbackBuilder(
-    innerProduct_ij_jk, .{
-        .{ innerProduct_ij_jk_ReverseArg0, 0 },
-        .{ innerProduct_ij_jk_ReverseArg1, 1 },
+const Linear_ij_jk_Callback = CallbackBuilder(
+    linear_ij_jk, .{
+        .{ linear_ij_jk_ReverseArg0, 0 },
+        .{ linear_ij_jk_ReverseArg1, 1 },
+        .{ linear_bias_ReverseArg3,  3 },
     }, NoCleanup,
 );
 
@@ -746,7 +817,7 @@ const inner_product_expressions = std.ComptimeStringMap(
         .{ "ji,j->i", Linear_ij_i_Callback },
 
         // Rank-2-to-Rank-2
-        .{ "ij,jk->ik", IP_ij_jk_Callback }
+        .{ "ij,jk->ik", Linear_ij_jk_Callback }
     }
 );
 

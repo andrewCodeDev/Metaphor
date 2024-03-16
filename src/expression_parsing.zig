@@ -336,3 +336,30 @@ pub fn innerProductSizes(comptime str: []const u8) struct {
         .len = out.len
     };
 }
+
+////////////////////////////////////////////////
+// Softmax expression parser
+
+pub fn softmaxExpression(comptime str: []const u8) []const u8 {
+
+    const pipe = comptime std.mem.indexOfScalar(u8, str, '|')
+        orelse @compileError("No pipe operator found on softmax.");
+
+    if (comptime pipe != str.len - 2) {
+        @compileError("Softmax requires that right hand index specifies either a row or column:" ++ str);
+    }
+    const trn = comptime translateIndices(str);
+    const lhs = comptime translateIndices(trn[0..pipe]);
+    const rhs = comptime translateIndices(trn[pipe + 1 ..]);
+
+    if (comptime lhs.len < rhs.len) {
+        @compileError("Softmax found extra indices in expression:" ++ str);
+    }
+    if (comptime std.mem.indexOf(u8, lhs, rhs) == null) {
+        @compileError("Softmax requires that right hand index is a substring of left-hand indices:" ++ str);
+    }
+
+    // TODO: More checks plz...
+
+    return comptime lhs ++ "|" ++ rhs;
+}

@@ -213,6 +213,24 @@ pub const ops = struct {
             Y else graph.appendNode(@TypeOf(perm), .{ X }, Y);
     }
 
+    pub fn softmax(X: anytype, comptime expression: []const u8) NodeTensor(Child(@TypeOf(X))) {
+
+        if (comptime !isGraphTensor(@TypeOf(X)))
+            @compileError("Permutate requires graph tensor.");
+        
+        const graph = X.ptr;
+
+        // tells us which size index to map from x to y    
+        const Y = graph.nodeTensor(X.sizes(), UT.Child(@TypeOf(X)));
+        
+        const sm = TenOps.findSoftmax(expression){ };
+
+        sm.forward(graph.stream, X, Y);
+
+        return if (graph.mode == .eval)
+            Y else graph.appendNode(@TypeOf(sm), .{ X }, Y);
+    }
+
 // <>--------------------------------------------------------<>
 
     pub fn innerProduct(

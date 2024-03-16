@@ -1,5 +1,6 @@
 const mp = @import("metaphor");
 const EU = @import("example_utils.zig");
+const std = @import("std");
 
 //TODO: actually explain the basics here
 
@@ -19,24 +20,30 @@ pub fn main() !void {
 
     defer G.deinit();
 
-    const row_x: usize = 16;
-    const col_x: usize = 32;
+    const row_x: usize = 50_000;
 
     /////////////////////////////////////////////////////
 
-    const X1 = G.tensor(.wgt, .r32, mp.Rank(1){ row_x });  
-    const X2 = G.tensor(.wgt, .r32, mp.Rank(2){ row_x, col_x });  
+    const x = G.tensor(.wgt, .r32, mp.Rank(1){ row_x });  
 
-    mp.mem.sequence(X1, 0.0, 1.0);
-    mp.mem.sequence(X2, 0.0, 1.0);
+    mp.mem.fill(x, 1.0);
 
     /////////////////////////////////////////////////////
+    //for (0..10) |_| {
+    //    const start = try std.time.Instant.now();
 
-    const Z1 = mp.ops.innerProduct(X1, X2, "i,ij->j");
+    //    const y = mp.ops.softmax(x, "i|i");
 
-    Z1.reverse();
+    //    const stop = try std.time.Instant.now();
 
-    //try EU.copyAndPrintMatrix("X2: value", X2.values(),  row_x, col_x, stream);
+    //    const delta = stop.since(start);
+
+    //    y.free();
+    //    
+    //    std.log.info("GPU 1 stream elapsed (ns): {} - Run 1", .{ delta });
+    //}
+
+    //try EU.copyAndPrintMatrix("Z1: value", Z1.values(), 1, row_x, stream);
     //try EU.copyAndPrintMatrix("X1: grads", X1.grads().?,     1, row_x, stream);
 
     //try EU.copyAndPrintMatrix("X1: value", X1.values(),      1, row_x, stream);

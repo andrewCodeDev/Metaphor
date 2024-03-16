@@ -120,6 +120,12 @@ pub const kernel_subtraction_reverse = OverloadSet(.{
 	decls.launch_subtraction_reverse_c64,
 });
 
+pub const kernel_gradient_descent = OverloadSet(.{
+	decls.launch_gradient_descent_r16,
+	decls.launch_gradient_descent_r32,
+	decls.launch_gradient_descent_r64,
+});
+
 pub const kernel_tanh_reverse = OverloadSet(.{
 	decls.launch_tanh_reverse_r16,
 	decls.launch_tanh_reverse_r32,

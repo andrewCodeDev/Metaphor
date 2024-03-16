@@ -108,10 +108,10 @@ __device__ __inline__ T cmul(T x, T y) {
 }
 
 struct MaxOP {
-  template<class T> static __inline__ __device__ T apply(T x, T y) { return std::max(x, y); }
+  template<class T> static __inline__ __device__ T apply(T x, T y) { return (x < y) ? y: x; }
 };
 struct MinOP {
-  template<class T> static __inline__ __device__ T apply(T x, T y) { return std::min(x, y); }
+  template<class T> static __inline__ __device__ T apply(T x, T y) { return (y < x) ? y: x; }
 };
 struct AddOP {
   template<class T> static __inline__ __device__ T apply(T x, T y) { return x + y; }
@@ -125,6 +125,13 @@ struct DivOP {
 struct SubOP {
   template<class T> static __inline__ __device__ T apply(T x, T y) { return x - y; }
 };
+
+struct ClipOP {
+template<class T> static __inline__ __device__ T apply(T x, T lower, T upper) {
+  return MinOP::apply(MaxOP::apply(x, lower), upper);
+}
+};
+
 
 template <class OP, int NUM, typename T>
 __inline__ __device__ void warpReduce(T* val) {

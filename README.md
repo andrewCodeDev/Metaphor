@@ -35,9 +35,6 @@ pub fn main() !void {
 
     const G = mp.Graph.init(.{
         .optimizer = mp.null_optimizer,
-        .auto_free_wgt_grads = false,
-        .auto_free_inp_grads = false,
-        .auto_free_hid_nodes = true,
         .stream = stream,
     });
 
@@ -46,8 +43,8 @@ pub fn main() !void {
     /////////////////////////////////////////////////
 
     // tensors are freed on graph.deinit()
-    const X1 = G.tensor("X1", .wgt, .r32, mp.Rank(2){ 2, 2 });  
-    const X2 = G.tensor("X2", .wgt, .r32, mp.Rank(2){ 2, 2 });
+    const X1 = G.tensor(.wgt, .r32, mp.Rank(2){ 2, 2 });  
+    const X2 = G.tensor(.wgt, .r32, mp.Rank(2){ 2, 2 });
 
     mp.mem.fill(X1, 2);
     mp.mem.fill(X2, 1);

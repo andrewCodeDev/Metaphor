@@ -491,6 +491,33 @@ EXTERN_C void launch_subtraction_reverse_c64(
   const r64 coef,
   len_t N
 );
+EXTERN_C void launch_gradient_descent_r16(
+  StreamCtx stream,
+        r16* a_value,
+  const r16* a_grads, 
+  r16 lrate,
+  r16 lower,
+  r16 upper,
+  len_t N
+);
+EXTERN_C void launch_gradient_descent_r32(
+  StreamCtx stream,
+        r32* a_value,
+  const r32* a_grads, 
+  r32 lrate,
+  r32 lower,
+  r32 upper,
+  len_t N
+);
+EXTERN_C void launch_gradient_descent_r64(
+  StreamCtx stream,
+        r64* a_value,
+  const r64* a_grads, 
+  r64 lrate,
+  r64 lower,
+  r64 upper,
+  len_t N
+);
 EXTERN_C void launch_tanh_reverse_r16(
   StreamCtx stream,
         r16 *a_grads,

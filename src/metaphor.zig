@@ -34,6 +34,7 @@ pub const stream = struct {
     pub const init = DU.initStream;  
     pub const deinit = DU.deinitStream;
     pub const synchronize = DU.synchronizeStream;
+    pub const Group = DU.StreamGroup;
 };
 
 pub const mem = struct {

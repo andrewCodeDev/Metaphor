@@ -94,9 +94,6 @@ pub fn LeafTensor(comptime T: type, comptime class: TensorClass) type {
         ptr: *Graph,
         idx: IndexType,
             
-        pub fn name(self: Self) []const u8 {
-            return self.ptr.leaves.names.items[self.idx];
-        }
         pub fn values(self: Self) []DataType {
             return getSlice(DataType, self.raw_values());
         }
@@ -123,6 +120,9 @@ pub fn LeafTensor(comptime T: type, comptime class: TensorClass) type {
         }
         pub fn stream(self: Self) Stream {
             return self.ptr.leaves.streams.items[self.idx];
+        }
+        pub fn free(self: Self) void {
+            self.ptr.freeTensor(DataType, Class, self.idx);
         }
         fn adjustDependencies(self: Self, comptime direction: i8) i8 {
             return self.ptr.adjustDependencies(Class, self.idx, direction);
@@ -178,6 +178,9 @@ pub fn NodeTensor(comptime T: type) type {
         pub fn attached(self: Self) bool {
             return self.ptr.attached(self.idx);
         }
+        pub fn free(self: Self) void {
+            self.ptr.freeTensor(DataType, Class, self.idx);
+        }
         pub fn reverse(self: Self) void {
 
             if (self.grads() == null) {
@@ -211,9 +214,6 @@ const Mode = enum {
 
 pub const GraphConfig = struct {
     optimizer: Optimizer,
-    auto_free_wgt_grads: bool = false,
-    auto_free_inp_grads: bool = false,
-    auto_free_hid_nodes: bool = true,
     stream: Stream,
     mode: Mode,
 };
@@ -223,8 +223,6 @@ pub const Graph = struct {
     const Self = @This();
 
     const Leaves = struct {
-        names: ArrayList([]const u8),
-        classes: ArrayList(TensorClass),
         values: ArrayList(SliceUnion),
         grads: ArrayList(?SliceUnion),
         sizes: ArrayList(Sizes),
@@ -233,8 +231,6 @@ pub const Graph = struct {
         streams: ArrayList(Stream),
         pub fn init(allocator: std.mem.Allocator, block_size: usize) !Leaves {
             return @This() {
-                .names = try ArrayList([]const u8).initCapacity(allocator, block_size),
-                .classes = try ArrayList(TensorClass).initCapacity(allocator, block_size),
                 .values = try ArrayList(SliceUnion).initCapacity(allocator, block_size),
                 .grads = try ArrayList(?SliceUnion).initCapacity(allocator, block_size),
                 .sizes = try ArrayList(Sizes).initCapacity(allocator, block_size),
@@ -268,8 +264,8 @@ pub const Graph = struct {
         }
     };
 
-    node_count: usize,
-    leaf_count: usize,
+    node_max: usize,
+    leaf_max: usize,
 
     leaf_arena: std.heap.ArenaAllocator,
     node_arena: std.heap.ArenaAllocator,
@@ -283,26 +279,25 @@ pub const Graph = struct {
     leaves: Leaves,
     nodes: Nodes,
 
-    // free upon reversal
-    auto_free_wgt_grads: bool,
-    auto_free_inp_grads: bool,
-    auto_free_hid_nodes: bool,
-
     mode: Mode,
 
     stream: Stream,
 
+    pub fn id(self: *const Self) usize {
+        return @intFromPtr(self);
+    }
+
     // this function ensures the correct allocator
     // and size are passed to the designated block
     fn initLeaves(self: *Self) Leaves {
-        return Leaves.init(self.leaf_arena.allocator(), self.leaf_count)
+        return Leaves.init(self.leaf_arena.allocator(), self.leaf_max)
             catch @panic("Graph.initLeaves: Out of Memory");
     }
 
     // this function ensures the correct allocator
     // and size are passed to the designated block
     fn initNodes(self: *Self) Nodes {
-        return Nodes.init(self.node_arena.allocator(), self.node_count)
+        return Nodes.init(self.node_arena.allocator(), self.node_max)
             catch @panic("Graph.initNodes: Out of Memory");
     }
  
@@ -315,8 +310,8 @@ pub const Graph = struct {
 
         self.stream = config.stream;
 
-        self.leaf_count = 0;
-        self.node_count = 0;
+        self.leaf_max = 0;
+        self.node_max = 0;
 
         self.leaf_arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
         self.node_arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
@@ -325,10 +320,6 @@ pub const Graph = struct {
         self.nodes = self.initNodes();
 
         self.tensor_allocator.setup();
-
-        self.auto_free_wgt_grads = config.auto_free_wgt_grads;
-        self.auto_free_inp_grads = config.auto_free_inp_grads;
-        self.auto_free_hid_nodes = config.auto_free_hid_nodes;
 
         self.mode = config.mode;
 
@@ -363,7 +354,7 @@ pub const Graph = struct {
                 if (0 < raw.len()) self.tensor_allocator.freeTensorRaw(raw, self.stream);
             }
             for (self.leaves.grads.items) |opt| {
-                if (opt) |raw| { if (0 < raw.len()) self.tensor_allocator.freeTensorRaw(raw, self.stream); }
+                if (opt) |raw| { self.tensor_allocator.freeTensorRaw(raw, self.stream); }
             }
             
             // drop all of our values out of play
@@ -373,7 +364,7 @@ pub const Graph = struct {
             self.leaves = self.initLeaves();
 
             // this will stack up otherwise
-            self.leaf_count = 0;
+            self.leaf_max = 0;
         }
         if (mode == .all or mode == .node) {
 
@@ -381,7 +372,7 @@ pub const Graph = struct {
                 if (0 < raw.len()) self.tensor_allocator.freeTensorRaw(raw, self.stream);
             }
             for (self.nodes.grads.items) |opt| {
-                if (opt) |raw| { if (0 < raw.len()) self.tensor_allocator.freeTensorRaw(raw, self.stream); }
+                if (opt) |raw| { self.tensor_allocator.freeTensorRaw(raw, self.stream); }
             }
 
             // drop all of our values out of play
@@ -391,7 +382,7 @@ pub const Graph = struct {
             self.nodes = self.initNodes();
 
             // this will stack up otherwise
-            self.node_count = 0;
+            self.node_max = 0;
         }
 
         DU.synchronizeStream(self.stream);
@@ -404,7 +395,6 @@ pub const Graph = struct {
 
     fn tensorFromComponents(
         self: *Self, 
-        name: ?[]const u8,
         comptime class: TensorClass,
         values: anytype,        
         sizes: Sizes,
@@ -421,23 +411,14 @@ pub const Graph = struct {
             try self.nodes.grads.append(null);
             try self.nodes.dependencies.append(0);
             try self.nodes.attached.append(true);
-            try self.leaves.streams.append(self.stream);
-            self.node_count += 1;
+            try self.nodes.streams.append(self.stream);
         } else {
-            if (name) |_name| {
-                assert(_name.len != 0);
-                try self.leaves.names.append(_name);
-                try self.leaves.classes.append(class);
-                try self.leaves.values.append(SliceUnion.init(values));
-                try self.leaves.sizes.append(sizes);
-                try self.leaves.strides.append(strides);
-                try self.leaves.grads.append(null);
-                try self.leaves.dependencies.append(0);            
-                try self.leaves.streams.append(self.stream);
-                self.leaf_count += 1;
-            } else {
-                @panic("Leaf tensors cannot have null names.");
-            }
+            try self.leaves.values.append(SliceUnion.init(values));
+            try self.leaves.sizes.append(sizes);
+            try self.leaves.strides.append(strides);
+            try self.leaves.grads.append(null);
+            try self.leaves.dependencies.append(0);            
+            try self.leaves.streams.append(self.stream);
         }
 
         const idx = if (class == .hid)
@@ -466,7 +447,6 @@ pub const Graph = struct {
 
     fn constructTensor(
         self: *Self, 
-        name: ?[]const u8,
         comptime class: TensorClass, 
         dimensions: Sizes, // fixed-length array
         comptime data_type: type,
@@ -489,7 +469,7 @@ pub const Graph = struct {
 
         TC.computeStrides(sizes, strides);
 
-        return self.tensorFromComponents(name, class, values, sizes, strides)
+        return self.tensorFromComponents(class, values, sizes, strides)
             catch @panic("Failed to add tensor from components.");
     }
 
@@ -502,7 +482,7 @@ pub const Graph = struct {
         comptime data_type: type,
     ) NodeTensor(data_type) {
         return self.constructTensor(
-            null, TensorClass.hid, dimensions, data_type, self.node_arena.allocator()
+            TensorClass.hid, dimensions, data_type, self.node_arena.allocator()
         );
     }
 
@@ -511,7 +491,6 @@ pub const Graph = struct {
 
     pub fn tensor(
         self: *Self, 
-        name: []const u8,
         comptime class: enum { inp, wgt }, 
         comptime data_type: ScalarTag,
         dimensions: anytype, // either fixed-length array or slice
@@ -522,12 +501,17 @@ pub const Graph = struct {
         const _data_type = comptime ScalarTag.asType(data_type);
 
         return self.constructTensor(
-            name, _class, dimensions[0..], _data_type, self.leaf_arena.allocator()
+            _class, dimensions[0..], _data_type, self.leaf_arena.allocator()
         );
     }
 
 
-    fn enableGradient(self: *Self, comptime T: type, class: TensorClass, idx: IndexType) []T {
+    fn enableGradient(
+        self: *Self, 
+        comptime T: type,
+        class: TensorClass, 
+        idx: IndexType
+    ) []T {
 
         const values_array = if (class == .hid) 
             &self.nodes.values else &self.leaves.values;
@@ -544,30 +528,6 @@ pub const Graph = struct {
         } else {
             return getSlice(T, grads.*.?);
         }
-    }
-
-    fn disableGradient(self: *Self, comptime data_type: type, class: TensorClass, idx: IndexType) void {
-        const grads_array = if (class == .hid) 
-            &self.nodes.grads else &self.leaves.grads;
-
-        if (grads_array.items[idx]) |grads| {            
-            self.tensor_allocator.freeTensor(getSlice(data_type, grads), self.stream);
-            grads_array.items[idx] = null;
-        }
-    }
-
-    fn freeTensor(self: *Self, X: anytype) void {
-        const T = @TypeOf(X);
-        
-        self.tensor_allocator.freeTensor(X.values(), self.stream);
-
-        const ptr: *SliceUnion = if (comptime T.Class == .hid)
-            &self.nodes.values.items[X.idx] else &self.leaves.values.items[X.idx];
-
-        // signals that the tensor has been freed
-        @field(ptr.*, SC.scalarName(T.DataType)).len = 0;
-
-        self.disableGradient(T.DataType, T.Class, X.idx);
     }
 
     fn adjustDependencies(self: *Self, class: TensorClass, idx: IndexType, direction: i8) i8 {
@@ -605,6 +565,120 @@ pub const Graph = struct {
         return out;
     }
 
+    fn freeGradient(
+        self: *Self, 
+        comptime data_type: type, 
+        class: TensorClass, 
+        idx: IndexType
+    ) void {
+        const grads_array = if (class == .hid) 
+            &self.nodes.grads else &self.leaves.grads;
+
+        if (grads_array.items[idx]) |grads| {            
+            self.tensor_allocator.freeTensor(getSlice(data_type, grads), self.stream);
+            grads_array.items[idx] = null;
+        }
+    }
+
+    fn freeGradientRaw(
+        self: *Self, 
+        raw: SliceUnion, 
+        class: TensorClass, 
+        idx: IndexType
+    ) void {
+        switch (raw) {
+             .q8 => self.freeGradient(SC.q8,  class, idx),  
+            .r16 => self.freeGradient(SC.r16, class, idx),  
+            .r32 => self.freeGradient(SC.r32, class, idx),  
+            .r64 => self.freeGradient(SC.r64, class, idx),  
+            .c16 => self.freeGradient(SC.c16, class, idx), 
+            .c32 => self.freeGradient(SC.c32, class, idx), 
+            .c64 => self.freeGradient(SC.c64, class, idx), 
+        }
+    }
+
+    fn freeTensor(
+        self: *Self, 
+        comptime data_type: type, 
+        class: TensorClass, 
+        idx: IndexType
+    ) void {
+
+        const values: *SliceUnion = if (class == .hid)
+            &self.nodes.values.items[idx] else &self.leaves.values.items[idx];
+
+        const stream: Stream = if (class == .hid)
+            self.nodes.streams.items[idx] else self.leaves.streams.items[idx];
+
+        const field = comptime SC.scalarName(data_type);
+
+        self.tensor_allocator.freeTensor(@field(values.*, field), stream);
+
+        @field(values.*, field).len = 0;
+
+        self.freeGradient(data_type, class, idx);
+    }
+
+    fn freeTensorRaw(
+        self: *Self, 
+        raw: SliceUnion, 
+        class: TensorClass, 
+        idx: IndexType
+    ) void {
+        switch (raw) {
+             .q8 => self.freeTensor(SC.q8,  class, idx),  
+            .r16 => self.freeTensor(SC.r16, class, idx),  
+            .r32 => self.freeTensor(SC.r32, class, idx),  
+            .r64 => self.freeTensor(SC.r64, class, idx),  
+            .c16 => self.freeTensor(SC.c16, class, idx), 
+            .c32 => self.freeTensor(SC.c32, class, idx), 
+            .c64 => self.freeTensor(SC.c64, class, idx), 
+        }
+    }
+
+    const ReleaseNodeMode = enum {
+        all, grd
+    };
+
+    // freeSubgraphTensors does *not* free leaf nodes
+    pub fn freeSubgraphTensors(
+        self: *Self, 
+        x: anytype, 
+        mode: ReleaseNodeMode
+    ) void {
+
+        const T = @TypeOf(x);
+
+        if (T != NodeTensor(T.DataType)) {
+            @compileError("freeSubgraphTensors requires NodeTensor.");
+        }
+
+        var idx = x.idx + 1;
+
+        var proceed: bool = true;
+
+        while (proceed) {
+
+            idx -= 1;
+
+            if (idx == 0 or !self.nodes.attached.items[idx - 1]) {
+                proceed = false;
+            }
+
+            switch (mode) {
+                .all => { 
+                    self.freeTensorRaw(self.nodes.values.items[idx], .hid, idx);
+                },
+                .grd => {
+                    const raw = self.nodes.grads.items[idx] 
+                        orelse continue;
+                    
+                    self.freeGradientRaw(raw, .hid, idx);
+                },
+            }
+        }
+    }
+
     // trampoline loop for reversing graph
     fn reverse(self: *Self, idx: SizeType) void {
 
@@ -630,7 +704,7 @@ pub const Graph = struct {
             // traversal and wether we've hit the last
             // reverse-child node with 'stop_call'
             const result = callbacks[last].call();
-
+            
             // this check causes us to do a breadth-wise
             // traversal across the nodes reverse edges
             if (result.stop_call) { 
@@ -652,11 +726,6 @@ pub const Graph = struct {
                 stack.appendAssumeCapacity(next);
             }
         }
-
-        // if we reversed the last index, all callbacks are exhausted
-        if (self.auto_free_hid_nodes and (total == idx + 1)) {
-            self.reset(.node);
-        }
     }
 };
 
@@ -674,12 +743,6 @@ fn reverseEdge(
     const DataType = @TypeOf(arg).DataType;
     const Class = @TypeOf(arg).Class;
     const graph = arg.ptr;
-
-    // why calculate the input gradient if we are
-    // freeing it immediately after creating it?
-    if ((Class == .inp) and graph.auto_free_inp_grads) {
-        return null;
-    }
 
     // enable gradients if we don't have them
     if (arg.grads() == null) {
@@ -702,15 +765,12 @@ fn reverseEdge(
             // by optimizing as we go along, we can free
             // gradients as soon as we're done using them
             graph.optimizer.update(
-                arg.name(), arg.raw_values(), arg.raw_grads().?
+                graph.id(), 
+                arg.idx, 
+                arg.raw_values(), 
+                arg.raw_grads().?, 
+                arg.stream()
             );
-
-            if (graph.auto_free_wgt_grads) {
-                // TODO: determine if this synchronization is necessary
-                DU.synchronizeStream(arg.stream());
-
-                graph.disableGradient(DataType, Class, arg.idx);
-            }
 
         // since we've collected all of our dependencies,
         // we check to see if we're a hidden tensor (node)
@@ -770,21 +830,6 @@ fn reverseNext(
         @call(.auto, decls.cleanup, edge_tuple);
     }
     
-    // the last argument is always the reverse-parent node.
-    const N = comptime UT.tupleSize(@TypeOf(edge_tuple)) - 1;
-
-    const graph = edge_tuple[N].ptr;
-
-    // Free unnecessary data as we go along...
-    if (graph.auto_free_hid_nodes) {
-        // we need to synchronize here to prevent the parent
-        // node from being released before the other children
-        // have a chance to collect their gradients
-        DU.synchronizeStream(edge_tuple[N].stream());
-
-        graph.freeTensor(edge_tuple[N]);
-    }
-
     // this node's reversals are now exhausted
     return ReverseNextResult {
         .next_node = null,

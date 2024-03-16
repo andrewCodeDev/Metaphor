@@ -34,11 +34,43 @@ const StreamEntry = struct {
     }
 };
 
+const MAX_STREAMS: usize = 16;
+
 pub const Stream = *StreamEntry;
 
 var stream_mutex: std.Thread.Mutex = .{ };
 
-var stream_array: [16]?StreamEntry = .{ null } ** 16;
+var stream_array: [MAX_STREAMS]?StreamEntry = .{ null } ** 16;
+
+
+pub fn StreamGroup(comptime N: usize) type {
+
+    if (MAX_STREAMS < N) {
+        @compileError("Stream group is larger than max streams.");
+    }
+    
+    return struct {
+
+        const Self = @This();
+        
+        items: [N]Stream,
+
+        pub fn init() Self {
+            var items: [N]Stream = undefined;
+            for (0..N) |i| items[i] = initStream();
+            return .{ .items = items };
+        }
+
+        pub fn synchronize(self: *const Self) void {
+            for (0..N) |i|synchronizeStream(self.items[i]);
+        }
+
+        pub fn deinit(self: *const Self) void {
+            for (0..N) |i| deinitStream(self.items[i]);
+        }
+        
+    };
+}
 
 pub fn initStream() Stream {
     stream_mutex.lock();

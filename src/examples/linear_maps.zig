@@ -15,9 +15,6 @@ pub fn main() !void {
 
     const G = mp.Graph.init(.{
         .optimizer = mp.null_optimizer,
-        .auto_free_wgt_grads = false,
-        .auto_free_inp_grads = false,
-        .auto_free_hid_nodes = false,
         .stream = stream,
         .mode = .eval
     });
@@ -30,13 +27,13 @@ pub fn main() !void {
 
     /////////////////////////////////////////////////////
 
-    const x = G.tensor("x", .wgt, .r32, mp.Rank(1){ M });  
-    const A = G.tensor("A", .wgt, .r32, mp.Rank(2){ M, N });  
-    const b = G.tensor("b", .wgt, .r32, mp.Rank(1){ N });  
+    const x = G.tensor(.inp, .r32, mp.Rank(1){ M });  
+    const A = G.tensor(.inp, .r32, mp.Rank(2){ M, N });  
+    const b = G.tensor(.inp, .r32, mp.Rank(1){ N });  
 
-    mp.mem.randomize(x, stream);
-    mp.mem.randomize(A, stream);
-    mp.mem.randomize(b, stream);
+    mp.mem.randomize(x);
+    mp.mem.randomize(A);
+    mp.mem.randomize(b);
 
     // in this example, we'll explore using the innerProduct
     // and linear functions. Linear transformations have the

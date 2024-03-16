@@ -240,7 +240,6 @@ pub fn sequence(
 
 pub fn randomize(
     x: anytype,
-    stream: DU.Stream
 ) void {
 
     //TODO: replace this with a kernel call...?
@@ -258,9 +257,9 @@ pub fn randomize(
     for (0..x.len()) |i|
         mem[i] = random.float(@TypeOf(x).DataType);
 
-    DU.copyToDevice(mem, x.values(), stream);
+    DU.copyToDevice(mem, x.values(), x.ptr.stream);
 
-    DU.synchronizeStream(stream);
+    DU.synchronizeStream(x.ptr.stream);
 }
 // <>--------------------------------------------------------<>
 

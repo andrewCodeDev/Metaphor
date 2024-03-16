@@ -14,20 +14,19 @@ pub fn main() !void {
 
     mp.device.init(0);
 
-    const stream = mp.stream.init();
+    // streams can be used as groups via the StreamGroup type
+
+    const streams = mp.stream.Group(2).init();
         
-    defer mp.stream.deinit(stream);
+    defer streams.deinit();
 
     const G = mp.Graph.init(.{
         .optimizer = mp.null_optimizer,
-        .auto_free_wgt_grads = false,
-        .auto_free_inp_grads = false,
-        .auto_free_hid_nodes = false,
         /////////////////////////////
         // this is the initial stream
-        .stream = stream,
+        .stream = streams.items[0],
         ////////////////////////////
-        .mode = .eval
+        .mode = .eval,
     });
 
     defer G.deinit();
@@ -41,11 +40,11 @@ pub fn main() !void {
 
     // A gets created using the stream in the graph. The
     // graph remembers what stream that A was created with.
-    const A = G.tensor("A", .wgt, .r32, mp.Rank(2){ M, N });  
+    const A = G.tensor(.inp, .r32, mp.Rank(2){ M, N });  
 
     // x gets created using the stream in the graph. The
     // graph remembers what stream that x was created with.
-    const x = G.tensor("x", .wgt, .r32, mp.Rank(1){ M });  
+    const x = G.tensor(.inp, .r32, mp.Rank(1){ M });  
 
     // both of these fill calls use the currently assigned
     // stream as well. If we had changed this stream,
@@ -63,7 +62,7 @@ pub fn main() !void {
     // stream has finished all the work in its queue.
     // Since we only have one stream, this is the same
     // as mp.stream.synchronize(G.stream);
-    mp.stream.synchronize(stream);
+    mp.stream.synchronize(streams.items[0]);
 
     std.log.info("Tensors in Cache after graph.precache: {}", .{ G.tensor_allocator.used() });
     // What follows is 10 matrix multiplications. These
@@ -87,7 +86,7 @@ pub fn main() !void {
         _ = &y;
     }
 
-    mp.stream.synchronize(stream);
+    mp.stream.synchronize(streams.items[0]);
 
     const stop = try std.time.Instant.now();
 
@@ -116,7 +115,7 @@ pub fn main() !void {
         _ = &y;
     }
 
-    mp.stream.synchronize(stream);
+    mp.stream.synchronize(streams.items[0]);
 
     const stop = try std.time.Instant.now();
 
@@ -128,27 +127,28 @@ pub fn main() !void {
 
     // this time, we'll make two streams and do
     // 5 products on one, and five on the other
-    const stream2 = mp.stream.init();
 
     G.reset(.node);
     /////////////////////////////////////////////////////
     {
     const start = try std.time.Instant.now();
 
+    G.stream = streams.items[0];
+
     for (0..5) |_| {
         const y = mp.ops.innerProduct(A, x, "ij,j->i");
         _ = &y;
     }
 
-    G.stream = stream2;
+    G.stream = streams.items[1];
 
     for (0..5) |_| {
         const y = mp.ops.innerProduct(A, x, "ij,j->i");
         _ = &y;
     }   
 
-    mp.stream.synchronize(stream);
-    mp.stream.synchronize(stream2);
+    // streams can be synchronized as a group
+    streams.synchronize();
 
     const stop = try std.time.Instant.now();
 

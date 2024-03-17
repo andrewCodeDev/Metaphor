@@ -588,15 +588,11 @@ pub const Graph = struct {
         }
     }
 
-    const ReleaseNodeMode = enum {
-        all, grd
-    };
-
     // freeSubgraphTensors does *not* free leaf nodes
-    pub fn freeSubgraphTensors(
+    pub fn freeSubgraph(
         self: *Self, 
         x: anytype, 
-        mode: ReleaseNodeMode
+        mode: ResetComponent
     ) void {
 
         const T = @TypeOf(x);

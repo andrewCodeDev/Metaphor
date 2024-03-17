@@ -117,7 +117,7 @@ pub fn main() !void {
     // in the backwards calculation of subgraph 1. In this case, we
     // haven't done that for the sake of demonstration.
 
-        G.freeSubgraphTensors(z4, .all);
+        G.freeSubgraph(z4, .all);
 
     // we've freed the values and gradients for z3 and z4
     // we have not freed the values and gradients for z2 and z1
@@ -129,7 +129,7 @@ pub fn main() !void {
 
     // it's important to note that freeing the subgraph
     // *does not* free the weights or inputs associated
-        G.freeSubgraphTensors(z2, .all);
+        G.freeSubgraph(z2, .all);
 
         std.debug.assert(z2.grads() == null);
         std.debug.assert(z1.grads() == null);

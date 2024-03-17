@@ -1,6 +1,6 @@
 #include "../kernel_header.h"
 
-__global__ void __kernel_permutate_RScalar(
+__global__ void __kernel_permutate_naive_RScalar(
     RTensor X, 
     RTensor Y, 
     Permutation P
@@ -39,16 +39,16 @@ extern "C" void launch_perumutate_RScalar(
   };
   
   cudaLaunchCooperativeKernel(
-    (void*)(__kernel_permutate_RScalar),
-    dim3(GRID_1D(X.len)),
-    dim3(32),
+    (void*)(__kernel_permutate_naive_RScalar),
+    dim3(DIMPAD(X.len, 128)),
+    dim3(128),
     args
   );
 
   CUDA_ASSERT(cudaDeviceSynchronize());
 }
 
-__global__ void __kernel_permutate_CScalar(
+__global__ void __kernel_permutate_naive_CScalar(
     CTensor X, 
     CTensor Y, 
     Permutation P
@@ -79,7 +79,7 @@ __global__ void __kernel_permutate_CScalar(
 }
 
 
-extern "C" void launch_permutate_CScalar(
+extern "C" void launch_permutate_naive_CScalar(
   CTensor X, CTensor Y, Permutation P
 ) {
 
@@ -88,7 +88,7 @@ extern "C" void launch_permutate_CScalar(
   };
   
   cudaLaunchCooperativeKernel(
-    (void*)(__kernel_permutate_CScalar),
+    (void*)(__kernel_permutate_naive_CScalar),
     dim3(GRID_1D(X.len)),
     dim3(32),
     args

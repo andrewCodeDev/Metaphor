@@ -21,64 +21,72 @@ pub fn main() !void {
 
     defer G.deinit();
 
-    const row: usize = 32;
+    const M: usize = 32;
+    const N: usize = M * 4;
 
     /////////////////////////////////////////////////////
+    // feed forward network...
 
-    const x = G.tensor(.inp, .r32, mp.Rank(1){ row });  
-    const w = G.tensor(.wgt, .r32, mp.Rank(1){ row });  
+    const x = G.tensor(.inp, .r32, mp.Rank(1){ M });  
 
-    mp.mem.randomize(x);
-    mp.mem.randomize(w);
+    const W1 = G.tensor(.wgt, .r32, mp.Rank(2){ N, M });  
+    const b1 = G.tensor(.wgt, .r32, mp.Rank(1){ N });  
 
-    const trg: mp.types.IndexType = 31;
-    var score: f64 = 0.0;
+    const W2 = G.tensor(.wgt, .r32, mp.Rank(2){ M, N });  
+    const b2 = G.tensor(.wgt, .r32, mp.Rank(1){ M });  
 
-    /////////////////////////////////////////////////////
+    // pub fn forward(self: *Self, x: anytype) NodeTensor(T) {
 
-    for (0..10) |_| {
+        // prevent freeing beyond block
+        if (comptime @TypeOf(x).Class == .hid) {
+            // x.detach();
+        }
 
-        const y = mp.ops.add(x, w);
+        const v1 = mp.ops.linear(W1, x, b1, "ij,j->i");
+        const z1 = mp.ops.selu(v1);
 
-        mp.loss.cce(y, trg, .{
-            .grads = true,
-            .score = &score,
-        });
+        const v2 = mp.ops.linear(W2, z1, b2, "ij,j->i");
+        const z2 = mp.ops.selu(v2);
 
-        y.reverse();
+        // if (self.cleanup) {
+            //mp.stream.synchronize(stream);
+            //defer v1.free();
+            //defer v2.free();
+        // }
 
-        mp.stream.synchronize(stream);
+        // z2.detach();
 
-        G.reset(.node, .all);
-        G.reset(.leaf, .grd);
+        // self.z2 = z2;
 
-        std.log.info("loss: {}", .{ score });
-    }
-
-    //try EU.copyAndPrintMatrix("grads", x.grads().?, row, 1, stream);
-
-
-
-    /////////////////////////////////////////////////////
-    //for (0..10) |_| {
-    //    const start = try std.time.Instant.now();
-
-    //    const y = mp.ops.softmax(x, "i|i");
-
-    //    const stop = try std.time.Instant.now();
-
-    //    const delta = stop.since(start);
-
-    //    y.free();
-    //    
-    //    std.log.info("GPU 1 stream elapsed (ns): {} - Run 1", .{ delta });
+        // return z2;
     //}
 
-    //try EU.copyAndPrintMatrix("Z1: value", Z1.values(), 1, row_x, stream);
-    //try EU.copyAndPrintMatrix("X1: grads", X1.grads().?,     1, row_x, stream);
+    // pub fn reverse(self: *Self) void {
 
-    //try EU.copyAndPrintMatrix("X1: value", X1.values(),      1, row_x, stream);
-    //try EU.copyAndPrintMatrix("X2: grads", X2.grads().?, row_x, row_x, stream);
+        z2.reverse();
+
+        // if (self.cleanup) {
+            //z2.ptr.freeSubgraph(z2, .all);
+        //}
+    //}
+
+    //////////////////////////////////////////////////////
+    // pub fn toCPU(self: *Self, stream: Stream) {
+    //
+    //     DU.copyFromDevice(self.z1, self.z1_cpu, stream);
+    //     DU.copyFromDevice(self.z1, self.z1_cpu, stream);
+    //
+        
+
+    // }
+
+    // later...
+
+    z2.reverse();
+
+    //mp.stream.synchronize(stream);
+
+    //G.freeSubgraph(z2, .all);
 
     ////////////////////////////////////////////
 }

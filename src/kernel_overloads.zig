@@ -92,11 +92,11 @@ pub const kernel_fill = OverloadSet(.{
 
 pub const kernel_permutate = OverloadSet(.{
 	decls.launch_perumutate_r16,
-	decls.launch_permutate_c16,
+	decls.launch_permutate_naive_c16,
 	decls.launch_perumutate_r32,
-	decls.launch_permutate_c32,
+	decls.launch_permutate_naive_c32,
 	decls.launch_perumutate_r64,
-	decls.launch_permutate_c64,
+	decls.launch_permutate_naive_c64,
 });
 
 pub const kernel_leaky_relu_reverse = OverloadSet(.{
@@ -112,6 +112,12 @@ pub const kernel_addition = OverloadSet(.{
 	decls.launch_addition_c32,
 	decls.launch_addition_r64,
 	decls.launch_addition_c64,
+});
+
+pub const kernel_softmax_i_i_reverse = OverloadSet(.{
+	decls.launch_softmax_i_i_reverse_r16,
+	decls.launch_softmax_i_i_reverse_r32,
+	decls.launch_softmax_i_i_reverse_r64,
 });
 
 pub const kernel_addition_reverse = OverloadSet(.{

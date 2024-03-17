@@ -1,8 +1,8 @@
-
 const std = @import("std");
 const assert = std.debug.assert;
 const SCL = @import("scalar.zig");
 const UT = @import("utility.zig");
+const C = @import("cimport.zig").C;
 
 pub const IndexType = usize;
 pub const SizeType = usize;
@@ -62,5 +62,18 @@ pub const SliceUnion = union(enum) {
 
 pub inline fn getSlice(comptime DataType: type, arg: SliceUnion) []DataType {
     return @field(arg, SCL.scalarName(DataType));
+}
+
+pub inline fn DeviceTensor(comptime DataType: type) type {
+    return switch(DataType) {
+         SCL.q8 => C.QTensor8,  
+        SCL.r16 => C.RTensor16,  
+        SCL.r32 => C.RTensor32,  
+        SCL.r64 => C.RTensor64,  
+        SCL.c16 => C.CTensor16,  
+        SCL.c32 => C.CTensor32,  
+        SCL.c64 => C.CTensor64,  
+        else => @compileError("Invalid Type for SliceUnion."),        
+    };
 }
 

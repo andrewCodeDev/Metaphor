@@ -383,19 +383,19 @@ EXTERN_C void launch_fill_c64(
 EXTERN_C void launch_perumutate_r16(
   RTensor16 X, RTensor16 Y, Permutation P
 );
-EXTERN_C void launch_permutate_c16(
+EXTERN_C void launch_permutate_naive_c16(
   CTensor16 X, CTensor16 Y, Permutation P
 );
 EXTERN_C void launch_perumutate_r32(
   RTensor32 X, RTensor32 Y, Permutation P
 );
-EXTERN_C void launch_permutate_c32(
+EXTERN_C void launch_permutate_naive_c32(
   CTensor32 X, CTensor32 Y, Permutation P
 );
 EXTERN_C void launch_perumutate_r64(
   RTensor64 X, RTensor64 Y, Permutation P
 );
-EXTERN_C void launch_permutate_c64(
+EXTERN_C void launch_permutate_naive_c64(
   CTensor64 X, CTensor64 Y, Permutation P
 );
 EXTERN_C void launch_relu_leaky_reverse_r16(
@@ -463,6 +463,30 @@ EXTERN_C void launch_addition_c64(
   const c64* b, 
   c64* c, 
   len_t N
+);
+EXTERN_C void launch_softmax_i_i_reverse_r16(
+  StreamCtx stream,
+        r16* a_grads, 
+  const r16* b_value, 
+  const r16* b_grads,
+        r16* scratch,
+  len_t m
+);
+EXTERN_C void launch_softmax_i_i_reverse_r32(
+  StreamCtx stream,
+        r32* a_grads, 
+  const r32* b_value, 
+  const r32* b_grads,
+        r32* scratch,
+  len_t m
+);
+EXTERN_C void launch_softmax_i_i_reverse_r64(
+  StreamCtx stream,
+        r64* a_grads, 
+  const r64* b_value, 
+  const r64* b_grads,
+        r64* scratch,
+  len_t m
 );
 EXTERN_C void launch_addition_reverse_r16(
   StreamCtx stream,

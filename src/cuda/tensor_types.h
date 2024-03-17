@@ -1,7 +1,7 @@
 #ifndef __COMPLEX_TYPES_H__
 #define __COMPLEX_TYPES_H__
 
-#define MAX_DIMS 8
+#define MAX_DIMS 6
 typedef unsigned long len_t;
 const len_t WARP_SIZE = 32;
 
@@ -103,6 +103,14 @@ typedef struct {
   len_t dims;
   len_t len;
 } CTensor64;
+
+typedef struct {
+  char* values;
+  len_t sizes[MAX_DIMS];
+  len_t strides[MAX_DIMS];
+  len_t dims;
+  len_t len;
+} QTensor8;
 
 typedef struct {
   len_t order[MAX_DIMS];

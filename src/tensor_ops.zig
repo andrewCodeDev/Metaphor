@@ -15,6 +15,7 @@ const Parser = @import("expression_parsing.zig");
 const Stream = DU.Stream;
 const NoArg = CB.NoArg;
 
+
 // <>--------------------------------------------------------<>
 
 pub fn additionForward(stream: Stream, x: anytype, y: anytype, z: anytype) void {
@@ -239,19 +240,24 @@ pub fn softmaxForward_i_i(stream: Stream, x: anytype, y: anytype) void {
 }
 
 
-pub fn logisticReverse(stream: Stream, x: anytype, y: anytype) void {
+pub fn softmaxReverse_i_i(stream: Stream, x: anytype, y: anytype) void {
     const x_grads = x.values();
-    const y_values = y.values();
-    const y_grads = UT.assertGrads(y);
+    const y_value = y.values();
+    const y_grads = y.grads().?;
+    const T = @TypeOf(x);
 
-    overloads.kernel_logistic_reverse.call(.{
-        stream.context, x_grads.ptr, y_values.ptr, y_grads.ptr, y_values.len
+    const n = ((y_value.len / (32 * 32 * 4)) + 2);
+
+    const scratch = stream.getScratch(Child(T), n);
+
+    overloads.kernel_softmax_i_i_reverse.call(.{
+        stream.context, x_grads.ptr, y_value.ptr, y_grads.ptr, scratch.ptr, y_value.len
     });
 }
 
 pub const SM_i_i_Callback = CallbackBuilder(
     softmaxForward_i_i, .{
-        .{ logisticReverse, 0 },
+        .{ softmaxReverse_i_i, 0 },
     }, NoCleanup
 );
 
@@ -341,6 +347,7 @@ pub inline fn permutate_ij_ji_Reverse(
        stream.context, y_grads.ptr, x_grads.ptr, SC.asScalar(T, 1.0), y_sizes[0], y_sizes[1] 
     });
 }
+
 
 const Perm_ij_ji_Callback = CallbackBuilder(
     permutate_ij_ji, .{ .{ permutate_ij_ji, 0 } }, NoCleanup
@@ -472,8 +479,8 @@ pub fn linear_ij_j_ReverseArg0(
     const m = A_sizes[0];
     const n = A_sizes[1];
 
-    std.debug.assert(m == x.len());
-    std.debug.assert(n == y.len());
+    std.debug.assert(n == x.len());
+    std.debug.assert(m == y.len());
 
     __outerProduct_i_j(
         stream, y.grads().?, x.values(), alpha, A.grads().?, 1.0, m, n

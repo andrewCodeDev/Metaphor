@@ -9,6 +9,10 @@ const CG = @import("graph.zig");
 const DU = @import("device_utils.zig");
 const Parser = @import("expression_parsing.zig");
 
+const appendNode = CG.appendNode;
+const enableGradient = CG.enableGradient;
+const nodeTensor = CG.nodeTensor;
+
 const Contract = UT.Contract;
 const Returns = UT.Returns;
 const Child = UT.Child;
@@ -19,8 +23,7 @@ const isGraphTensor = CG.isGraphTensor;
 const Optimizer = @import("optimizer.zig");
 
 const TenOps = @import("tensor_ops.zig");
-
-//const Scale = @import("scale.zig");
+const Loss = @import("loss.zig");
 
 ///////////////////////////////////////////////
 ///////////////////////////////////////////////
@@ -67,9 +70,39 @@ pub const scalar = struct {
     pub const as = SC.asScalar;
 };
 
-pub const Graph = CG.Graph;
+pub const optm = struct {
+    pub const SGD = Optimizer.SGD;
+};
 
-pub const null_optimizer = Optimizer.NullOptimizer.optimizer();
+pub const loss = struct {
+
+    pub fn cce(
+        x: anytype,
+        y: anytype,
+        config: struct {
+            grads: bool,
+            score: ?*f64,
+    }) void {
+        const T = @TypeOf(x);
+
+        const graph = x.ptr;
+
+        if (config.grads) {
+            _ = enableGradient(graph, T.DataType, T.Class, x.idx);
+        }
+        const redux: ?[*]f64 = if (config.score != null)
+            graph.tensor_allocator.allocScalar(f64, graph.stream) else null;
+        defer {
+            if (redux) |ptr| graph.tensor_allocator.freeScalar(ptr);
+        }
+        const score: ?[*]f64 = if (config.score) |ptr|
+            @ptrCast(@alignCast(ptr)) else null;
+
+        Loss.cce(graph.stream, x, y, redux, score);
+    }
+};
+
+pub const Graph = CG.Graph;
 
 pub fn Rank(comptime rank: usize) type {
     return [rank]types.SizeType;
@@ -88,20 +121,20 @@ pub const ops = struct {
         assert(std.mem.eql(types.SizeType, X.sizes(), Y.sizes()));
         const graph = X.ptr;
         const DataType = SC.ScalarResult(@TypeOf(X).DataType, @TypeOf(Y).DataType);
-        const Z = graph.nodeTensor(X.sizes(), DataType);        
+        const Z = nodeTensor(graph, X.sizes(), DataType);        
         const callback = Callback{ };  // instance for comptime fields
         callback.forward(graph.stream, X, Y, Z);
         return if (graph.mode == .eval)
-            Z else graph.appendNode(Callback, .{ X, Y }, Z);
+            Z else appendNode(graph, Callback, .{ X, Y }, Z);
     }
 
     inline fn activationDispatch(comptime Callback: type,  X: anytype) NodeTensor(Child(@TypeOf(X))) {
         const graph = X.ptr;
-        const Y = graph.nodeTensor(X.sizes(), @TypeOf(X).DataType);        
+        const Y = nodeTensor(graph, X.sizes(), @TypeOf(X).DataType);        
         const callback = Callback{ };  // instance for comptime fields
         callback.forward(graph.stream, X, Y);
         return if (graph.mode == .eval)
-            Y else graph.appendNode(Callback, .{ X }, Y);
+            Y else appendNode(graph, Callback, .{ X }, Y);
     }
 
 // <>--------------------------------------------------------<>
@@ -145,12 +178,12 @@ pub const ops = struct {
 
         assert((0.0 <= coef) and (coef < 1.0));
 
-        const Y = graph.nodeTensor(X.sizes(), @TypeOf(X).DataType);        
+        const Y = nodeTensor(graph, X.sizes(), @TypeOf(X).DataType);        
 
         TenOps.leakyReluForward(graph.stream, X, coef, Y);
 
         return if (graph.mode == .eval)
-            Y else graph.appendNode(TenOps.LeakyReluCallback, .{ X }, Y);
+            Y else appendNode(graph, TenOps.LeakyReluCallback, .{ X }, Y);
     }
 
 // <>--------------------------------------------------------<>
@@ -203,14 +236,14 @@ pub const ops = struct {
             y_sizes[map.perm[i]] = elem;
         }
     
-        const Y = graph.nodeTensor(y_sizes[0..], UT.Child(@TypeOf(X)));
+        const Y = nodeTensor(graph, y_sizes[0..], UT.Child(@TypeOf(X)));
         
         const perm = TenOps.findPermutation(expression){ };
 
         perm.forward(graph.stream, X, Y);
 
         return if (graph.mode == .eval)
-            Y else graph.appendNode(@TypeOf(perm), .{ X }, Y);
+            Y else appendNode(graph, @TypeOf(perm), .{ X }, Y);
     }
 
     pub fn softmax(X: anytype, comptime expression: []const u8) NodeTensor(Child(@TypeOf(X))) {
@@ -221,14 +254,14 @@ pub const ops = struct {
         const graph = X.ptr;
 
         // tells us which size index to map from x to y    
-        const Y = graph.nodeTensor(X.sizes(), UT.Child(@TypeOf(X)));
+        const Y = nodeTensor(graph, X.sizes(), UT.Child(@TypeOf(X)));
         
         const sm = TenOps.findSoftmax(expression){ };
 
         sm.forward(graph.stream, X, Y);
 
         return if (graph.mode == .eval)
-            Y else graph.appendNode(@TypeOf(sm), .{ X }, Y);
+            Y else appendNode(graph, @TypeOf(sm), .{ X }, Y);
     }
 
 // <>--------------------------------------------------------<>
@@ -259,7 +292,7 @@ pub const ops = struct {
             if (maps.y_map[i]) |idx| { z_sizes[idx] = elem; }
         }
     
-        const Z = graph.nodeTensor(z_sizes[0..], UT.Child(@TypeOf(X)));
+        const Z = nodeTensor(graph, z_sizes[0..], UT.Child(@TypeOf(X)));
         
         // locate inner product by expression
         const ip = TenOps.findLinear(expression, false){ };
@@ -268,7 +301,7 @@ pub const ops = struct {
         ip.forward(graph.stream, X, Y, 1.0, Z, 0.0, Z);
 
         return if (graph.mode == .eval)
-            Z else graph.appendNode(@TypeOf(ip), .{ X, Y, 1.0, Z, 0.0 }, Z);
+            Z else appendNode(graph, @TypeOf(ip), .{ X, Y, 1.0, Z, 0.0 }, Z);
     }
 
     pub fn linear(
@@ -301,7 +334,7 @@ pub const ops = struct {
         // bias needs to have the same dimensions as output
         std.debug.assert(std.mem.eql(types.SizeType, z_sizes[0..], B.sizes()));
     
-        const Z = graph.nodeTensor(z_sizes[0..], UT.Child(@TypeOf(X)));
+        const Z = nodeTensor(graph, z_sizes[0..], UT.Child(@TypeOf(X)));
         
         // locate inner product by expression
         const ip = TenOps.findLinear(expression, true){ };
@@ -310,7 +343,7 @@ pub const ops = struct {
         ip.forward(graph.stream, X, Y, 1.0, B, 1.0, Z);
 
         return if (graph.mode == .eval)
-            Z else graph.appendNode(@TypeOf(ip), .{ X, Y, 1.0, B, 1.0 }, Z);
+            Z else appendNode(graph, @TypeOf(ip), .{ X, Y, 1.0, B, 1.0 }, Z);
     }
 };
 

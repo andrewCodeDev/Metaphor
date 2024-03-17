@@ -14,7 +14,6 @@ pub fn main() !void {
     defer mp.stream.deinit(stream);
 
     const G = mp.Graph.init(.{
-        .optimizer = mp.null_optimizer,
         .stream = stream,
         .mode = .eval
     });

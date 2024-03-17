@@ -1,4 +1,3 @@
-
 const std = @import("std");
 const math = std.math;
 const SC = @import("scalar.zig");
@@ -14,8 +13,7 @@ const NoCleanup = CB.NoCleanup;
 const overloads = @import("kernel_overloads.zig");
 const Parser = @import("expression_parsing.zig");
 const Stream = DU.Stream;
-
-const None = opaque{ };
+const NoArg = CB.NoArg;
 
 // <>--------------------------------------------------------<>
 
@@ -517,7 +515,7 @@ pub inline fn linear_bias_ReverseArg3(
     _: f16,
     y: anytype,
 ) void {
-    additionReverseArg0(stream, b, None, y);
+    additionReverseArg0(stream, b, NoArg, y);
 }
 
 const Linear_ij_j_Callback = CallbackBuilder(

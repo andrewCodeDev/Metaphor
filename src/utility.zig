@@ -4,7 +4,6 @@ const debug = (builtin.mode == std.builtin.OptimizeMode.Debug);
 
 //////////////////////////////////////////////////////////////////////////////////
 // Allocator clean-up functions... these basically exist to regularize the syntax.
-
 pub inline fn alloc(comptime T: type, n: usize, allocator: std.mem.Allocator) []T {
     return allocator.alloc(T, n) catch @panic("Alloc: Out of memory.");
 }
@@ -14,6 +13,8 @@ pub inline fn dupe(x: anytype, allocator: std.mem.Allocator) @TypeOf(x) {
 pub inline fn append(array: anytype, value: anytype) void {
     return array.append(value) catch @panic("Append: Out of memory.");
 }
+
+// TODO: remove this function. It hides the source location of the error.
 pub inline fn assertGrads(x: anytype) std.meta.Child(@TypeOf(x.grads())) {
     if (comptime debug) {
         if (x.grads()) |grd| {
@@ -29,6 +30,7 @@ pub inline fn assertGrads(x: anytype) std.meta.Child(@TypeOf(x.grads())) {
 /////////////////////////////////////
 // Contracts for function call sites.
 
+// TODO: remove this function.
 pub fn Contract(comptime constraint: bool, comptime result: type) type {
      if (!constraint){ 
         @compileError("Failed type constraints.");
@@ -36,6 +38,7 @@ pub fn Contract(comptime constraint: bool, comptime result: type) type {
     return result;
 }
 
+// TODO: remove this function.
 pub fn Returns(comptime result: type) type {
     return result;
 }
@@ -58,6 +61,20 @@ pub fn isSlice(comptime T: type) bool {
             return ptr.size == .Slice;
         }, 
         else => false,
+    };
+}
+
+pub inline fn isInteger(comptime T: type) bool {
+    return switch (@typeInfo(T)) {
+        .Int, .ComptimeInt => true,
+        else => false
+    };
+}
+
+pub inline fn isFloat(comptime T: type) bool {
+    return switch (@typeInfo(T)) {
+        .Float, .ComptimeFloat => true, 
+        else => false
     };
 }
 
@@ -113,3 +130,4 @@ pub fn Child(comptime T: type) type {
         }        
     }
 }
+

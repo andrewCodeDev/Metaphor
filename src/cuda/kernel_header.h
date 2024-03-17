@@ -92,6 +92,10 @@ __device__ __inline__ r16 rexp(r16 x) { return hexp(x); }
 __device__ __inline__ r32 rexp(r32 x) { return std::exp(x); }
 __device__ __inline__ r64 rexp(r64 x) { return std::exp(x); }
 
+__device__ __inline__ r16 rlog(r16 x) { return hlog(x); }
+__device__ __inline__ r32 rlog(r32 x) { return std::log(x); }
+__device__ __inline__ r64 rlog(r64 x) { return std::log(x); }
+
 #endif
 
 // TODO: epsilon value?
@@ -136,22 +140,26 @@ struct ClipOP {
 template<class T> struct Init;
 
 template<> struct Init<r16> {
-  static __device__ __inline__ r16 infinity() {
-    const unsigned short x = 31744;
-    return *reinterpret_cast<const r16*>(&x);
+  static __device__ __inline__ r16 infinity() { 
+    const unsigned short inf_result = 31744;
+    return *reinterpret_cast<const r16*>(&inf_result); 
+  }
+  static __device__ __inline__ r16 epsilon()  { 
+    const unsigned short eps_result = 1024;
+    return *reinterpret_cast<const r16*>(&eps_result); 
   }
 };
 template<> struct Init<r32> {
-  static constexpr r32 result = std::numeric_limits<r32>::infinity();
-  static __device__ __inline__ r32 infinity() {
-    return Init<r32>::result;
-  }
+  static constexpr r32 inf_result = std::numeric_limits<r32>::infinity();
+  static constexpr r32 eps_result = std::numeric_limits<r32>::epsilon();
+  static __device__ __inline__ r32 infinity() { return Init<r32>::inf_result; }
+  static __device__ __inline__ r32 epsilon()  { return Init<r32>::eps_result; }
 };
 template<> struct Init<r64> {
-  static constexpr r64 result = std::numeric_limits<r64>::infinity();
-  static __device__ __inline__ r64 infinity() {
-    return Init<r64>::result;
-  }
+  static constexpr r64 inf_result = std::numeric_limits<r64>::infinity();
+  static constexpr r32 eps_result = std::numeric_limits<r64>::epsilon();
+  static __device__ __inline__ r64 infinity() { return Init<r64>::inf_result; }
+  static __device__ __inline__ r64 epsilon()  { return Init<r64>::eps_result; }
 };
 
 template <class OP, typename T>

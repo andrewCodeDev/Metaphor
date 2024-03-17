@@ -71,6 +71,33 @@ EXTERN_C void launch_tanh_r64(
         r64* b, 
   len_t N
 );
+EXTERN_C void launch_cce_loss_i_i_r16(
+  StreamCtx stream,
+  const r16* src_value, 
+        r16* src_grads, 
+        len_t    trg,
+        r16* scratch,
+        double*  redux, // scalar
+  len_t m
+);
+EXTERN_C void launch_cce_loss_i_i_r32(
+  StreamCtx stream,
+  const r32* src_value, 
+        r32* src_grads, 
+        len_t    trg,
+        r32* scratch,
+        double*  redux, // scalar
+  len_t m
+);
+EXTERN_C void launch_cce_loss_i_i_r64(
+  StreamCtx stream,
+  const r64* src_value, 
+        r64* src_grads, 
+        len_t    trg,
+        r64* scratch,
+        double*  redux, // scalar
+  len_t m
+);
 EXTERN_C void launch_hadamard_reverse_r16(
   StreamCtx stream,
   r16 *grads_a,
@@ -184,6 +211,42 @@ EXTERN_C void launch_subtraction_c64(
   const c64* b, 
   c64* c, 
   len_t N
+);
+EXTERN_C void launch_matmul_2D_r16(
+  StreamCtx stream,
+  const r16 *A, 
+  const r16 *B,
+        r16 alpha, // scales product
+  const r16 *C,
+        r16 beta, // blends C back in
+        r16 *Y,
+  len_t M, 
+  len_t N, 
+  len_t K 
+);
+EXTERN_C void launch_matmul_2D_r32(
+  StreamCtx stream,
+  const r32 *A, 
+  const r32 *B,
+        r32 alpha, // scales product
+  const r32 *C,
+        r32 beta, // blends C back in
+        r32 *Y,
+  len_t M, 
+  len_t N, 
+  len_t K 
+);
+EXTERN_C void launch_matmul_2D_r64(
+  StreamCtx stream,
+  const r64 *A, 
+  const r64 *B,
+        r64 alpha, // scales product
+  const r64 *C,
+        r64 beta, // blends C back in
+        r64 *Y,
+  len_t M, 
+  len_t N, 
+  len_t K 
 );
 EXTERN_C void launch_linear_i_ij_r16(
   StreamCtx stream,
@@ -437,42 +500,6 @@ EXTERN_C void launch_addition_reverse_c64(
   const c64* b, 
   len_t N
 );
-EXTERN_C void launch_matmul_2D_r16(
-  StreamCtx stream,
-  const r16 *A, 
-  const r16 *B,
-        r16 alpha, // scales product
-  const r16 *C,
-        r16 beta, // blends C back in
-        r16 *Y,
-  len_t M, 
-  len_t N, 
-  len_t K 
-);
-EXTERN_C void launch_matmul_2D_r32(
-  StreamCtx stream,
-  const r32 *A, 
-  const r32 *B,
-        r32 alpha, // scales product
-  const r32 *C,
-        r32 beta, // blends C back in
-        r32 *Y,
-  len_t M, 
-  len_t N, 
-  len_t K 
-);
-EXTERN_C void launch_matmul_2D_r64(
-  StreamCtx stream,
-  const r64 *A, 
-  const r64 *B,
-        r64 alpha, // scales product
-  const r64 *C,
-        r64 beta, // blends C back in
-        r64 *Y,
-  len_t M, 
-  len_t N, 
-  len_t K 
-);
 EXTERN_C void launch_sequence_r16(
   StreamCtx stream,
   r16* dev_a,
@@ -540,7 +567,7 @@ EXTERN_C void launch_gradient_descent_r16(
   StreamCtx stream,
         r16* a_value,
   const r16* a_grads, 
-  r16 lrate,
+  r16 rate,
   r16 lower,
   r16 upper,
   len_t N
@@ -549,7 +576,7 @@ EXTERN_C void launch_gradient_descent_r32(
   StreamCtx stream,
         r32* a_value,
   const r32* a_grads, 
-  r32 lrate,
+  r32 rate,
   r32 lower,
   r32 upper,
   len_t N
@@ -558,7 +585,7 @@ EXTERN_C void launch_gradient_descent_r64(
   StreamCtx stream,
         r64* a_value,
   const r64* a_grads, 
-  r64 lrate,
+  r64 rate,
   r64 lower,
   r64 upper,
   len_t N

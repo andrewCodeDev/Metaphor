@@ -9,7 +9,8 @@ const SC = @import("scalar.zig");
 const TC = @import("tensor_components.zig");
 const DU = @import("device_utils.zig");
 
-const Optimizer = @import("optimizer.zig").Optimizer;
+const Optm = @import("optimizer.zig");
+const Optimizer = Optm.Optimizer;
 const LaneAllocator = @import("lane_allocator.zig").LaneAllocator;
 const Stream = DU.Stream;
 
@@ -22,6 +23,9 @@ const c16 = SC.c16;
 const c32 = SC.c32;
 const c64 = SC.c64;
 const ScalarTag = SC.ScalarTag;
+
+// default optimizer if null is passed via graph config
+const null_optimizer = Optm.NullOptimizer.optimizer();
 
 const Contract = UT.Contract;
 const Returns = UT.Returns;
@@ -185,9 +189,9 @@ pub fn NodeTensor(comptime T: type) type {
 
             if (self.grads() == null) {
                 // if a loss hasn't been applied, this will be null
-                const grd = self.ptr.enableGradient(DataType, .hid, self.idx);
+                const grd = enableGradient(self.ptr, DataType, .hid, self.idx);
                 // derivative with respect to self is 1
-                fillSlice(DataType, grd, SC.asScalar(DataType, 1), self.ptr.stream);
+                fillSlice(DataType, grd, SC.asScalar(DataType, 1.0), self.ptr.stream);
             }
 
             // call graph reverse
@@ -207,13 +211,12 @@ fn GraphTensor(comptime data_type: type, comptime class: TensorClass) type {
     }
 }
 
-
 const Mode = enum {
     train, eval
 };
 
 pub const GraphConfig = struct {
-    optimizer: Optimizer,
+    optimizer: ?Optimizer = null,
     stream: Stream,
     mode: Mode,
 };
@@ -306,7 +309,7 @@ pub const Graph = struct {
         const self: *Self = std.heap.c_allocator.create(Self)
             catch @panic("Graph.init: Out of Memory");
             
-        self.optimizer = config.optimizer;
+        self.optimizer = config.optimizer orelse null_optimizer;
 
         self.stream = config.stream;
 
@@ -328,7 +331,8 @@ pub const Graph = struct {
 
     pub fn deinit(self: *Self) void {
         // hand our memory back to the allocator
-        self.reset(.all);
+        self.reset(.node, .all);
+        self.reset(.leaf, .all);
 
         // free our memory from the allocator
         self.tensor_allocator.deinit(self.stream);
@@ -340,52 +344,62 @@ pub const Graph = struct {
         std.heap.c_allocator.destroy(self);
     }
 
-    const ResetMode = enum {
-        all, node, leaf
+
+    const ResetGroup = enum {
+        node, leaf,
+    };
+    const ResetComponent = enum {
+        all, grd
     };
 
     // this function helps defragment the arenas and
     // preps the graph - called by reverse conditionally
-    pub fn reset(self: *Self, mode: ResetMode) void {
+    pub fn reset(self: *Self, group: ResetGroup, component: ResetComponent) void {
+        
+        if (group == .leaf) {
 
-        if (mode == .all or mode == .leaf) {
-
-            for (self.leaves.values.items) |raw| {
-                if (0 < raw.len()) self.tensor_allocator.freeTensorRaw(raw, self.stream);
+            if (component == .grd) {
+                for (self.leaves.grads.items, 0..) |opt, i| {
+                    if (opt) |raw| self.freeGradientRaw(raw, .inp, i);
+                }
             }
-            for (self.leaves.grads.items) |opt| {
-                if (opt) |raw| { self.tensor_allocator.freeTensorRaw(raw, self.stream); }
+            if (component == .all) {
+                // frees both values and grads
+                for (self.leaves.values.items, 0..) |raw, i| {
+                    if (0 < raw.len()) self.freeTensorRaw(raw, .inp, i);
+                }
+                // keep the max number of leaves created
+                self.leaf_max = @max(self.leaf_max, self.leaves.values.items.len);
+                
+                // drop all of our values out of play
+                _ = self.leaf_arena.reset(.retain_capacity);
+
+                // reinstantiate the array lists
+                self.leaves = self.initLeaves();
             }
-            
-            // drop all of our values out of play
-            _ = self.leaf_arena.reset(.retain_capacity);
 
-            // reinstantiate the array lists
-            self.leaves = self.initLeaves();
+        } else {
 
-            // this will stack up otherwise
-            self.leaf_max = 0;
+            if (component == .grd) {
+                // frees both values and grads
+                for (self.nodes.grads.items, 0..) |opt, i| {
+                    if (opt) |raw| self.freeGradientRaw(raw, .hid, i);
+                }
+            }
+            if (component == .all) {
+                for (self.nodes.values.items, 0..) |raw, i| {
+                    if (0 < raw.len()) self.freeTensorRaw(raw, .hid, i);
+                }
+                // keep the max number of leaves created
+                self.node_max = @max(self.node_max, self.nodes.values.items.len);
+
+                // drop all of our values out of play
+                _ = self.node_arena.reset(.retain_capacity);
+
+                // reinstantiate the array lists
+                self.nodes = self.initNodes();
+            }
         }
-        if (mode == .all or mode == .node) {
-
-            for (self.nodes.values.items) |raw| {
-                if (0 < raw.len()) self.tensor_allocator.freeTensorRaw(raw, self.stream);
-            }
-            for (self.nodes.grads.items) |opt| {
-                if (opt) |raw| { self.tensor_allocator.freeTensorRaw(raw, self.stream); }
-            }
-
-            // drop all of our values out of play
-            _ = self.node_arena.reset(.retain_capacity);
-
-            // reinstantiate the array lists
-            self.nodes = self.initNodes();
-
-            // this will stack up otherwise
-            self.node_max = 0;
-        }
-
-        DU.synchronizeStream(self.stream);
     }
 
     // load precache values for the tensor allocator to use
@@ -474,19 +488,6 @@ pub const Graph = struct {
     }
 
     ////////////////////////////////////////////
-    // internal api for making node tensors
-
-    pub fn nodeTensor(
-        self: *Self, 
-        dimensions: Sizes, // fixed-length array
-        comptime data_type: type,
-    ) NodeTensor(data_type) {
-        return self.constructTensor(
-            TensorClass.hid, dimensions, data_type, self.node_arena.allocator()
-        );
-    }
-
-    ////////////////////////////////////////////
     // public api for making leaf tensors
 
     pub fn tensor(
@@ -505,31 +506,6 @@ pub const Graph = struct {
         );
     }
 
-
-    fn enableGradient(
-        self: *Self, 
-        comptime T: type,
-        class: TensorClass, 
-        idx: IndexType
-    ) []T {
-
-        const values_array = if (class == .hid) 
-            &self.nodes.values else &self.leaves.values;
-
-        const grads_array = if (class == .hid) 
-            &self.nodes.grads else &self.leaves.grads;
-        
-        const grads: *?SliceUnion = &grads_array.items[idx];
-        if (grads.* == null) {            
-            const size = values_array.items[idx].len();
-            const grd = self.tensor_allocator.allocTensor(T, size, self.stream);
-            grads.* = SliceUnion.init(grd);
-            return grd;
-        } else {
-            return getSlice(T, grads.*.?);
-        }
-    }
-
     fn adjustDependencies(self: *Self, class: TensorClass, idx: IndexType, direction: i8) i8 {
         const array = if (class == .hid) 
             &self.nodes.dependencies else &self.leaves.dependencies;
@@ -539,30 +515,6 @@ pub const Graph = struct {
         array.items[idx] -= direction;
         
         return array.items[idx];
-    }
-
-    // TODO: 
-    //    I don't like that this function is public
-    //    but it's used by the tensor ops to make
-    //    nodes on the graph for a given op.
-    pub fn appendNode(
-        self: *Self, 
-        comptime FuncObj: type,
-        args: anytype,
-        out: anytype,
-    ) @TypeOf(out) {
-        const closure = Closure.init(FuncObj, args ++ .{ out }) 
-            catch @panic("Out of Memory");
-        
-        UT.append(&self.nodes.callbacks, closure);
-
-        comptime var i: SizeType = 0;
-        inline while (comptime UT.tupleSize(@TypeOf(args)) > i) : (i += 1) {
-            if (comptime isGraphTensor(@TypeOf(args[i]))) {
-                _ = args[i].adjustDependencies(1);
-            }
-        }
-        return out;
     }
 
     fn freeGradient(
@@ -729,6 +681,63 @@ pub const Graph = struct {
     }
 };
 
+////////////////////////////////
+// non-interface graph functions
+////////////////////////////////
+
+pub fn enableGradient(
+    self: *Graph, 
+    comptime T: type,
+    class: TensorClass, 
+    idx: IndexType
+) []T {
+    const values_array = if (class == .hid) 
+        &self.nodes.values else &self.leaves.values;
+
+    const grads_array = if (class == .hid) 
+        &self.nodes.grads else &self.leaves.grads;
+    
+    const grads: *?SliceUnion = &grads_array.items[idx];
+    if (grads.* == null) {            
+        const size = values_array.items[idx].len();
+        const grd = self.tensor_allocator.allocTensor(T, size, self.stream);
+        grads.* = SliceUnion.init(grd);
+        return grd;
+    } else {
+        return getSlice(T, grads.*.?);
+    }
+}
+
+pub fn appendNode(
+    self: *Graph, 
+    comptime FuncObj: type,
+    args: anytype,
+    out: anytype,
+) @TypeOf(out) {
+    const closure = Closure.init(FuncObj, args ++ .{ out }) 
+        catch @panic("Out of Memory");
+    
+    UT.append(&self.nodes.callbacks, closure);
+
+    comptime var i: SizeType = 0;
+    inline while (comptime UT.tupleSize(@TypeOf(args)) > i) : (i += 1) {
+        if (comptime isGraphTensor(@TypeOf(args[i]))) {
+            _ = args[i].adjustDependencies(1);
+        }
+    }
+    return out;
+}
+
+pub fn nodeTensor(
+    self: *Graph, 
+    dimensions: Sizes, // fixed-length array
+    comptime data_type: type,
+) NodeTensor(data_type) {
+    return self.constructTensor(
+        TensorClass.hid, dimensions, data_type, self.node_arena.allocator()
+    );
+}
+
 
  /////////////////////////////////////////////
 /////////////////////////////////////////////
@@ -746,7 +755,7 @@ fn reverseEdge(
 
     // enable gradients if we don't have them
     if (arg.grads() == null) {
-        const grd = graph.enableGradient(DataType, Class, arg.idx);
+        const grd = enableGradient(graph, DataType, Class, arg.idx);
         fillSlice(DataType, grd, SC.asScalar(DataType, 0), arg.stream());
     }
 

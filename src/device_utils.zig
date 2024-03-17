@@ -127,9 +127,9 @@ pub fn alloc(comptime T: type, N: usize, stream: Stream) []T {
     return out[0..N];
 }
 
-pub fn create(comptime T: type, stream: Stream) *T {
-    std.debug.assert(stream != null);
-    const ptr: *anyopaque = cuda.mpMemAlloc(@sizeOf(T), stream.constex) orelse unreachable;
+pub fn create(comptime T: type, stream: Stream) [*]T {
+    //std.debug.assert(stream != null);
+    const ptr: *anyopaque = cuda.mpMemAlloc(@sizeOf(T), stream.context) orelse unreachable;
     return @ptrCast(@alignCast(ptr));
 }
 

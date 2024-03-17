@@ -10,8 +10,8 @@ pub fn build(b: *std.Build) void {
 
     const gen: *FileGen = FileGen.init(.{
         .source_extension = ".cu",
-        .source_directory = b.pathJoin(&.{"src", "cuda", "nvcc_source"}),
-        .target_directory = b.pathJoin(&.{"src", "cuda", "nvcc_target"}),
+        .source_directory = b.pathJoin(&.{"src", "cuda", "nvcc_src"}),
+        .target_directory = b.pathJoin(&.{"src", "cuda", "nvcc_trg"}),
         .zigsrc_directory = "src",
     });
 

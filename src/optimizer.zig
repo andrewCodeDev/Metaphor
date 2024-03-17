@@ -59,12 +59,12 @@ inline fn updateDispatch(
     stream: Stream,
 ) void {
     switch (wgt) {
-        SC.r16 => opt.optimize(gid, wid, wgt.r16, grd.r16, stream),
-        SC.r32 => opt.optimize(gid, wid, wgt.r32, grd.r32, stream),
-        SC.r64 => opt.optimize(gid, wid, wgt.r64, grd.r64, stream),
-        SC.c16 => opt.optimize(gid, wid, wgt.r16, grd.r16, stream),
-        SC.c32 => opt.optimize(gid, wid, wgt.r32, grd.r32, stream),
-        SC.c64 => opt.optimize(gid, wid, wgt.r64, grd.r64, stream),
+        .r16 => opt.optimize(gid, wid, wgt.r16, grd.r16, stream),
+        .r32 => opt.optimize(gid, wid, wgt.r32, grd.r32, stream),
+        .r64 => opt.optimize(gid, wid, wgt.r64, grd.r64, stream),
+        .c16 => opt.optimize(gid, wid, wgt.r16, grd.r16, stream),
+        .c32 => opt.optimize(gid, wid, wgt.r32, grd.r32, stream),
+        .c64 => opt.optimize(gid, wid, wgt.r64, grd.r64, stream),
         else => {
              @panic("Optimizer: TODO - q8");
         }
@@ -88,21 +88,18 @@ pub const NullOptimizer = struct {
     }
 };
 
-pub const SGDescent = struct {
+pub const SGD = struct {
 
     const Self = @This();
-    lrate: f16,
-    stream: Stream,
+    rate: f16,
     clip: ClipRange,
 
     pub fn init(config: struct{
-        lrate: f16, 
-        stream: Stream,
-        clip: ?ClipRange,
-    }) SGDescent {
+        rate: f16, 
+        clip: ?ClipRange = null,
+    }) SGD {
         return .{
-            .lrate = config.lrate,
-            .stream = config.stream,
+            .rate = config.rate,
             .clip = config.clip orelse ClipRange.init(),
         };
     }
@@ -132,15 +129,16 @@ pub const SGDescent = struct {
         grd: anytype,
         stream: Stream,
     ) void {
-        std.assert(wgt.len == grd.len);
+
+        std.debug.assert(wgt.len == grd.len);
         const T = Child(@TypeOf(grd));
         overloads.kernel_gradient_descent.call(.{
             stream.context,
             wgt.ptr, 
             grd.ptr, 
-            SC.asScalar(T, self.lrate),
-            SC.asScalar(T, self.clip.upper),
+            SC.asScalar(T, self.rate),
             SC.asScalar(T, self.clip.lower),
+            SC.asScalar(T, self.clip.upper),
             wgt.len,
         });
     }

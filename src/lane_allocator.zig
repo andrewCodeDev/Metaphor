@@ -113,7 +113,7 @@ pub const LaneAllocator = struct {
         }
     }
 
-    pub fn allocScalar(self: *Self, comptime T: type, stream: Stream) *T {
+    pub fn allocScalar(self: *Self, comptime T: type, stream: Stream) [*]T {
 
         const lane = comptime getTypeLane(T);
 

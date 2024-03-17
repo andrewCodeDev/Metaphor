@@ -21,7 +21,6 @@ pub fn main() !void {
     defer streams.deinit();
 
     const G = mp.Graph.init(.{
-        .optimizer = mp.null_optimizer,
         /////////////////////////////
         // this is the initial stream
         .stream = streams.items[0],
@@ -103,7 +102,7 @@ pub fn main() !void {
 
     std.log.info("Tensors in Cache Before graph.reset: {}", .{ G.tensor_allocator.used() });
 
-    G.reset(.node);    
+    G.reset(.node, .all);    
 
     std.log.info("Tensors in Cache After graph.reset: {}", .{ G.tensor_allocator.used() });
     ////////////////////////////////////////////////////
@@ -128,7 +127,7 @@ pub fn main() !void {
     // this time, we'll make two streams and do
     // 5 products on one, and five on the other
 
-    G.reset(.node);
+    G.reset(.node, .all);
     /////////////////////////////////////////////////////
     {
     const start = try std.time.Instant.now();

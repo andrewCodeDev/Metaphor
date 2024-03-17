@@ -29,6 +29,7 @@ const std = @import("std");
 const UT = @import("utility.zig");
 
 pub const NoCleanup = opaque { };
+pub const NoArg = opaque{ };
 
 pub fn CallbackBuilder(
     comptime forward: anytype,

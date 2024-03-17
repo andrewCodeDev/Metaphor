@@ -1,6 +1,7 @@
 const std = @import("std");
 const C = @import("cimport.zig").C;
 const SC = @This();
+const UT = @import("utility.zig");
 
   ////////////////////////////////////////////////
  ///// Scalar Types /////////////////////////////
@@ -66,19 +67,9 @@ pub const ScalarTag = enum {
  ///// Constraints //////////////////////////////
 ////////////////////////////////////////////////
 
-pub inline fn isInteger(comptime T: type) bool {
-    return switch (@typeInfo(T)) {
-        .Int, .ComptimeInt => true,
-        else => false
-    };
-}
+pub const isInteger = UT.isInteger;
 
-pub inline fn isFloat(comptime T: type) bool {
-    return switch (@typeInfo(T)) {
-        .Float, .ComptimeFloat => true, 
-        else => false
-    };
-}
+pub const isFloat = UT.isFloat;
 
 // we have to support some weird types of floating
 // point "equivalents". Because of this, we cannot

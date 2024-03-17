@@ -21,6 +21,12 @@ pub const kernel_tanh = OverloadSet(.{
 	decls.launch_tanh_r64,
 });
 
+pub const kernel_cce_loss_i_i = OverloadSet(.{
+	decls.launch_cce_loss_i_i_r16,
+	decls.launch_cce_loss_i_i_r32,
+	decls.launch_cce_loss_i_i_r64,
+});
+
 pub const kernel_hadamard_reverse = OverloadSet(.{
 	decls.launch_hadamard_reverse_r16,
 	decls.launch_hadamard_reverse_c16,
@@ -43,6 +49,12 @@ pub const kernel_subtraction = OverloadSet(.{
 	decls.launch_subtraction_c32,
 	decls.launch_subtraction_r64,
 	decls.launch_subtraction_c64,
+});
+
+pub const kernel_linear_ij_jk = OverloadSet(.{
+	decls.launch_matmul_2D_r16,
+	decls.launch_matmul_2D_r32,
+	decls.launch_matmul_2D_r64,
 });
 
 pub const kernel_linear_i_ij = OverloadSet(.{
@@ -109,12 +121,6 @@ pub const kernel_addition_reverse = OverloadSet(.{
 	decls.launch_addition_reverse_c32,
 	decls.launch_addition_reverse_r64,
 	decls.launch_addition_reverse_c64,
-});
-
-pub const kernel_matmul_2D = OverloadSet(.{
-	decls.launch_matmul_2D_r16,
-	decls.launch_matmul_2D_r32,
-	decls.launch_matmul_2D_r64,
 });
 
 pub const kernel_sequence = OverloadSet(.{

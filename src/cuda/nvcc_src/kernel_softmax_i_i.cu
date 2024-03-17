@@ -8,8 +8,6 @@ __global__ void __kernel_softmax_i_i_RScalar(
 ) {
   auto grid = cg::this_grid();
 
-  __shared__ RScalar cache[WARP_SIZE];
-    
   const len_t idx = grid.thread_rank();
 
   // since we're coalescing by 4's for every thread in the
@@ -188,7 +186,7 @@ extern "C" void launch_softmax_i_i_RScalar(
     (void*)&A, (void*)&B, (void*)&scratch, (void*)&m
   };
 
-  cudaLaunchCooperativeKernel(
+  CUDA_ASSERT(cudaLaunchCooperativeKernel(
     (void*)(__kernel_softmax_i_i_RScalar), grid, block, args, 0, getCtx(stream)
-  );
+  ));
 }

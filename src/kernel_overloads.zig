@@ -81,6 +81,12 @@ pub const kernel_leaky_relu = OverloadSet(.{
 	decls.launch_leaky_relu_r64,
 });
 
+pub const kernel_mse_loss_i_i = OverloadSet(.{
+	decls.launch_mse_loss_i_i_r16,
+	decls.launch_mse_loss_i_i_r32,
+	decls.launch_mse_loss_i_i_r64,
+});
+
 pub const kernel_fill = OverloadSet(.{
 	decls.launch_fill_r16,
 	decls.launch_fill_c16,

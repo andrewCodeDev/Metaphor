@@ -704,14 +704,7 @@ pub inline fn linear_ij_jk(
     std.debug.assert(C.len() == Y.len());
 
     __linear_ij_jk(
-        stream,
-        A.values(),
-        B.values(),
-        alpha,
-        C.values(),
-        beta, //beta
-        Y.values(),
-        m, n, k
+        stream, A.values(), B.values(), alpha, C.values(), beta,  Y.values(), m, n, k
     );
 }
 
@@ -746,10 +739,8 @@ inline fn linear_ij_jk_ReverseArg0(
         stream, 
         Y_grads,
         B_tran,
-        alpha, // alpha
-        A_grads,
-        1.0, // beta
-        A_grads,
+        alpha, A_grads,
+        1.0, A_grads,
         Y_sizes[0],
         Y_sizes[1],
         B_sizes[0],
@@ -807,6 +798,214 @@ const Linear_ij_jk_Callback = CallbackBuilder(
     }, NoCleanup,
 );
 
+pub inline fn linear_ij_kj(
+    stream: Stream, 
+    A: anytype, 
+    B: anytype,
+    alpha: f16,
+    C: anytype,
+    beta: f16,
+    Y: anytype,
+) void {
+    const T = @TypeOf(Y);
+    const A_sizes = A.sizes();
+    const B_sizes = B.sizes();
+    const m = A_sizes[0];
+    const n = B_sizes[1];
+    const k = B_sizes[0];
+
+    std.debug.assert(A_sizes.len == 2);
+    std.debug.assert(B_sizes.len == 2);
+    std.debug.assert(n == A_sizes[1]);
+    std.debug.assert(Y.len() == m * k);
+    std.debug.assert(C.len() == Y.len());
+
+    const B_tran = stream.getScratch(T.DataType, B.len());
+    
+    overloads.kernel_permutate_ij_ji.call(.{
+       stream.context, B.values().ptr, B_tran.ptr, SC.asScalar(T, 0.0), B_sizes[0], B_sizes[1] 
+    });
+    __linear_ij_jk(
+        stream, A.values(), B_tran, alpha, C.values(), beta, Y.values(), m, n, k
+    );
+}
+
+inline fn linear_ij_kj_ReverseArg0(
+    stream: Stream, 
+    A: anytype, 
+    B: anytype,
+    alpha: f16,
+    _: anytype,
+    _: f16,
+    Y: anytype,
+) void {
+    // ij,kj->ik... ik,jk->ij
+    // (3,5).(4,5) -> (3,4)
+    // (3,5),(5,4) -> (3,4)
+    // (3,4),(4,5) -> (3,5)
+    const Y_sizes = Y.sizes();
+    const B_sizes = B.sizes();
+
+    const m = Y_sizes[0];
+    const n = Y_sizes[1];
+    const k = B_sizes[0];
+
+    std.debug.assert(n == B_sizes[0]);
+    std.debug.assert(A.len() == m * k);
+
+    __linear_ij_jk(
+        stream, Y.grads().?, B.values(), alpha, A.grads().?, 1.0, A.grads().?, m,n,k
+    );
+}
+
+inline fn linear_ij_kj_ReverseArg1(
+    stream: Stream, 
+    A: anytype, 
+    B: anytype,
+    alpha: f16,
+    _: anytype,
+    _: f16,
+    Y: anytype,
+) void {
+    // ij,kj->ik... ki,ij->kj
+    // (3,5).(4,5) -> (3,4)
+    // (3,5),(5,4) -> (3,4)
+    // (4,3),(3,5) -> (4,5)
+    const T = Child(@TypeOf(A));
+    const Y_sizes = Y.sizes();
+    const A_sizes = A.sizes();
+
+    const Y_tran = stream.getScratch(T.DataType, B.len());
+
+    overloads.kernel_permutate_ij_ji.call(.{
+       stream.context, Y.grads().?.ptr, Y_tran.ptr, SC.asScalar(T, 0.0), Y_sizes[0], Y_sizes[1] 
+    });
+
+    const m = Y_sizes[1];
+    const n = Y_sizes[0];
+    const k = A_sizes[1];
+
+    std.debug.assert(n == A_sizes[0]);
+    std.debug.assert(B.len() == m * k);
+    
+    __linear_ij_jk(
+        stream, Y_tran, A.values(), alpha, B.grads().?, 1.0, B.grads().?, m,n,k
+    );
+}
+
+const Linear_ij_kj_Callback = CallbackBuilder(
+    linear_ij_kj, .{
+        .{ linear_ij_kj_ReverseArg0, 0 },
+        .{ linear_ij_kj_ReverseArg1, 1 },
+        .{ linear_bias_ReverseArg3,  3 },
+    }, NoCleanup,
+);
+
+pub inline fn linear_ji_jk(
+    stream: Stream, 
+    A: anytype, 
+    B: anytype,
+    alpha: f16,
+    C: anytype,
+    beta: f16,
+    Y: anytype,
+) void {
+    const T = @TypeOf(Y);
+    const A_sizes = A.sizes();
+    const B_sizes = B.sizes();
+    std.debug.assert(A_sizes.len == 2);
+    std.debug.assert(B_sizes.len == 2);
+    std.debug.assert(C.len() == Y.len());
+
+    const A_tran = stream.getScratch(T.DataType, A.len());
+    
+    overloads.kernel_permutate_ij_ji.call(.{
+       stream.context, A.values().ptr, A_tran.ptr, SC.asScalar(T, 0.0), A_sizes[0], A_sizes[1] 
+    });
+
+    const m = A_sizes[1];
+    const n = A_sizes[0];
+    const k = B_sizes[1];
+
+    std.debug.assert(n == B_sizes[0]);
+    std.debug.assert(Y.len() == m * k);
+
+    __linear_ij_jk(
+        stream, A_tran, B.values(), alpha, C.values(), beta, Y.values(), m,n,k
+    );
+}
+
+inline fn linear_ji_jk_ReverseArg0(
+    stream: Stream, 
+    A: anytype, 
+    B: anytype,
+    alpha: f16,
+    _: anytype,
+    _: f16,
+    Y: anytype,
+) void {
+    // ji,kj->ik... jk,ki->ji
+    // (4,3).(4,5) -> (...)
+    // (3,4),(4,5) -> (3,5)
+    // (4,5),(5,3) -> (4,3)
+    const T = @TypeOf(A);
+    const Y_sizes = Y.sizes();
+    const B_sizes = B.sizes();
+
+    const Y_tran = stream.getScratch(T.DataType, Y.len());
+    
+    overloads.kernel_permutate_ij_ji.call(.{
+       stream.context, Y.grads().?.ptr, Y_tran.ptr, SC.asScalar(T, 0.0), Y_sizes[0], Y_sizes[1] 
+    });
+
+    const m = B_sizes[0];
+    const n = B_sizes[1];
+    const k = Y_sizes[0];
+
+    std.debug.assert(n == Y_sizes[1]);
+    std.debug.assert(A.len() == m * k);
+
+    __linear_ij_jk(
+        stream, B.values(), Y_tran, alpha, A.grads(), 1.0, A.grads().?, m,n,k,
+    );
+}
+
+inline fn linear_ji_jk_ReverseArg1(
+    stream: Stream, 
+    A: anytype, 
+    B: anytype,
+    alpha: f16,
+    _: anytype,
+    _: f16,
+    Y: anytype,
+) void {
+    // ji,jk->ik... ji,ik->jk
+    // (5,3).(5,4) -> (...)
+    // (3,5),(5,4) -> (3,4)
+    // (5,3),(3,4) -> (5,4)
+    const Y_sizes = Y.sizes();
+    const A_sizes = A.sizes();
+
+    const m = A_sizes[0];
+    const n = A_sizes[1];
+    const k = Y_sizes[1];
+
+    std.debug.assert(n == Y_sizes[0]);
+    std.debug.assert(B.len() == m * k);
+    
+    __linear_ij_jk(
+        stream, A.values(), Y.grads().?, alpha, B.grads().?, 1.0, B.grads().?, m,n,k
+    );
+}
+
+const Linear_ji_jk_Callback = CallbackBuilder(
+    linear_ji_jk, .{
+        .{ linear_ji_jk_ReverseArg0, 0 },
+        .{ linear_ji_jk_ReverseArg1, 1 },
+        .{ linear_bias_ReverseArg3,  3 },
+    }, NoCleanup,
+);
+
 const inner_product_expressions = std.ComptimeStringMap(
     type, .{
         // Rank-1-to-Rank-2
@@ -822,7 +1021,14 @@ const inner_product_expressions = std.ComptimeStringMap(
         .{ "ji,j->i", Linear_ij_i_Callback },
 
         // Rank-2-to-Rank-2
-        .{ "ij,jk->ik", Linear_ij_jk_Callback }
+        .{ "ij,jk->ik", Linear_ij_jk_Callback },
+        .{ "ji,ik->jk", Linear_ij_jk_Callback },
+        // transpose right
+        .{ "ij,kj->ik", Linear_ij_kj_Callback },
+        .{ "ji,ki->jk", Linear_ij_kj_Callback },
+        // transpose left
+        .{ "ji,jk->ik", Linear_ji_jk_Callback },
+        .{ "ij,ik->jk", Linear_ji_jk_Callback },
     }
 );
 

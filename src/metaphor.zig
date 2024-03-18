@@ -100,6 +100,31 @@ pub const loss = struct {
 
         Loss.cce(graph.stream, x, y, redux, score);
     }
+
+    pub fn mse(
+        x: anytype,
+        y: anytype,
+        config: struct {
+            grads: bool,
+            score: ?*f64,
+    }) void {
+        const T = @TypeOf(x);
+
+        const graph = x.ptr;
+
+        if (config.grads) {
+            _ = enableGradient(graph, T.DataType, T.Class, x.idx);
+        }
+        const redux: ?[*]f64 = if (config.score != null)
+            graph.tensor_allocator.allocScalar(f64, graph.stream) else null;
+        defer {
+            if (redux) |ptr| graph.tensor_allocator.freeScalar(ptr);
+        }
+        const score: ?[*]f64 = if (config.score) |ptr|
+            @ptrCast(@alignCast(ptr)) else null;
+
+        Loss.mse(graph.stream, x, y, redux, score);
+    }
 };
 
 pub const Graph = CG.Graph;

@@ -22,71 +22,36 @@ pub fn main() !void {
     defer G.deinit();
 
     const M: usize = 32;
-    const N: usize = M * 4;
 
     /////////////////////////////////////////////////////
     // feed forward network...
 
     const x = G.tensor(.inp, .r32, mp.Rank(1){ M });  
+    const b = G.tensor(.wgt, .r32, mp.Rank(1){ M });  
+    const t = G.tensor(.wgt, .r32, mp.Rank(1){ M });  
 
-    const W1 = G.tensor(.wgt, .r32, mp.Rank(2){ N, M });  
-    const b1 = G.tensor(.wgt, .r32, mp.Rank(1){ N });  
+    mp.mem.randomize(x);
+    mp.mem.randomize(b);
+    mp.mem.randomize(t);
 
-    const W2 = G.tensor(.wgt, .r32, mp.Rank(2){ M, N });  
-    const b2 = G.tensor(.wgt, .r32, mp.Rank(1){ M });  
+    var score: f64 = 0.0;
 
-    // pub fn forward(self: *Self, x: anytype) NodeTensor(T) {
+    for (0..10) |_| {
 
-        // prevent freeing beyond block
-        if (comptime @TypeOf(x).Class == .hid) {
-            // x.detach();
-        }
+        const y = mp.ops.add(x, b);
 
-        const v1 = mp.ops.linear(W1, x, b1, "ij,j->i");
-        const z1 = mp.ops.selu(v1);
+        mp.loss.mse(y, t, .{
+            .grads = true,
+            .score = &score
+        });
 
-        const v2 = mp.ops.linear(W2, z1, b2, "ij,j->i");
-        const z2 = mp.ops.selu(v2);
+        y.reverse();
 
-        // if (self.cleanup) {
-            //mp.stream.synchronize(stream);
-            //defer v1.free();
-            //defer v2.free();
-        // }
+        mp.stream.synchronize(stream);
 
-        // z2.detach();
+        G.reset(.node, .all);
 
-        // self.z2 = z2;
-
-        // return z2;
-    //}
-
-    // pub fn reverse(self: *Self) void {
-
-        z2.reverse();
-
-        // if (self.cleanup) {
-            //z2.ptr.freeSubgraph(z2, .all);
-        //}
-    //}
-
-    //////////////////////////////////////////////////////
-    // pub fn toCPU(self: *Self, stream: Stream) {
-    //
-    //     DU.copyFromDevice(self.z1, self.z1_cpu, stream);
-    //     DU.copyFromDevice(self.z1, self.z1_cpu, stream);
-    //
-        
-
-    // }
-
-    // later...
-
-    z2.reverse();
-
-    //mp.stream.synchronize(stream);
-
-    //G.freeSubgraph(z2, .all);
-
+        std.log.info("score: {d:.4}", .{ score });
+    }
     ////////////////////////////////////////////
 }

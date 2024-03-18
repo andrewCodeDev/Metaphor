@@ -344,6 +344,33 @@ EXTERN_C void launch_leaky_relu_r64(
         r64 coef,
   len_t N
 );
+EXTERN_C void launch_mse_loss_i_i_r16(
+  StreamCtx stream,
+  const r16* src_value, 
+        r16* src_grads, 
+  const r16* trg_value, 
+        r16* scratch,
+        double*  redux, // scalar
+  len_t m
+);
+EXTERN_C void launch_mse_loss_i_i_r32(
+  StreamCtx stream,
+  const r32* src_value, 
+        r32* src_grads, 
+  const r32* trg_value, 
+        r32* scratch,
+        double*  redux, // scalar
+  len_t m
+);
+EXTERN_C void launch_mse_loss_i_i_r64(
+  StreamCtx stream,
+  const r64* src_value, 
+        r64* src_grads, 
+  const r64* trg_value, 
+        r64* scratch,
+        double*  redux, // scalar
+  len_t m
+);
 EXTERN_C void launch_fill_r16(
   StreamCtx stream,
   r16* dev_a,

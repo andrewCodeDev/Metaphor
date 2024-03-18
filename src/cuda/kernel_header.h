@@ -113,6 +113,11 @@ __device__ __inline__ T cmul(T x, T y) {
   return T { .r = (x.r * y.r - x.i * y.i), .i = (x.r * y.i + x.i * y.r) };
 }
 
+template<class T>
+__device__ __inline__ T rsqr(T x) { 
+  return x * x;
+}
+
 struct MaxOP {
   template<class T> static __inline__ __device__ T apply(T x, T y) { return (x > y) ? x: y; }
 };

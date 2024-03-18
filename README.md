@@ -82,11 +82,11 @@ const y = mp.ops.linear(A, x, b, "ij,j->i");
 // B = A transpose
 const B = mp.ops.permutate(A, "ij->ji");
 // w = u + v
-const w = mp.ops.add(u + v);
+const w = mp.ops.add(u, v);
 // operations can be composed, e = (a + b) * (c + d)
 const e = mp.ops.hadamard(mp.ops.add(a, b), mp.ops.add(c, d));    
 ```
-Reversal is straightforward, but has many additional features (see src/examples for more):
+Reversal is straight-forward, but has many additional features (see src/examples for more):
 
 ```zig
 // feed-forward block
@@ -111,7 +111,7 @@ Clone this repository onto your local machine.
 Either copy, move, or symlink the CUDA Developer Toolkit to the "Metaphor/deps" folder. Metaphor uses this path to ensure that CUDA includes are correct.
 
 Open the "Metaphor/config.json" file and specify the following fields:
-    - gcc-bin-path
-    - gpu-architecture
+    - gcc-bin-path      - example: "/usr/bin/gcc"
+    - gpu-architecture  - example: "sm_89"
 
 You can now use Metaphor!

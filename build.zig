@@ -17,14 +17,14 @@ pub fn build(b: *std.Build) void {
 
     defer gen.deinit();
 
-    ScriptCompiler.setupConfig(b.allocator, gen.current_directory);
+    ScriptCompiler.setupConfig(b, gen.current_directory);
 
     const src_body = gen.appendCudaDirectory("device_utils.cu");
     const src_head = gen.appendCudaDirectory("device_utils.h");
     const trg_lib = gen.appendLibraryDirectory("libdev_utils.so");
 
     if (FileGen.isModified(src_body, trg_lib) or FileGen.isModified(src_head, trg_lib))
-        ScriptCompiler.compileSingleFile(b.allocator, src_body, trg_lib);
+        ScriptCompiler.compileSingleFile(b, src_body, trg_lib);
 
     // ensures that the @cImport always has the correct
     // absolute paths for importing C-files into Zig

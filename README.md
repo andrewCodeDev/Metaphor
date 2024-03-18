@@ -102,12 +102,16 @@ if (A.grads()) |grd| {
 
 # Installation Steps
 
-If you do not have a version of the CUDA Developer Toolkit on your machine, download it and locate the path it was saved to.
+If you do not have a version of the GCC compiler, download/install it and locate the path it was saved to.
+
+If you do not have a version of the CUDA Developer Toolkit, download it and locate the path it was saved to.
 
 Clone this repository onto your local machine.
 
-Either copy, move, or symlink the CUDA Developer Toolkit to the "Metaphor/dependencies" folder. Metaphor uses this path to ensure that CUDA includes are correct.
+Either copy, move, or symlink the CUDA Developer Toolkit to the "Metaphor/deps" folder. Metaphor uses this path to ensure that CUDA includes are correct.
 
-Open the "Metaphor/config.json" file and specify your GPU's compute architecture (such as sm_89) in the config.json file.
+Open the "Metaphor/config.json" file and specify the following fields:
+    - gcc-bin-path
+    - gpu-architecture
 
 You can now use Metaphor!

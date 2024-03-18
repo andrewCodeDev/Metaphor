@@ -345,6 +345,7 @@ pub fn generate(self: *Self) void {
     }    
 
     if (modded_abspaths.items.len != 0) {
+        std.log.info("compile.", .{});
         self.makeKernelDeclarations() 
             catch @panic("Failed to make kernel declarations.");
 

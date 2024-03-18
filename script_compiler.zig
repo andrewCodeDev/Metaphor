@@ -7,15 +7,17 @@ fn joinString(allocator: std.mem.Allocator, a: []const u8, b: []const u8)  []u8 
 
 const MetaphorConfig = struct {
     setup: bool = false,
+    gcc_bin_path: []const u8 = "",
+    cuda_include_path: []const u8 = "",
+    cuda_library_path: []const u8 = "",
     gpu_architecture: []const u8 = "",
 };
 
 var config: MetaphorConfig = .{};
 
-pub fn setupConfig(allocator: std.mem.Allocator, cwd_path: []const u8) void {
-    const config_path = std.fs.path.join(allocator, &.{ cwd_path, "config.json" })
-        catch @panic("Out of Memory");
-    
+pub fn setupConfig(b: *std.Build, cwd_path: []const u8) void {
+    const config_path = b.pathJoin(&.{ cwd_path, "config.json" });
+
     const f = std.fs.cwd().openFile(config_path, .{}) 
         catch @panic("Cannot open config.");
     
@@ -23,14 +25,28 @@ pub fn setupConfig(allocator: std.mem.Allocator, cwd_path: []const u8) void {
     
     const f_len = f.getEndPos() 
         catch @panic("Could not get config end position.");
-    const config_string = allocator.alloc(u8, f_len) 
+
+    const config_string = b.allocator.alloc(u8, f_len) 
         catch @panic("Config: Out of memory.");
+
     _ = f.readAll(config_string) 
         catch @panic("Could not read file config.");
+
     var config_json = std.json.parseFromSlice(
         std.json.Value, std.heap.page_allocator, config_string, .{}
     ) catch @panic("Failed to parse config json.");
     
+    /////////////////////////////////
+    // get gcc binary path //////////
+    if (config_json.value.object.get("gcc-bin-path")) |gcc_bin| {
+        switch (gcc_bin) {
+            .string => |str| {
+                // TODO: give early panic if gcc path does not exist
+                config.gcc_bin_path = str;
+            }, else => @panic("\n\nInvalid datatype in config for gcc-bin-path.\n"),
+        }
+    }
+
     /////////////////////////////////
     // get gpu architecture /////////
     if (config_json.value.object.get("gpu-architecture")) |gpu_arch| {
@@ -39,10 +55,25 @@ pub fn setupConfig(allocator: std.mem.Allocator, cwd_path: []const u8) void {
                 if (!std.mem.startsWith(u8, str, "sm_")) {
                     @panic("\n\nInvalid in format in config for gpu-achitecture. Valid format example: \"sm_89\"\n");
                 }
-                config.gpu_architecture = joinString(allocator, "--gpu-architecture=", str);
-            }, else => @panic("\n\nInvalid in datatype in config for gpu-achitecture.\n"),
+                config.gpu_architecture = joinString(b.allocator, "--gpu-architecture=", str);
+            }, else => @panic("\n\nInvalid datatype in config for gpu-achitecture.\n"),
         }
     }
+
+    config.cuda_include_path = b.pathJoin(
+        &.{ "-I", cwd_path, "deps", "cuda", "include" }
+    );
+    config.cuda_library_path = b.pathJoin(
+        &.{ "-L", cwd_path, "deps", "cuda", "lib64" }
+    );
+
+    std.log.info("Config:\n  {s}\n  {s}\n  {s}\n  {s}\n", .{ 
+        config.gcc_bin_path,
+        config.cuda_include_path,
+        config.cuda_library_path,
+        config.gpu_architecture 
+    });
+
     config.setup = true;
 }
 
@@ -59,12 +90,12 @@ pub fn buildSharedLibraryArgv(
         "-O3",
         "--allow-unsupported-compiler",
         "-ccbin",
-        "/usr/bin/gcc",
+        config.gcc_bin_path,
         config.gpu_architecture, 
         "--compiler-options", 
         "-fPIC", 
-        "-I/usr/local/cuda/include", 
-        "-L/usr/local/cuda/lib", 
+        config.cuda_include_path,
+        config.cuda_library_path, 
         "-lcudart",
         "-lcuda"
     };
@@ -132,15 +163,14 @@ pub fn objectFilesArgv(
         "-O3",
         "--allow-unsupported-compiler",
         "-ccbin",
-        "/usr/bin/gcc",
+        config.gcc_bin_path,
         config.gpu_architecture, 
         "--compiler-options", 
-        "-I/usr/local/cuda/include", 
-        "-L/usr/local/cuda/lib", 
+        config.cuda_include_path,
+        config.cuda_library_path, 
         "-lcudart",
         "-lcuda"
     };
-
     var argv = try std.ArrayListUnmanaged([]const u8).initCapacity(
         allocator, comp_head.len + mod_targets.len + comp_tail.len
     );
@@ -148,7 +178,7 @@ pub fn objectFilesArgv(
     argv.appendSliceAssumeCapacity(comp_head);
     argv.appendSliceAssumeCapacity(mod_targets);
     argv.appendSliceAssumeCapacity(comp_tail);
-    std.debug.assert(argv.capacity == argv.items.len);
+    std.debug.assert(argv.capacity == argv.items.len);        
     return argv.allocatedSlice();
 }
 
@@ -167,6 +197,10 @@ pub fn archiveFilesArgv(
     argv.appendAssumeCapacity(lib_name);
     argv.appendSliceAssumeCapacity(object_abspaths);
     std.debug.assert(argv.capacity == argv.items.len);
+
+    for (argv.items) |item| {
+        std.debug.print("{s}\n", .{ item });
+    }
     return argv.allocatedSlice();
 }
 
@@ -189,16 +223,13 @@ pub fn compileStaticLibrary(input: struct {
 
         defer dir.close();
 
-    dir.setAsCwd() 
-        catch @panic("Failed to move to target directory");
-
-    blk: { 
+    dir.setAsCwd() catch @panic("Failed to move to target directory");
 
         { // compile modified argument files
             const argv = objectFilesArgv(input.allocator, input.modded_abspaths) 
                 catch @panic("Failed to create object files argv");
 
-            defer input.allocator.free(argv);
+            //defer input.allocator.free(argv);
             
             const result = ChildProcess.run(.{
                 .allocator = input.allocator, .argv = argv,
@@ -209,8 +240,7 @@ pub fn compileStaticLibrary(input: struct {
 
             switch (result.term) {
                 .Exited  => |e| {
-                    if (e != 0)
-                    std.log.err("Exit Code: {}", .{ e });
+                    if (e != 0) std.log.err("Exit Code: {}", .{ e });
                 },
                 .Signal  => |s| std.log.err("Signal: {}\n",  .{s}),
                 .Stopped => |s| std.log.err("Stopped: {}\n", .{s}),
@@ -219,6 +249,7 @@ pub fn compileStaticLibrary(input: struct {
 
             if (result.stderr.len > 0) {
                 std.log.err("{s}\n", .{ result.stderr });
+                @panic("Failed to create object files");
             }
         }
 
@@ -226,7 +257,7 @@ pub fn compileStaticLibrary(input: struct {
             const argv = archiveFilesArgv(input.allocator, input.object_abspaths, input.lib_name)
                 catch @panic("Failed to create archive argv");
 
-            defer input.allocator.free(argv);
+            //defer input.allocator.free(argv);
             
             const result = ChildProcess.run(.{
                 .allocator = input.allocator, .argv = argv,
@@ -237,19 +268,16 @@ pub fn compileStaticLibrary(input: struct {
 
             switch (result.term) {
                 .Exited  => |e| {
-                    if (e == 0) break :blk;
-                    std.log.err("Exit Code: {}", .{ e });
+                    if (e != 0) std.log.err("Exit Code: {}", .{ e });
                 },
                 .Signal  => |s| std.log.err("Signal: {}\n",  .{s}),
                 .Stopped => |s| std.log.err("Stopped: {}\n", .{s}),
                 .Unknown => |u| std.log.err("Unknown: {}\n", .{u}),
             }
-            std.log.err(
-                "{s}\n", .{ if (result.stderr.len > 0) result.stderr else "None" }
-            );
-
-            @panic("Failed to create static library");
-        }
+            if (result.stderr.len > 0) {
+                std.log.err("{s}\n", .{ result.stderr });
+                @panic("Failed to create static library files");
+            }
     }
 
     // move back to home
@@ -258,12 +286,11 @@ pub fn compileStaticLibrary(input: struct {
 
         defer home.close();
 
-    home.setAsCwd()
-        catch @panic("Failed to move to target directory");
+    home.setAsCwd() catch @panic("Failed to move to target directory");
 }
 
 pub fn compileSingleFile(
-    allocator: std.mem.Allocator,
+    b: *std.Build,
     source_path: []const u8,
     target_path: []const u8,
 ) void {
@@ -279,14 +306,18 @@ pub fn compileSingleFile(
         config.gpu_architecture,
         "--compiler-options",
         "-fPIC", 
-        "-I/usr/local/cuda/include",
-        "-L/usr/local/cuda/lib",
+        config.cuda_include_path,
+        config.cuda_library_path, 
         "-lcudart",
         "-lcuda"
     };
 
+    for (libgen_utils_argv[0..]) |item| {
+        std.debug.print("{s}\n", .{ item });
+    }
+
     const result = std.ChildProcess.run(.{
-        .allocator = allocator, .argv = libgen_utils_argv
+        .allocator = b.allocator, .argv = libgen_utils_argv
     }) catch |e| {
         std.log.err("Error: {}", .{e});
         @panic("Failed to create libdev_utils.so");

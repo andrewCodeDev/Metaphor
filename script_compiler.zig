@@ -197,10 +197,6 @@ pub fn archiveFilesArgv(
     argv.appendAssumeCapacity(lib_name);
     argv.appendSliceAssumeCapacity(object_abspaths);
     std.debug.assert(argv.capacity == argv.items.len);
-
-    for (argv.items) |item| {
-        std.debug.print("{s}\n", .{ item });
-    }
     return argv.allocatedSlice();
 }
 
@@ -311,10 +307,6 @@ pub fn compileSingleFile(
         "-lcudart",
         "-lcuda"
     };
-
-    for (libgen_utils_argv[0..]) |item| {
-        std.debug.print("{s}\n", .{ item });
-    }
 
     const result = std.ChildProcess.run(.{
         .allocator = b.allocator, .argv = libgen_utils_argv

@@ -111,7 +111,9 @@ Clone this repository onto your local machine.
 Either copy, move, or symlink the CUDA Developer Toolkit to the "Metaphor/deps" folder. Metaphor uses this path to ensure that CUDA includes are correct.
 
 Open the "Metaphor/config.json" file and specify the following fields:
+```
     - gcc-bin-path      - example: "/usr/bin/gcc"
     - gpu-architecture  - example: "sm_89"
+```
 
 You can now use Metaphor!

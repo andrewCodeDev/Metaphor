@@ -9,7 +9,8 @@ pub fn main() !void {
     mp.device.init(0);
 
     const stream = mp.stream.init();
-        defer mp.stream.deinit(stream);
+
+    defer mp.stream.deinit(stream);
 
     var sgd = mp.optm.SGD.init(.{ .rate = 1.0, });
 
@@ -45,7 +46,7 @@ pub fn main() !void {
             .score = &score
         });
 
-        y.reverse();
+        y.reverse(.keep);
 
         mp.stream.synchronize(stream);
 

@@ -34,13 +34,13 @@ const StreamEntry = struct {
     }
 };
 
-const MAX_STREAMS: usize = 16;
+pub const MAX_STREAMS: usize = 16;
 
 pub const Stream = *StreamEntry;
 
 var stream_mutex: std.Thread.Mutex = .{ };
 
-var stream_array: [MAX_STREAMS]?StreamEntry = .{ null } ** 16;
+pub var stream_array: [MAX_STREAMS]?StreamEntry = .{ null } ** 16;
 
 
 pub fn StreamGroup(comptime N: usize) type {

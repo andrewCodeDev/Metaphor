@@ -724,8 +724,8 @@ EXTERN_C void launch_selu_r64(
 );
 EXTERN_C void launch_linear_ij_j_r16(
   StreamCtx stream,
-  const r16 *x,
   const r16 *A, 
+  const r16 *x,
         r16 alpha, // scales product
   const r16 *b,
         r16 beta, // blends y back in
@@ -735,8 +735,8 @@ EXTERN_C void launch_linear_ij_j_r16(
 );
 EXTERN_C void launch_linear_ij_j_r32(
   StreamCtx stream,
-  const r32 *x,
   const r32 *A, 
+  const r32 *x,
         r32 alpha, // scales product
   const r32 *b,
         r32 beta, // blends y back in
@@ -746,8 +746,8 @@ EXTERN_C void launch_linear_ij_j_r32(
 );
 EXTERN_C void launch_linear_ij_j_r64(
   StreamCtx stream,
-  const r64 *x,
   const r64 *A, 
+  const r64 *x,
         r64 alpha, // scales product
   const r64 *b,
         r64 beta, // blends y back in

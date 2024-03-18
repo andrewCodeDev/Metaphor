@@ -114,6 +114,7 @@ const EXAMPLE_NAMES = &[_][]const u8{
     "linear_maps",
     "streams",
     "subgraphs",
+    "feedforward",
 
     // this is for development purposes
     "experimental",

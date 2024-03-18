@@ -91,22 +91,38 @@ pub fn main() !void {
     //                  z4
 
     // reversals will calculate down to z2's gradients,
-    // but no further than that.
+    // but no further than that. We will also free
+    // all of the z4 subgraph up to but not including
+    // z2 (the detachment)...
 
-        z4.reverse();
+        z4.reverse(.free);
 
-        std.debug.assert(z4.grads() != null);
-        std.debug.assert(z3.grads() != null);
+        std.debug.assert(z4.len() == 0);
+        std.debug.assert(z3.len() == 0);
+        std.debug.assert(z4.grads() == null);
+        std.debug.assert(z3.grads() == null);
+
+        // weights and inputs are not freed
+        std.debug.assert(z2.len() != 0);
+        std.debug.assert(w2.len() != 0);
+        std.debug.assert(z2.grads() != null);
         std.debug.assert(w2.grads() != null);
 
+        // we have not reversed these yet
+        std.debug.assert( x.len() != 0);
+        std.debug.assert(z1.len() != 0);
+        std.debug.assert(w1.len() != 0);
+        std.debug.assert( x.grads() == null);
         std.debug.assert(z1.grads() == null);
         std.debug.assert(w1.grads() == null);
-        std.debug.assert( x.grads() == null);
 
-    // we'll proceed to reverse z2's subgraph...
+    // we'll proceed to reverse z2's subgraph, but keep its nodes
 
-        z2.reverse();
+        z2.reverse(.keep);
 
+        std.debug.assert( x.len() != 0);
+        std.debug.assert(z1.len() != 0);
+        std.debug.assert(w1.len() != 0);
         std.debug.assert(z1.grads() != null);
         std.debug.assert(w1.grads() != null);
         std.debug.assert( x.grads() != null);
@@ -114,40 +130,15 @@ pub fn main() !void {
     // This now gives us interesting opportunities for optimzations.
     // Notably, we can partially free the subgraph beneath z4. This
     // means that we can reuse the memory collected from subgraph 2
-    // in the backwards calculation of subgraph 1. In this case, we
-    // haven't done that for the sake of demonstration.
+    // in the backwards calculation of subgraph 1. 
 
-        G.freeSubgraph(z4, .all);
+    // Now, we can free nodes in the graph.
+        G.reset(.node, .all);
 
-    // we've freed the values and gradients for z3 and z4
-    // we have not freed the values and gradients for z2 and z1
-
-        std.debug.assert(z4.grads() == null);
-        std.debug.assert(z3.grads() == null);
-        std.debug.assert(w2.grads() != null);
-        std.debug.assert(z2.grads() != null);
-
-    // it's important to note that freeing the subgraph
-    // *does not* free the weights or inputs associated
-        G.freeSubgraph(z2, .all);
-
-        std.debug.assert(z2.grads() == null);
-        std.debug.assert(z1.grads() == null);
-
-        std.debug.assert(w1.grads() != null);
-        std.debug.assert( x.grads() != null);
-
-    // check our values - only the leaves
-    // should be still non-zero sized
-
-        std.debug.assert(0 !=  x.len());
-        std.debug.assert(0 != w1.len());
-        std.debug.assert(0 != w2.len());
-
-        std.debug.assert(0 == z1.len());
-        std.debug.assert(0 == z2.len());
-        std.debug.assert(0 == z3.len());
-        std.debug.assert(0 == z4.len());
+    // To free the weight gradients, we can use reset:
+        G.reset(.leaf, .grd);
+    
+    // You cannot reuse the nodes again after you do this.
 
     ////////////////////////////////////////////
 

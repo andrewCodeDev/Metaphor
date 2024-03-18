@@ -185,7 +185,7 @@ pub fn NodeTensor(comptime T: type) type {
         pub fn free(self: Self) void {
             self.ptr.freeTensor(DataType, Class, self.idx);
         }
-        pub fn reverse(self: Self) void {
+        pub fn reverse(self: Self, cleanup: ReverseCleanup) void {
 
             if (self.grads() == null) {
                 // if a loss hasn't been applied, this will be null
@@ -195,7 +195,7 @@ pub fn NodeTensor(comptime T: type) type {
             }
 
             // call graph reverse
-            self.ptr.reverse(self.idx);
+            self.ptr.reverse(self.idx, cleanup);
         }
         fn adjustDependencies(self: Self, comptime direction: i8) i8 {
             return self.ptr.adjustDependencies(.hid, self.idx, direction);
@@ -219,6 +219,10 @@ pub const GraphConfig = struct {
     optimizer: ?Optimizer = null,
     stream: Stream,
     mode: Mode,
+};
+
+pub const ReverseCleanup = enum {
+    keep, free
 };
 
 pub const Graph = struct {
@@ -559,6 +563,8 @@ pub const Graph = struct {
         const values: *SliceUnion = if (class == .hid)
             &self.nodes.values.items[idx] else &self.leaves.values.items[idx];
 
+        if (values.len() == 0) return;
+
         const stream: Stream = if (class == .hid)
             self.nodes.streams.items[idx] else self.leaves.streams.items[idx];
 
@@ -588,47 +594,8 @@ pub const Graph = struct {
         }
     }
 
-    // freeSubgraphTensors does *not* free leaf nodes
-    pub fn freeSubgraph(
-        self: *Self, 
-        x: anytype, 
-        mode: ResetComponent
-    ) void {
-
-        const T = @TypeOf(x);
-
-        if (T != NodeTensor(T.DataType)) {
-            @compileError("freeSubgraphTensors requires NodeTensor.");
-        }
-
-        var idx = x.idx + 1;
-
-        var proceed: bool = true;
-
-        while (proceed) {
-
-            idx -= 1;
-
-            if (idx == 0 or !self.nodes.attached.items[idx - 1]) {
-                proceed = false;
-            }
-
-            switch (mode) {
-                .all => { 
-                    self.freeTensorRaw(self.nodes.values.items[idx], .hid, idx);
-                },
-                .grd => {
-                    const raw = self.nodes.grads.items[idx] 
-                        orelse continue;
-                    
-                    self.freeGradientRaw(raw, .hid, idx);
-                },
-            }
-        }
-    }
-
     // trampoline loop for reversing graph
-    fn reverse(self: *Self, idx: SizeType) void {
+    fn reverse(self: *Self, idx: SizeType, cleanup: ReverseCleanup) void {
 
         std.debug.assert(self.mode != .eval);
 
@@ -636,17 +603,29 @@ pub const Graph = struct {
 
         if (total == 0) return;
 
-        var stack = std.ArrayListUnmanaged(usize).initCapacity(self.node_arena.allocator(), idx + 1)
+        var call_stack = std.ArrayList(usize).initCapacity(self.node_arena.allocator(), idx + 1)
             catch @panic("Graph.reverse: Out of Memory.");
 
-        defer stack.deinit(self.node_arena.allocator());
+        var free_stack: std.ArrayList(usize) = undefined;
+
+        if (cleanup == .free) {
+            free_stack = std.ArrayList(usize).initCapacity(self.node_arena.allocator(), idx + 1)
+                catch @panic("Graph.reverse: Out of Memory.");
+        }
+            
+        defer {
+            call_stack.deinit();
+
+            if (cleanup == .free) 
+                free_stack.deinit();
+        }
 
         // put parameter node on the top of the stack
-        stack.appendAssumeCapacity(idx);
+        call_stack.appendAssumeCapacity(idx);
 
         const callbacks = self.nodes.callbacks.items[0..];
 
-        while (stack.getLastOrNull()) |last| {
+        while (call_stack.getLastOrNull()) |last| {
 
             // result tells us if we can do a depth-wise
             // traversal and wether we've hit the last
@@ -659,7 +638,10 @@ pub const Graph = struct {
 
                 // if there were no more edges to explore,
                 // we backup by one and continue calling
-                _ = stack.pop();
+                const popped = call_stack.pop();
+
+                if (cleanup == .free)
+                    free_stack.append(popped) catch @panic("Graph.reverse: Out of Memory");
 
                 continue;
             }
@@ -671,8 +653,22 @@ pub const Graph = struct {
                 if (!self.attached(next))
                     continue;
 
-                stack.appendAssumeCapacity(next);
+                call_stack.append(next) catch @panic("Graph.reverse: Out of Memory");
             }
+        }
+
+        if (cleanup == .free) {
+            // synchronize all unique streams
+            var unique = std.StaticBitSet(DU.MAX_STREAMS).initEmpty();
+           
+            for (free_stack.items) |node|
+                unique.setValue(self.nodes.streams.items[node].ID, true); 
+
+            for (0..DU.MAX_STREAMS) |i| {
+                if (unique.isSet(i)) DU.synchronizeStream(&DU.stream_array[i].?);
+            }
+            for (free_stack.items) |node|
+                self.freeTensorRaw(self.nodes.values.items[node], .hid, node); 
         }
     }
 };

@@ -1,8 +1,8 @@
 #include "../kernel_header.h"
 
 __global__ void __kernel_linear_ij_j_RScalar(
-  const RScalar *x,
   const RScalar *A, 
+  const RScalar *x,
         RScalar alpha, // scales product
   const RScalar *b,
         RScalar beta, // blends y back in
@@ -111,8 +111,8 @@ __global__ void __kernel_linear_ij_j_RScalar(
 
 extern "C" void launch_linear_ij_j_RScalar(
   StreamCtx stream,
-  const RScalar *x,
   const RScalar *A, 
+  const RScalar *x,
         RScalar alpha, // scales product
   const RScalar *b,
         RScalar beta, // blends y back in

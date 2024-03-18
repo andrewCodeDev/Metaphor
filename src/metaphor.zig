@@ -52,6 +52,8 @@ pub const mem = struct {
 };
 
 pub const types = struct {
+    pub const NodeTensor = CG.NodeTensor;
+    pub const LeafTensor = CG.LeafTensor;
     pub const SliceUnion = TC.SliceUnion;
     pub const IndexType = TC.IndexType;
     pub const SizeType = TC.SizeType;
@@ -67,6 +69,7 @@ pub const scalar = struct {
     pub const c16 = SC.c16;
     pub const c32 = SC.c32;
     pub const c64 = SC.c64;
+    pub const Tag = SC.ScalarTag;
     pub const as = SC.asScalar;
 };
 
@@ -335,6 +338,16 @@ pub const ops = struct {
         B: anytype,
         comptime expression: []const u8
     ) NodeTensor(Child(@TypeOf(X))) {
+        return linearScaled(X, Y, 1.0, B, expression);
+    }
+
+    pub fn linearScaled(
+        X: anytype,
+        Y: anytype,
+        alpha: f16,
+        B: anytype,
+        comptime expression: []const u8
+    ) NodeTensor(Child(@TypeOf(X))) {
 
         if (comptime !isGraphTensor(@TypeOf(X)) or !isGraphTensor(@TypeOf(Y)) or !isGraphTensor(@TypeOf(B)))
             @compileError("Linear requires graph tensors.");
@@ -362,13 +375,13 @@ pub const ops = struct {
         const Z = nodeTensor(graph, z_sizes[0..], UT.Child(@TypeOf(X)));
         
         // locate inner product by expression
-        const ip = TenOps.findLinear(expression, true){ };
+        const lin = TenOps.findLinear(expression, true){ };
 
         // cancel out addition using 0.0 for beta
-        ip.forward(graph.stream, X, Y, 1.0, B, 1.0, Z);
+        lin.forward(graph.stream, X, Y, alpha, B, 1.0, Z);
 
         return if (graph.mode == .eval)
-            Z else appendNode(graph, @TypeOf(ip), .{ X, Y, 1.0, B, 1.0 }, Z);
+            Z else appendNode(graph, @TypeOf(lin), .{ X, Y, alpha, B, 1.0 }, Z);
     }
 };
 

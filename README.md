@@ -92,7 +92,15 @@ Reversal is straight-forward, but has many additional features (see src/examples
 // feed-forward block
 const y = mp.ops.selu(mp.ops.linear(x, A, b, "i,ij->j"));    
 
-y.reverse();
+// if we want to free the hidden nodes, we can use 
+//".free" - this does not free weights or inputs.
+// alternatively, we can use ".keep" to prevent
+// freeing the hidden nodes on reversal
+
+y.reverse(.free);
+
+// if we don't want to keep hidden nodes, we can use 
+//".keep" - this does not free weights or inputs.
 
 // inspect gradients
 if (A.grads()) |grd| {

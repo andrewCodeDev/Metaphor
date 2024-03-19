@@ -18,7 +18,7 @@ pub inline fn append(array: anytype, value: anytype) void {
 pub inline fn assertGrads(x: anytype) std.meta.Child(@TypeOf(x.grads())) {
     if (comptime debug) {
         if (x.grads()) |grd| {
-            return grd;   
+            return grd;
         } else {
             @panic("Unassigned tensor gradient.");
         }
@@ -32,7 +32,7 @@ pub inline fn assertGrads(x: anytype) std.meta.Child(@TypeOf(x.grads())) {
 
 // TODO: remove this function.
 pub fn Contract(comptime constraint: bool, comptime result: type) type {
-     if (!constraint){ 
+    if (!constraint) {
         @compileError("Failed type constraints.");
     }
     return result;
@@ -44,22 +44,22 @@ pub fn Returns(comptime result: type) type {
 }
 
 pub fn isPointer(comptime T: type) bool {
-    return switch(@typeInfo(T)) {
-        .Pointer => true, else => false,
+    return switch (@typeInfo(T)) {
+        .Pointer => true,
+        else => false,
     };
 }
 
 pub fn isArray(comptime T: type) bool {
-    return switch(@typeInfo(T)) {
-        .Array => true, else => false,
+    return switch (@typeInfo(T)) {
+        .Array => true,
+        else => false,
     };
 }
 
 pub fn isSlice(comptime T: type) bool {
-    return switch(@typeInfo(T)) {
-        .Pointer => |ptr| { 
-            return ptr.size == .Slice;
-        }, 
+    return switch (@typeInfo(T)) {
+        .Pointer => |ptr| ptr.size == .Slice,
         else => false,
     };
 }
@@ -67,14 +67,14 @@ pub fn isSlice(comptime T: type) bool {
 pub inline fn isInteger(comptime T: type) bool {
     return switch (@typeInfo(T)) {
         .Int, .ComptimeInt => true,
-        else => false
+        else => false,
     };
 }
 
 pub inline fn isFloat(comptime T: type) bool {
     return switch (@typeInfo(T)) {
-        .Float, .ComptimeFloat => true, 
-        else => false
+        .Float, .ComptimeFloat => true,
+        else => false,
     };
 }
 
@@ -100,34 +100,23 @@ pub fn isFunction(comptime T: type) bool {
 }
 
 pub fn isTuple(comptime T: type) bool {
-    return switch(@typeInfo(T)) {
+    return switch (@typeInfo(T)) {
         .Struct => |s| s.is_tuple,
         else => false,
     };
 }
 
 pub fn tupleSize(comptime T: type) usize {
-    switch (@typeInfo(T)) {
-        .Struct => |s| { return s.fields.len; },
-        else => { @compileError("Type must be a tuple."); },
-    }
+    return switch (@typeInfo(T)) {
+        .Struct => |s| s.fields.len,
+        else => @compileError("Type must be a tuple."),
+    };
 }
 
 pub fn Child(comptime T: type) type {
-    switch (@typeInfo(T)) {
-        .Struct => {
-            if (comptime @hasDecl(T, "DataType")) {
-                return T.DataType;
-            } else {
-                @compileError("Child function expects tensor or slice type.");
-            }
-        },
-        .Pointer => {
-            return std.meta.Child(T);
-        },
-        else => {
-            @compileError("Child function expects tensor or slice type.");
-        }        
-    }
+    return switch (@typeInfo(T)) {
+        .Struct => if (comptime @hasDecl(T, "DataType")) T.DataType else @compileError("Child function expects tensor or slice type."),
+        .Pointer => return std.meta.Child(T),
+        else => @compileError("Child function expects tensor or slice type."),
+    };
 }
-

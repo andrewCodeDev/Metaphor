@@ -1,8 +1,8 @@
 #include "../kernel_header.h"
 
 __global__ void __kernel_permutate_naive_RScalar(
-    RTensor X, 
-    RTensor Y, 
+    RTensor X,
+    RTensor Y,
     Permutation P
   ) {
 
@@ -30,14 +30,14 @@ __global__ void __kernel_permutate_naive_RScalar(
   Y.values[idx] = X.values[tid];
 }
 
-extern "C" void launch_perumutate_RScalar(
+extern "C" void launch_permutate_RScalar(
   RTensor X, RTensor Y, Permutation P
 ) {
 
-  void* args[] = { 
+  void* args[] = {
     (void*)&X, (void*)&Y, (void*)&P
   };
-  
+
   cudaLaunchCooperativeKernel(
     (void*)(__kernel_permutate_naive_RScalar),
     dim3(DIMPAD(X.len, 128)),
@@ -49,8 +49,8 @@ extern "C" void launch_perumutate_RScalar(
 }
 
 __global__ void __kernel_permutate_naive_CScalar(
-    CTensor X, 
-    CTensor Y, 
+    CTensor X,
+    CTensor Y,
     Permutation P
   ) {
 
@@ -83,10 +83,10 @@ extern "C" void launch_permutate_naive_CScalar(
   CTensor X, CTensor Y, Permutation P
 ) {
 
-  void* args[] = { 
+  void* args[] = {
     (void*)&X, (void*)&Y, (void*)&P
   };
-  
+
   cudaLaunchCooperativeKernel(
     (void*)(__kernel_permutate_naive_CScalar),
     dim3(GRID_1D(X.len)),

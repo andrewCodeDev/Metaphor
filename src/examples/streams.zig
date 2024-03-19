@@ -11,13 +11,11 @@ const std = @import("std");
 // among other streams.
 
 pub fn main() !void {
-
     mp.device.init(0);
 
     // streams can be used as groups via the StreamGroup type
 
     const streams = mp.stream.Group(2).init();
-        
     defer streams.deinit();
 
     const G = mp.Graph.init(.{
@@ -39,11 +37,11 @@ pub fn main() !void {
 
     // A gets created using the stream in the graph. The
     // graph remembers what stream that A was created with.
-    const A = G.tensor(.inp, .r32, mp.Rank(2){ M, N });  
+    const A = G.tensor(.inp, .r32, mp.Rank(2){ M, N });
 
     // x gets created using the stream in the graph. The
     // graph remembers what stream that x was created with.
-    const x = G.tensor(.inp, .r32, mp.Rank(1){ M });  
+    const x = G.tensor(.inp, .r32, mp.Rank(1){M});
 
     // both of these fill calls use the currently assigned
     // stream as well. If we had changed this stream,
@@ -51,7 +49,7 @@ pub fn main() !void {
     mp.mem.fill(A, 1.0);
     mp.mem.fill(x, 1.0);
 
-    // precaching allows us to allocate and then cache
+    // pre-caching allows us to allocate and then cache
     // tensors to remove the overhead of the initial
     // allocation. This again uses the graph's recent
     // stream that has been assigned.
@@ -63,64 +61,64 @@ pub fn main() !void {
     // as mp.stream.synchronize(G.stream);
     mp.stream.synchronize(streams.items[0]);
 
-    std.log.info("Tensors in Cache after graph.precache: {}", .{ G.tensor_allocator.used() });
+    std.log.info("Tensors in Cache after graph.precache: {}", .{G.tensor_allocator.used()});
     // What follows is 10 matrix multiplications. These
     // are queued up by the CPU one after another.
 
     // Here's what actually happens... the cpu goes ahead
     // and creates the data elements for each of these
-    // products (sizes, computes strides, uncaches memory...)
+    // products (sizes, computes strides, evicts caches...)
 
-    // The kernels asssume that the data is ready to go,
+    // The kernels assume that the data is ready to go,
     // so they begin operating on the information as soon
     // as they are ready to go. It's important that we don't
     // free anything until we've resynchronized.
 
     ////////////////////////////////////////////////////
     {
-    const start = try std.time.Instant.now();
+        const start = try std.time.Instant.now();
 
-    for (0..10) |_| {
-        const y = mp.ops.innerProduct(A, x, "ij,j->i");
-        _ = &y;
-    }
+        for (0..10) |_| {
+            const y = mp.ops.innerProduct(A, x, "ij,j->i");
+            _ = &y;
+        }
 
-    mp.stream.synchronize(streams.items[0]);
+        mp.stream.synchronize(streams.items[0]);
 
-    const stop = try std.time.Instant.now();
+        const stop = try std.time.Instant.now();
 
-    const delta = stop.since(start);
-    
-    std.log.info("GPU 1 stream elapsed (ns): {} - Run 1", .{ delta });
+        const delta = stop.since(start);
+
+        std.log.info("GPU 1 stream elapsed (ns): {} - Run 1", .{delta});
     }
     /////////////////////////////////////////////////////
 
     // this clears our node cache, but keeps all of the
     // memory for each allocator, meaning we now have a
-    // contiugous block of memory that will be used for
+    // contiguous block of memory that will be used for
     // our next round of operations.
 
-    std.log.info("Tensors in Cache Before graph.reset: {}", .{ G.tensor_allocator.used() });
+    std.log.info("Tensors in Cache Before graph.reset: {}", .{G.tensor_allocator.used()});
 
-    G.reset(.node, .all);    
+    G.reset(.node, .all);
 
-    std.log.info("Tensors in Cache After graph.reset: {}", .{ G.tensor_allocator.used() });
+    std.log.info("Tensors in Cache After graph.reset: {}", .{G.tensor_allocator.used()});
     ////////////////////////////////////////////////////
     {
-    const start = try std.time.Instant.now();
+        const start = try std.time.Instant.now();
 
-    for (0..10) |_| {
-        const y = mp.ops.innerProduct(A, x, "ij,j->i");
-        _ = &y;
-    }
+        for (0..10) |_| {
+            const y = mp.ops.innerProduct(A, x, "ij,j->i");
+            _ = &y;
+        }
 
-    mp.stream.synchronize(streams.items[0]);
+        mp.stream.synchronize(streams.items[0]);
 
-    const stop = try std.time.Instant.now();
+        const stop = try std.time.Instant.now();
 
-    const delta = stop.since(start);
-    
-    std.log.info("GPU 1 stream elapsed (ns): {} - Run 2", .{ delta });
+        const delta = stop.since(start);
+
+        std.log.info("GPU 1 stream elapsed (ns): {} - Run 2", .{delta});
     }
     /////////////////////////////////////////////////////
 
@@ -130,57 +128,57 @@ pub fn main() !void {
     G.reset(.node, .all);
     /////////////////////////////////////////////////////
     {
-    const start = try std.time.Instant.now();
+        const start = try std.time.Instant.now();
 
-    G.stream = streams.items[0];
+        G.stream = streams.items[0];
 
-    for (0..5) |_| {
-        const y = mp.ops.innerProduct(A, x, "ij,j->i");
-        _ = &y;
-    }
+        for (0..5) |_| {
+            const y = mp.ops.innerProduct(A, x, "ij,j->i");
+            _ = &y;
+        }
 
-    G.stream = streams.items[1];
+        G.stream = streams.items[1];
 
-    for (0..5) |_| {
-        const y = mp.ops.innerProduct(A, x, "ij,j->i");
-        _ = &y;
-    }   
+        for (0..5) |_| {
+            const y = mp.ops.innerProduct(A, x, "ij,j->i");
+            _ = &y;
+        }
 
-    // streams can be synchronized as a group
-    streams.synchronize();
+        // streams can be synchronized as a group
+        streams.synchronize();
 
-    const stop = try std.time.Instant.now();
+        const stop = try std.time.Instant.now();
 
-    const delta = stop.since(start);
-    
-    std.log.info("GPU 2 stream elapsed (ns): {} - Run 3", .{ delta });
+        const delta = stop.since(start);
+
+        std.log.info("GPU 2 stream elapsed (ns): {} - Run 3", .{delta});
     }
     /////////////////////////////////////////////////////
 
     // for fun, we'll compare to the CPU
 
     const A_cpu = try EU.allocCPU(f32, M * N);
-        defer EU.freeCPU(A_cpu);
+    defer EU.freeCPU(A_cpu);
 
     const x_cpu = try EU.allocCPU(f32, M);
-        defer EU.freeCPU(x_cpu);
+    defer EU.freeCPU(x_cpu);
 
     const y_cpu = try EU.allocCPU(f32, N);
-        defer EU.freeCPU(y_cpu);
+    defer EU.freeCPU(y_cpu);
 
     {
-    const start = try std.time.Instant.now();
+        const start = try std.time.Instant.now();
 
-    for (0..10) |_| {
-        EU.cpuMatmul(A_cpu, x_cpu, y_cpu, M, N, 1);
-        _ = &y_cpu;
-    }
+        for (0..10) |_| {
+            EU.cpuMatmul(A_cpu, x_cpu, y_cpu, M, N, 1);
+            _ = &y_cpu;
+        }
 
-    const stop = try std.time.Instant.now();
+        const stop = try std.time.Instant.now();
 
-    const delta = stop.since(start);
-    
-    std.log.info("CPU 1 thread elapsed (ns): {}", .{ delta });
+        const delta = stop.since(start);
+
+        std.log.info("CPU 1 thread elapsed (ns): {}", .{delta});
     }
 
     ////////////////////////////////////////////

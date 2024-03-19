@@ -49,13 +49,10 @@ fn constCompatible(arg_const: bool, param_const: bool) bool {
     return (arg_const or param_const) == param_const;
 }
 
-fn sizeCompatible(
-    n: std.builtin.Type.Pointer.Size, 
-    m: std.builtin.Type.Pointer.Size, 
-) bool {
-    return (n == m)
-        or ((n == .One or n == .Many) and (m == .C))
-        or ((m == .One or m == .Many) and (n == .C));
+fn sizeCompatible(n: std.builtin.Type.Pointer.Size, m: std.builtin.Type.Pointer.Size) bool {
+    return (n == m) or
+        ((n == .One or n == .Many) and (m == .C)) or
+        ((m == .One or m == .Many) and (n == .C));
 }
 
 const Match = struct {
@@ -187,9 +184,10 @@ fn detectArgsError(comptime args: anytype) ?[]const u8 {
             const T1 = @TypeOf(args[j]);
             const params1 = @typeInfo(T1).Fn.params;
             const signatures_are_identical = params0.len == params1.len and
-                for (params0, params1) |param0, param1| {
-                    if (param0.type != param1.type) break false;
-                } else true;
+                for (params0, params1) |param0, param1|
+            {
+                if (param0.type != param1.type) break false;
+            } else true;
             if (signatures_are_identical) {
                 return "Identical function signatures in overload set.";
             }
@@ -199,48 +197,50 @@ fn detectArgsError(comptime args: anytype) ?[]const u8 {
 }
 
 test "best-type-matching-1-param" {
-
     const foo = struct {
-        pub fn call1(_: []const u8) bool { return false; }  
-        pub fn call2(_: []u8) bool { return true; }  
+        pub fn call1(_: []const u8) bool {
+            return false;
+        }
+        pub fn call2(_: []u8) bool {
+            return true;
+        }
     };
 
     const os = OverloadSet(.{ foo.call1, foo.call2 });
 
     const x: []u8 = undefined;
 
-    const result = os.call(.{ x });
+    const result = os.call(.{x});
 
-    try std.testing.expect(result);    
+    try std.testing.expect(result);
 }
 
 test "best-type-matching-N-param" {
-
     const foo = struct {
         pub fn call1( // worse match
-            _: []const u8, 
-            _: []const u8, 
-            _: []const u8, 
-            _: usize
+            _: []const u8,
+            _: []const u8,
+            _: []const u8,
+            _: usize,
         ) bool {
-             return false; 
-        }  
+            return false;
+        }
         pub fn call2( // better match
-            _: []const u8, 
-            _: []u8, 
-            _: []const u8, 
-            _: usize
+            _: []const u8,
+            _: []u8,
+            _: []const u8,
+            _: usize,
         ) bool {
-             return true; 
-        }  
+            return true;
+        }
         pub fn call3( // no match
-            _: []u8, 
-            _: []u8, 
-            _: []const u8, 
-            _: usize
+            _: []u8,
+            _: []u8,
+            _: []const u8,
+            _: usize,
         ) bool {
-             return false; 
-        }  
+            return false;
+        }
     };
 
     const os = OverloadSet(.{ foo.call1, foo.call2, foo.call3 });
@@ -252,68 +252,74 @@ test "best-type-matching-N-param" {
 
     const result = os.call(.{ x, y, z, w });
 
-    try std.testing.expect(result);    
+    try std.testing.expect(result);
 }
 
-
 test "non-const-promotion" {
-
     const foo = struct {
-        pub fn call(_: []const u8) bool { return true; }  
+        pub fn call(_: []const u8) bool {
+            return true;
+        }
     };
 
-    const os = OverloadSet(.{ foo.call });
+    const os = OverloadSet(.{foo.call});
 
     const x: []u8 = undefined;
 
-    const result = os.call(.{ x });
+    const result = os.call(.{x});
 
-    try std.testing.expect(result);    
+    try std.testing.expect(result);
 }
 
 test "empty-parameter-call" {
-
     const foo = struct {
-        pub fn call1(_: u8) bool { return false; }
-        pub fn call2() bool { return true; }  
+        pub fn call1(_: u8) bool {
+            return false;
+        }
+        pub fn call2() bool {
+            return true;
+        }
     };
 
     const os = OverloadSet(.{ foo.call1, foo.call2 });
 
-    const result = os.call(.{ });
+    const result = os.call(.{});
 
-    try std.testing.expect(result);    
+    try std.testing.expect(result);
 }
 
 test "cannot-demote-const" {
-
     const foo = struct {
-        pub fn call1(_: []u8) bool { return false; }  
-        pub fn call2(_: []const u8) bool { return true; }  
+        pub fn call1(_: []u8) bool {
+            return false;
+        }
+        pub fn call2(_: []const u8) bool {
+            return true;
+        }
     };
 
     const os = OverloadSet(.{ foo.call1, foo.call2 });
 
     const x: []const u8 = undefined;
 
-    const result = os.call(.{ x });
+    const result = os.call(.{x});
 
-    try std.testing.expect(result);    
+    try std.testing.expect(result);
 }
 
 test "multi-parameter-matching" {
-
     const foo = struct {
-        pub fn call(_: u8, _: []u8) bool { return true; }  
+        pub fn call(_: u8, _: []u8) bool {
+            return true;
+        }
     };
 
-    const os = OverloadSet(.{ foo.call });
+    const os = OverloadSet(.{foo.call});
 
     const x: u8 = undefined;
     const y: []u8 = undefined;
 
     const result = os.call(.{ x, y });
 
-    try std.testing.expect(result);    
+    try std.testing.expect(result);
 }
-

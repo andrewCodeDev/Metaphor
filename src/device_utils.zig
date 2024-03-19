@@ -7,7 +7,7 @@ const StreamEntry = struct {
     ID: usize,
     context: StreamCtx,
     scratch: struct {
-        head: usize = 0, 
+        head: usize = 0,
         tail: usize = 0,
     } = .{},
 
@@ -16,12 +16,10 @@ const StreamEntry = struct {
     // own memory, but dangerous if streams can use other scratch.
 
     pub fn getScratch(self: *StreamEntry, comptime T: type, n: usize) []T {
-
         const offset: usize = @sizeOf(T) * n;
 
         // check if we have enough scratch to provide a payload
         if (self.scratch.tail < (self.scratch.head + offset)) {
-
             if (self.scratch.head != 0)
                 free(@as(*anyopaque, @ptrFromInt(self.scratch.head)), self);
 
@@ -38,21 +36,18 @@ pub const MAX_STREAMS: usize = 16;
 
 pub const Stream = *StreamEntry;
 
-var stream_mutex: std.Thread.Mutex = .{ };
+var stream_mutex: std.Thread.Mutex = .{};
 
-pub var stream_array: [MAX_STREAMS]?StreamEntry = .{ null } ** 16;
-
+pub var stream_array: [MAX_STREAMS]?StreamEntry = .{null} ** 16;
 
 pub fn StreamGroup(comptime N: usize) type {
-
     if (MAX_STREAMS < N) {
         @compileError("Stream group is larger than max streams.");
     }
-    
-    return struct {
 
+    return struct {
         const Self = @This();
-        
+
         items: [N]Stream,
 
         pub fn init() Self {
@@ -62,36 +57,28 @@ pub fn StreamGroup(comptime N: usize) type {
         }
 
         pub fn synchronize(self: *const Self) void {
-            for (0..N) |i|synchronizeStream(self.items[i]);
+            for (0..N) |i| synchronizeStream(self.items[i]);
         }
 
         pub fn deinit(self: *const Self) void {
             for (0..N) |i| deinitStream(self.items[i]);
         }
-        
     };
 }
 
 pub fn initStream() Stream {
     stream_mutex.lock();
     defer stream_mutex.unlock();
-    
+
     for (0..16) |i| {
         if (stream_array[i] == null) {
-            stream_array[i] = .{
-                .ID = i,
-                .context = cuda.mpInitStream(),
-                .scratch = .{ 
-                    .head = 0, 
-                    .tail = 0 
-                }
-            };
+            stream_array[i] = .{ .ID = i, .context = cuda.mpInitStream(), .scratch = .{ .head = 0, .tail = 0 } };
             return &(stream_array[i].?);
         }
     }
+
     @panic("stream limit reached - increase streams");
 }
-
 
 pub fn initDevice(device_number: u32) void {
     cuda.initDevice(device_number);
@@ -101,10 +88,9 @@ pub fn deinitStream(stream: Stream) void {
     // std.debug.assert(stream != null);
     if (stream.scratch.head > 0) {
         free(@as(*anyopaque, @ptrFromInt(stream.scratch.head)), stream);
-
         synchronizeStream(stream);
     }
-    
+
     cuda.mpDeinitStream(stream.context);
 
     synchronizeDevice();
@@ -145,11 +131,9 @@ pub fn copyToDevice(src: anytype, dst: @TypeOf(src), stream: Stream) void {
                 cuda.mpMemcpyHtoD(dst, src, @sizeOf(T), stream.context);
             }
         },
-        else => @compileError(
-            "Invalid type for CopyTo: " ++ @typeName(@TypeOf(src))
-        ),
-    }    
-} 
+        else => @compileError("Invalid type for CopyTo: " ++ @typeName(@TypeOf(src))),
+    }
+}
 
 pub fn copyFromDevice(src: anytype, dst: @TypeOf(src), stream: Stream) void {
     // std.debug.assert(stream != null);
@@ -163,11 +147,9 @@ pub fn copyFromDevice(src: anytype, dst: @TypeOf(src), stream: Stream) void {
                 cuda.mpMemcpyDtoH(dst, src, @sizeOf(T), stream.context);
             }
         },
-        else => @compileError(
-            "Invalid type for CopyFrom: " ++ @typeName(@TypeOf(src))
-        ),
-    }    
-} 
+        else => @compileError("Invalid type for CopyFrom: " ++ @typeName(@TypeOf(src))),
+    }
+}
 
 pub fn free(dev_mem: anytype, stream: Stream) void {
     // std.debug.assert(stream != null);
@@ -179,9 +161,6 @@ pub fn free(dev_mem: anytype, stream: Stream) void {
                 cuda.mpMemFree(dev_mem, stream.context);
             }
         },
-        else => @compileError(
-            "Invalid type for Free: " ++ @typeName(@TypeOf(dev_mem))
-        ),
+        else => @compileError("Invalid type for Free: " ++ @typeName(@TypeOf(dev_mem))),
     }
 }
-

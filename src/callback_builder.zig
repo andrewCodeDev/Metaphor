@@ -1,4 +1,3 @@
-
 //////////////////////////////////////////////////////////
 ////////////////////// EXAMPLE ///////////////////////////
 //////////////////////////////////////////////////////////
@@ -28,16 +27,15 @@
 const std = @import("std");
 const UT = @import("utility.zig");
 
-pub const NoCleanup = opaque { };
-pub const NoArg = opaque{ };
+pub const NoCleanup = opaque {};
+pub const NoArg = opaque {};
 
 pub fn CallbackBuilder(
     comptime forward: anytype,
     comptime reverse_tuple: anytype,
     comptime cleanup: anytype,
 ) type {
-
-    if (comptime !UT.isFunction(@TypeOf(forward))){
+    if (comptime !UT.isFunction(@TypeOf(forward))) {
         @compileError("Reversible field 'func' argument must be a function.");
     }
 
@@ -45,7 +43,7 @@ pub fn CallbackBuilder(
     const M: usize = if (comptime @TypeOf(cleanup) == @TypeOf(NoCleanup)) 1 else 2;
 
     if (comptime M == 2 and !UT.isFunction(@TypeOf(cleanup))) {
-        @compileError("Cleanup must be a function, otherwise use NoCleaup.");
+        @compileError("Cleanup must be a function, otherwise use NoCleanup.");
     }
 
     const N: usize = comptime UT.fieldsLen(@TypeOf(reverse_tuple)) + M;
@@ -53,7 +51,7 @@ pub fn CallbackBuilder(
     if (comptime N == M) {
         @compileError("FunctionDeclarations: Empty Reverse Tuple.");
     }
-    
+
     comptime var fields: [N]std.builtin.Type.StructField = undefined;
 
     fields[0] = .{
@@ -75,16 +73,16 @@ pub fn CallbackBuilder(
     }
 
     comptime var suffix: u8 = 'a';
-        
+
     inline for (M..N) |i| {
         const elem = reverse_tuple[i - M];
-        
+
         const FieldType = ReversibleField(elem[0], elem[1]);
 
-        fields[i] = .{ 
-            .name = "reverse_" ++ &[_]u8{ suffix },
+        fields[i] = .{
+            .name = "reverse_" ++ &[_]u8{suffix},
             .type = FieldType,
-            .default_value = &FieldType{ },
+            .default_value = &FieldType{},
             .is_comptime = true,
             .alignment = 0,
         };
@@ -92,22 +90,16 @@ pub fn CallbackBuilder(
         suffix += 1;
     }
 
-    return @Type(.{
-        .Struct = .{
-            .layout = .auto,
-            .fields = fields[0..],
-            .decls = &.{},
-            .is_tuple = false,
-            .backing_integer = null
-        },
-    });
+    return @Type(.{ .Struct = .{
+        .layout = .auto,
+        .fields = fields[0..],
+        .decls = &.{},
+        .is_tuple = false,
+        .backing_integer = null,
+    } });
 }
 
-pub fn CallbackDropReverse(
-    comptime callback: type,
-    comptime drop_index: usize,
-) type {
-
+pub fn CallbackDropReverse(comptime callback: type, comptime drop_index: usize) type {
     if (comptime drop_index == 0)
         @compileError("Dropping field zero removes forward function.");
 
@@ -127,48 +119,41 @@ pub fn CallbackDropReverse(
     comptime var mod_idx: usize = 1;
 
     while (mod_idx < N) {
-
         // we offset by -1 to only consider reversals
         if (org_idx == drop_index) {
             org_idx += 1;
             continue;
         }
-        
+
         mod_fields[mod_idx] = fields[org_idx];
 
         mod_idx += 1;
         org_idx += 1;
     }
 
-    return @Type(.{
-        .Struct = .{
-            .layout = .auto,
-            .fields = mod_fields[0..],
-            .decls = &.{},
-            .is_tuple = false,
-            .backing_integer = null
-        },
-    });
+    return @Type(.{ .Struct = .{
+        .layout = .auto,
+        .fields = mod_fields[0..],
+        .decls = &.{},
+        .is_tuple = false,
+        .backing_integer = null,
+    } });
 }
 
-fn ReversibleField(
-    comptime func: anytype,
-    comptime edge_index: usize
-) type {
-
-    if (comptime !UT.isFunction(@TypeOf(func))){
+fn ReversibleField(comptime func: anytype, comptime edge_index: usize) type {
+    if (comptime !UT.isFunction(@TypeOf(func))) {
         @compileError("Reversible field 'func' argument must be a function.");
     }
 
     const fields: [2]std.builtin.Type.StructField = .{
-        std.builtin.Type.StructField {
+        std.builtin.Type.StructField{
             .name = "callback",
             .type = @TypeOf(func),
             .default_value = func,
             .is_comptime = true,
             .alignment = 0,
         },
-        std.builtin.Type.StructField {
+        std.builtin.Type.StructField{
             .name = "edge_index",
             .type = usize,
             .default_value = &edge_index,
@@ -177,14 +162,11 @@ fn ReversibleField(
         },
     };
 
-    return @Type(.{
-        .Struct = .{
-            .layout = .auto,
-            .fields = fields[0..],
-            .decls = &.{},
-            .is_tuple = false,
-            .backing_integer = null
-        },
-    });
+    return @Type(.{ .Struct = .{
+        .layout = .auto,
+        .fields = fields[0..],
+        .decls = &.{},
+        .is_tuple = false,
+        .backing_integer = null,
+    } });
 }
-

@@ -1,4 +1,4 @@
 {
-  "gcc-bin-path": "/usr/bin/gcc",
-  "gpu-architecture": "sm_89"
+    "gcc-bin-path": "/usr/bin/gcc",
+    "gpu-architecture": "sm_89"
 }

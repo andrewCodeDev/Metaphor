@@ -40,7 +40,7 @@ extern "C" void mpDeinitStream(StreamCtx stream) {
 }
 extern "C" void initDevice(unsigned device_number) {
 
-    CURESULT_ASSERT(cuInit(0));
+    CURESULT_ASSERT(cuInit(device_number));
 
     CUdevice device;
     CUcontext context;

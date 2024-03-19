@@ -88,7 +88,7 @@ pub fn LeafTensor(comptime T: type, comptime class: TensorClass) type {
         pub const DataType = T;
         pub const Class = class;
 
-        ptr: *Self,
+        ptr: *Graph,
         idx: IndexType,
 
         pub fn values(self: Self) []DataType {

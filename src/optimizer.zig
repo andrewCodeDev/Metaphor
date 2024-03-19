@@ -15,7 +15,7 @@ const ClipRange = struct {
     pub fn init() ClipRange {
         return .{
             .lower = -std.math.inf(f16),
-            .upper =  std.math.inf(f16),
+            .upper = std.math.inf(f16),
         };
     }
 };
@@ -27,24 +27,17 @@ const ClipRange = struct {
 // per optimizer.
 
 pub const Optimizer = struct {
-    const Self = @This();
     opt_ptr: *anyopaque,
-    upd_ptr: *const fn(
-        *anyopaque, 
-        GraphID,    // graph ptr value
-        IndexType,  // index of weight
+    upd_ptr: *const fn (
+        *anyopaque,
+        GraphID, // graph ptr value
+        IndexType, // index of weight
         SliceUnion, // raw wgt values
         SliceUnion, // raw grd values
-        Stream      // stream of wgt
+        Stream, // stream of wgt
     ) void,
-    pub inline fn update(
-        self: Self, 
-        gid: GraphID,
-        wid: IndexType,
-        wgt: SliceUnion,
-        grd: SliceUnion, 
-        stream: Stream
-    ) void {
+
+    pub inline fn update(self: Optimizer, gid: GraphID, wid: IndexType, wgt: SliceUnion, grd: SliceUnion, stream: Stream) void {
         self.upd_ptr(self.opt_ptr, gid, wid, wgt, grd, stream);
     }
 };
@@ -65,9 +58,7 @@ inline fn updateDispatch(
         .c16 => opt.optimize(gid, wid, wgt.r16, grd.r16, stream),
         .c32 => opt.optimize(gid, wid, wgt.r32, grd.r32, stream),
         .c64 => opt.optimize(gid, wid, wgt.r64, grd.r64, stream),
-        else => {
-             @panic("Optimizer: TODO - q8");
-        }
+        else => @panic("Optimizer: TODO - q8"),
     }
 }
 
@@ -76,26 +67,24 @@ pub const NullOptimizer = struct {
     // "It's a show about nothing! It does nothing... but it does it in style!"
     //     ~ Andrei Alexandrescu
 
-    const Self = @This();
     fn update(_: *anyopaque, _: GraphID, _: IndexType, _: SliceUnion, _: SliceUnion, _: Stream) void {
-        return;
-    }    
+        return {};
+    }
+
     pub fn optimizer() Optimizer {
         return .{
-            .opt_ptr = undefined, 
-            .upd_ptr = Self.update,
+            .opt_ptr = undefined,
+            .upd_ptr = NullOptimizer.update,
         };
     }
 };
 
 pub const SGD = struct {
-
-    const Self = @This();
     rate: f16,
     clip: ClipRange,
 
-    pub fn init(config: struct{
-        rate: f16, 
+    pub fn init(config: struct {
+        rate: f16,
         clip: ?ClipRange = null,
     }) SGD {
         return .{
@@ -104,38 +93,27 @@ pub const SGD = struct {
         };
     }
 
-    fn update(
-        ptr: *anyopaque, 
-        gid: GraphID,
-        wid: IndexType, 
-        wgt: SliceUnion, 
-        grd: SliceUnion, 
-        stream: Stream
-    ) void {
-        const self: *Self = @ptrCast(@alignCast(ptr));
-
-        @call(.always_inline, updateDispatch, .{ 
-            self, gid, wid, wgt, grd, stream 
-        });
+    fn update(ptr: *anyopaque, gid: GraphID, wid: IndexType, wgt: SliceUnion, grd: SliceUnion, stream: Stream) void {
+        const self: *SGD = @ptrCast(@alignCast(ptr));
+        @call(.always_inline, updateDispatch, .{ self, gid, wid, wgt, grd, stream });
     }
 
     ///////////////////////////////////////////////////////////////////
-    
+
     fn optimize(
-        self: *Self,
+        self: *SGD,
         _: GraphID,
         _: IndexType,
         wgt: anytype,
         grd: anytype,
         stream: Stream,
     ) void {
-
         std.debug.assert(wgt.len == grd.len);
         const T = Child(@TypeOf(grd));
         overloads.kernel_gradient_descent.call(.{
             stream.context,
-            wgt.ptr, 
-            grd.ptr, 
+            wgt.ptr,
+            grd.ptr,
             SC.asScalar(T, self.rate),
             SC.asScalar(T, self.clip.lower),
             SC.asScalar(T, self.clip.upper),
@@ -143,11 +121,10 @@ pub const SGD = struct {
         });
     }
 
-    pub fn optimizer(self: *Self) Optimizer {
-        return Optimizer {
-            .opt_ptr = self, 
-            .upd_ptr = Self.update,
+    pub fn optimizer(self: *SGD) Optimizer {
+        return .{
+            .opt_ptr = self,
+            .upd_ptr = SGD.update,
         };
     }
 };
-

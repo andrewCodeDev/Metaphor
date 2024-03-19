@@ -4,17 +4,15 @@ const FileGen = @import("file_gen.zig");
 const ScriptCompiler = @import("script_compiler.zig");
 
 pub fn build(b: *std.Build) void {
-
     /////////////////////////
     // File/Kernel Generation
 
     const gen: *FileGen = FileGen.init(.{
         .source_extension = ".cu",
-        .source_directory = b.pathJoin(&.{"src", "cuda", "nvcc_src"}),
-        .target_directory = b.pathJoin(&.{"src", "cuda", "nvcc_trg"}),
+        .source_directory = b.pathJoin(&.{ "src", "cuda", "nvcc_src" }),
+        .target_directory = b.pathJoin(&.{ "src", "cuda", "nvcc_trg" }),
         .zigsrc_directory = "src",
     });
-
     defer gen.deinit();
 
     ScriptCompiler.setupConfig(b, gen.current_directory);
@@ -31,24 +29,12 @@ pub fn build(b: *std.Build) void {
     gen.makeCImport();
 
     // try to create kernels
-    gen.generate(); 
+    gen.generate();
 
-    // Standard target options allows the person running `zig build` to choose
-    // what target to build for. Here we do not override the defaults, which
-    // means any target is allowed, and the default is native. Other options
-    // for restricting supported target set are available.
     const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseFast });
 
-    // Standard optimization options allow the person running `zig build` to select
-    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
-    // set a preferred release mode, allowing the user to decide how to optimize.
-    const optimize = b.standardOptimizeOption(.{
-        .preferred_optimize_mode = .ReleaseFast
-    });
-
-    const mp_module = b.addModule("metaphor", .{
-        .root_source_file = .{ .path = b.pathJoin(&.{ "src", "metaphor.zig" }) }
-    });
+    const mp_module = b.addModule("metaphor", .{ .root_source_file = .{ .path = b.pathJoin(&.{ "src", "metaphor.zig" }) } });
 
     // reusable paths for linking libraries to source files
     // TODO: make a flag for x86-x64-linux to support different OS's
@@ -59,12 +45,11 @@ pub fn build(b: *std.Build) void {
 
     // create options for each example in src/examples/
     inline for (EXAMPLE_NAMES) |EXAMPLE_NAME| {
-
         const examples_step = b.step("example-" ++ EXAMPLE_NAME, "Run example \"" ++ EXAMPLE_NAME ++ "\"");
-        
+
         const example = b.addExecutable(.{
             .name = EXAMPLE_NAME,
-            .root_source_file = .{ .path = b.pathJoin(&.{"src", "examples", EXAMPLE_NAME ++ ".zig"}) },
+            .root_source_file = .{ .path = b.pathJoin(&.{ "src", "examples", EXAMPLE_NAME ++ ".zig" }) },
             .target = target,
             .optimize = optimize,
         });
@@ -74,15 +59,13 @@ pub fn build(b: *std.Build) void {
         linkLibraries(example, mp_src_lib, cuda_lib64, cuda_stubs, mp_kernels);
 
         const example_run = b.addRunArtifact(example);
-        // This allows the user to pass arguments to the application in the build
-        // command itself, like this: `zig build run -- arg1 arg2 etc`
         if (b.args) |args| {
             example_run.addArgs(args);
         }
         examples_step.dependOn(&example_run.step);
         b.default_step.dependOn(examples_step);
     }
-    
+
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
     //const lib_unit_tests = b.addTest(.{
@@ -120,13 +103,7 @@ const EXAMPLE_NAMES = &[_][]const u8{
     "experimental",
 };
 
-fn linkLibraries(
-    step: *std.Build.Step.Compile, 
-    mp_src_lib: []const u8,
-    cuda_lib64: []const u8,
-    cuda_stubs: []const u8,
-    mp_kernels: []const u8
-) void {    
+fn linkLibraries(step: *std.Build.Step.Compile, mp_src_lib: []const u8, cuda_lib64: []const u8, cuda_stubs: []const u8, mp_kernels: []const u8) void {
     step.addLibraryPath(.{ .path = mp_src_lib });
     step.addLibraryPath(.{ .path = cuda_lib64 });
     step.addLibraryPath(.{ .path = cuda_stubs });

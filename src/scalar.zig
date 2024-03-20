@@ -57,7 +57,7 @@ pub const ScalarTag = enum {
         };
     }
 
-    pub fn asOption(comptime T: type) ScalarTag {
+    pub fn asTag(comptime T: type) ScalarTag {
         return switch (T) {
             SC.q8 => .q8,
             SC.r16 => .r16,
@@ -66,7 +66,7 @@ pub const ScalarTag = enum {
             SC.c16 => .c16,
             SC.c32 => .c32,
             SC.c64 => .c64,
-            else => @compileError("Invalid type for asOption: " ++ @typeName(T)),
+            else => @compileError("Invalid type for asTag: " ++ @typeName(T)),
         };
     }
 };
@@ -179,10 +179,11 @@ inline fn __r16_init(x: anytype) r16 {
 
     switch (@typeInfo(@TypeOf(x))) {
         .Int, .ComptimeInt => {
-            return r16{ .__x = @intCast(x) };
+            const u: f16 = @floatFromInt(x);
+            return r16{ .__x = @bitCast(u) };
         },
         .Float, .ComptimeFloat => {
-            const u: f16 = x;
+            const u: f16 = @floatCast(x);
             return r16{ .__x = @bitCast(u) };
         },
         else => @compileError("Invalid Type for r16 Conversion: " ++ @typeName(@TypeOf(x))),

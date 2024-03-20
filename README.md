@@ -98,10 +98,8 @@ const y = mp.ops.selu(mp.ops.linear(x, A, b, "i,ij->j"));
 
 // if we want to free the hidden nodes, we can use
 // ".free" - this does not free weights or inputs.
+// to keep hidden nodes, we can use ".keep"
 y.reverse(.free);
-
-// otherwise, if we don't want to keep hidden nodes, we can use
-// ".keep" - this does not free weights or inputs.
 
 // inspect gradients
 if (A.grads()) |grd| {

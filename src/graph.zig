@@ -170,10 +170,7 @@ pub fn NodeTensor(comptime T: type) type {
         }
 
         pub fn grads(self: Self) ?[]DataType {
-            if (self.raw_grads()) |grd| {
-                return getSlice(DataType, grd);
-            }
-            return null;
+            return if (self.raw_grads()) |grd| getSlice(DataType, grd) else null;
         }
 
         pub fn len(self: Self) SizeType {

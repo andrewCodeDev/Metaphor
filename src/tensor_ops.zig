@@ -735,7 +735,7 @@ inline fn linear_ij_kj_ReverseArg1(
     const Y_sizes = Y.sizes();
     const A_sizes = A.sizes();
 
-    const Y_tran = stream.getScratch(T.DataType, B.len());
+    const Y_tran = stream.getScratch(T, B.len());
 
     overloads.kernel_permutate_ij_ji.call(.{ stream.context, Y.grads().?.ptr, Y_tran.ptr, SC.asScalar(T, 0.0), Y_sizes[0], Y_sizes[1] });
 

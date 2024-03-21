@@ -9,48 +9,37 @@
 // parser utility functions. These functions are intended
 // to be executed at comptime.
 pub fn symmetricDifference(comptime lhs: []const u8, comptime rhs: []const u8) []const u8 {
-    const tot_len: usize = lhs.len + rhs.len;
 
-    // inspired by LucasSantos91:
-    //    https://ziggit.dev/t/algorithm-translation-challenge-1-symmetric-difference/2572/2
+    const N = 26;
 
-    // buffer to contain the results
-    comptime var out_buf: [tot_len]u8 = .{'0'} ** tot_len;
-    // slices to resize and advance
-    comptime var tmp_lhs = lhs;
-    comptime var tmp_rhs = rhs;
-    // final output length
-    comptime var out_len: usize = tot_len;
-    comptime var i: usize = 0;
+    comptime var lhs_bits = std.StaticBitSet(N).initEmpty();
+    comptime var rhs_bits = std.StaticBitSet(N).initEmpty();
 
-    while (true) {
-        if (tmp_lhs.len == 0) {
-            @memcpy(out_buf[i..out_len], tmp_rhs);
-            break;
-        }
-        if (tmp_rhs.len == 0) {
-            @memcpy(out_buf[i..out_len], tmp_lhs);
-            break;
-        }
-        switch (std.math.order(tmp_lhs[0], tmp_rhs[0])) {
-            .lt => {
-                out_buf[i] = tmp_lhs[0];
-                tmp_lhs = tmp_lhs[1..];
-                i += 1;
-            },
-            .gt => {
-                out_buf[i] = tmp_rhs[0];
-                tmp_rhs = tmp_rhs[1..];
-                i += 1;
-            },
-            .eq => {
-                tmp_lhs = tmp_lhs[1..];
-                tmp_rhs = tmp_rhs[1..];
-                out_len -= 2;
-            },
+    comptime var diff: [N]u8 = undefined;
+
+    for (lhs) |c| {
+        lhs_bits.setValue(c - 'a', true);
+    }
+
+    for (rhs) |c| {
+        rhs_bits.setValue(c - 'a', true);
+    }
+
+    const union_bits = lhs_bits.unionWith(rhs_bits);
+    const inter_bits = lhs_bits.intersectWith(rhs_bits);
+    const symdif_bits = union_bits.differenceWith(inter_bits);
+
+    comptime var cur: u8 = 'a';
+    comptime var len: usize = 0;
+
+    while (cur < 'z') : (cur += 1){
+        if (symdif_bits.isSet(cur - 'a')) {
+            diff[len] = cur;
+            len += 1;
         }
     }
-    return out_buf[0..out_len];
+
+    return diff[0..len];
 }
 
 const std = @import("std");
@@ -86,33 +75,28 @@ pub fn contains(comptime char: u8, comptime string: []const u8) bool {
     return false;
 }
 
-// check that a permutation is both full and accounted for
-pub fn isPermutation(comptime source: []const u8, comptime target: []const u8) bool {
-    if (source.len != target.len) {
+// check that a permutation is both complete and has unique elements
+pub fn isPermutationUnique(comptime lhs: []const u8, comptime rhs: []const u8) bool {
+    if (lhs.len != rhs.len) {
         return false;
     }
-    if (source.len == 0) { // the empty set is a permutation of itself
+    if (lhs.len == 0) { // the empty set is a permutation of itself
         return true;
     }
-    // create mask for proper permutation
-    const full: usize = (1 << source.len) - 1;
-    comptime var i_mask: usize = 0;
-    comptime var j_mask: usize = 0;
 
-    comptime var i: usize = 0;
-    comptime var j: usize = 0;
-    inline while (i < source.len) : ({
-        i += 1;
-        j = 0;
-    }) {
-        inline while (j < target.len) : (j += 1) {
-            if (source[i] == target[j]) {
-                i_mask |= (1 << i);
-                j_mask |= (1 << j);
-            }
-        }
-    }
-    return i_mask == j_mask and i_mask == full;
+    const N = 26;
+
+    comptime var lhs_bits = std.StaticBitSet(N).initEmpty();
+    comptime var rhs_bits = std.StaticBitSet(N).initEmpty();
+
+    for (lhs) |c| lhs_bits.setValue(c - 'a', true);
+    for (rhs) |c| rhs_bits.setValue(c - 'a', true);
+
+    // check for repeats because or'ing will compress repeats
+    const all_unique: bool = (lhs.len == lhs_bits.count()) and (rhs.len == rhs_bits.count());
+
+    // order of bits doesn't matter, but they have to be the same
+    return all_unique and (lhs_bits.eql(rhs_bits));
 }
 
 pub fn countUniqueAlpha(comptime string: []const u8) usize {
@@ -227,7 +211,7 @@ pub fn permutationExpression(comptime str: []const u8) []const u8 {
     const lhs = comptime translateIndices(trn[0..arrow.tail]);
     const rhs = comptime translateIndices(trn[arrow.head + 1 ..]);
 
-    if (!comptime isPermutation(lhs, rhs)) {
+    if (!comptime isPermutationUnique(lhs, rhs)) {
         @compileError("Permutate requires left and right operands to be permutations of each other." ++ str);
     }
 
@@ -243,7 +227,7 @@ pub fn permutateSizes(comptime str: []const u8) struct { perm: []const usize, le
     if (!allAlphaLower(lhs) or !allAlphaLower(rhs)) {
         @compileError("Tensor indices must be lower case characters: " ++ str);
     }
-    if (!comptime isPermutation(lhs, rhs)) {
+    if (!comptime isPermutationUnique(lhs, rhs)) {
         @compileError("Permutate requires left and right operands to be permutations of each other." ++ str);
     }
 
@@ -284,7 +268,7 @@ pub fn innerProductExpression(comptime str: []const u8) []const u8 {
 
     const sym_dif = comptime symmetricDifference(lhs, rhs);
 
-    if (!comptime isPermutation(sym_dif, out)) {
+    if (!comptime isPermutationUnique(sym_dif, out)) {
         @compileError("Invalid inner product expression: " ++ str);
     }
 

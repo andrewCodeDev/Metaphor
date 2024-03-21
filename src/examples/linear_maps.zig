@@ -131,7 +131,7 @@ pub fn main() !void {
         const AT_B = mp.ops.innerProduct(A, B, "ji,jk->ik");
 
         // A.T(B)
-        //const A_BT = mp.ops.innerProduct(A, B, "ij,kj->ik");
+        const A_BT = mp.ops.innerProduct(A, B, "ij,kj->ik");
 
         mp.stream.synchronize(stream);
 
@@ -146,7 +146,6 @@ pub fn main() !void {
             EU.cpuMatmul(A_cpu, B_cpu, C_cpu, M, N, N);
             EU.verifyResults("A.B", A_B_cpu, C_cpu);
         }
-
         {
             const AT_B_cpu = try EU.copyToCPU(AT_B.values(), stream);
             defer EU.freeCPU(AT_B_cpu);
@@ -154,14 +153,13 @@ pub fn main() !void {
             EU.cpuMatmul(T_cpu, B_cpu, C_cpu, M, N, N);
             EU.verifyResults("T(A).B", AT_B_cpu, C_cpu);
         }
-        //
-        //{
-        //    const A_BT_cpu = EU.copyToCPU(A_BT.values(), stream);
-        //    defer EU.freeCPU(A_BT_cpu);
-        //    EU.cpuTranspose(B_cpu, T_cpu, M, N);
-        //    EU.cpuMatmul(A_cpu, T_cpu, C_cpu, M, N, N);
-        //    EU.verifyResults("A.T(B)", A_BT_cpu, C_cpu);
-        //}
+        {
+            const A_BT_cpu = try EU.copyToCPU(A_BT.values(), stream);
+            defer EU.freeCPU(A_BT_cpu);
+            EU.cpuTranspose(B_cpu, T_cpu, M, N);
+            EU.cpuMatmul(A_cpu, T_cpu, C_cpu, M, N, N);
+            EU.verifyResults("A.T(B)", A_BT_cpu, C_cpu);
+        }
     }
 
 

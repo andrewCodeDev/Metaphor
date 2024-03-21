@@ -70,13 +70,13 @@ pub const LaneAllocator = struct {
 
     const AnyNode = AnyList.Node;
 
-    const TensorStackSize = 64;
+    const TensorStackSize = 256;
 
     const TensorStack = std.BoundedArray(struct { list: AnyList, len: usize }, TensorStackSize);
 
     //// data cache...
     scalar_lanes: [MAX_TYPES]AnyList,
-    tensor_lanes: [MAX_TYPES]TensorStack,
+    tensor_stack: TensorStack,
 
     // node cache...
     free_nodes: AnyList,
@@ -106,9 +106,8 @@ pub const LaneAllocator = struct {
         for (self.scalar_lanes[0..]) |*list| {
             list.first = null;
         }
-        for (self.tensor_lanes[0..]) |*stack| {
-            stack.len = 0;
-        }
+
+        self.tensor_stack.len = 0;
     }
 
     pub fn deinit(self: *Self, stream: Stream) void {
@@ -143,17 +142,19 @@ pub const LaneAllocator = struct {
     }
 
     pub fn allocTensor(self: *Self, comptime T: type, N: usize, stream: Stream) []T {
-        const lane = comptime getTypeLane(T);
 
-        const slice = self.tensor_lanes[lane].slice();
+        const byte_len = N * @sizeOf(T);
+
+        const slice = self.tensor_stack.slice();
 
         for (0..slice.len) |i| {
-            if (slice[i].len == N) {
+            if (slice[i].len == byte_len) {
                 // save our node and retrieve the slice
                 if (slice[i].list.popFirst()) |node| {
                     const ptr = self.releaseDataAndCacheNode(node);
-
                     return castSlice(T, ptr, N);
+                } else {
+                    break;
                 }
             }
         }
@@ -163,23 +164,22 @@ pub const LaneAllocator = struct {
     pub fn freeTensor(self: *Self, tensor: anytype, stream: Stream) void {
         const node = self.getFreeNode();
 
+        const T = std.meta.Child(@TypeOf(tensor));
+
+        const byte_len = tensor.len * @sizeOf(T);
+
         node.data = tensor.ptr;
 
-        // find our lane and track down the proper block
-        const lane = comptime getTypeLane(std.meta.Child(@TypeOf(tensor)));
-
-        const slice = self.tensor_lanes[lane].slice();
+        const slice = self.tensor_stack.slice();
 
         for (0..slice.len) |i| {
-            if (slice[i].len == tensor.len) {
+            if (slice[i].len == byte_len) {
                 return slice[i].list.prepend(node);
             }
         }
 
-        // TODO: should this following block result in an error?
-
         // no tensor blocks were found that match the length
-        self.tensor_lanes[lane].append(.{ .list = .{ .first = node }, .len = tensor.len }) catch {
+        self.tensor_stack.append(.{ .list = .{ .first = node }, .len = byte_len }) catch {
             cuda.free(tensor, stream); // StackOverflow
         };
     }
@@ -199,6 +199,7 @@ pub const LaneAllocator = struct {
         return count;
     }
 
+    // TODO: remove this function. The graph needs to do more cleanup and this shouldn't be called directly
     pub fn freeTensorRaw(self: *Self, raw: SliceUnion, stream: Stream) void {
         switch (raw) {
             .q8 => self.freeTensor(raw.q8, stream),

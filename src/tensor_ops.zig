@@ -213,9 +213,44 @@ pub const SM_i_i_Callback = CallbackBuilder(
     NoCleanup,
 );
 
+pub fn softmaxForward_ij_j(stream: Stream, x: anytype, y: anytype) void {
+    const x_value = x.values();
+    const y_value = y.values();
+    const x_sizes = x.sizes();
+
+    std.debug.assert(x_value.len == y_value.len);
+    std.debug.assert(x.sizes().len == 2);
+    std.debug.assert(y.sizes().len == 2);
+    std.debug.assert(x.len() == y.len());
+
+    overloads.kernel_softmax_ij_j.call(.{ stream.context, x_value.ptr, y_value.ptr, x_sizes[0], x_sizes[1] });
+}
+
+pub fn softmaxReverse_ij_j(stream: Stream, x: anytype, y: anytype) void {
+
+    const x_grads = x.grads().?;
+    const x_sizes = x.sizes();
+    const y_value = y.values();
+    const y_grads = y.grads().?;
+
+    std.debug.assert(x_grads.len == y_grads.len);
+    std.debug.assert(x_grads.len == y_value.len);
+    std.debug.assert(x.sizes().len == 2);
+    std.debug.assert(y.sizes().len == 2);
+    std.debug.assert(x.len() == y.len());
+
+    overloads.kernel_softmax_ij_j_reverse.call(.{ stream.context, x_grads.ptr, y_value.ptr, y_grads.ptr, x_sizes[0], x_sizes[1] });
+}
+
+pub const SM_ij_j_Callback = CallbackBuilder(
+    softmaxForward_ij_j,
+    .{.{ softmaxReverse_ij_j, 0 }},
+    NoCleanup,
+);
 const softmax_expressions = std.ComptimeStringMap(type, .{
     // Rank-1-to-Rank-2
     .{ "i|i", SM_i_i_Callback },
+    .{ "ij|j", SM_ij_j_Callback },
 });
 
 pub fn findSoftmax(comptime expression: []const u8) type {

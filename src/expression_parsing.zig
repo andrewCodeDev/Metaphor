@@ -17,13 +17,8 @@ pub fn symmetricDifference(comptime lhs: []const u8, comptime rhs: []const u8) [
 
     comptime var diff: [N]u8 = undefined;
 
-    for (lhs) |c| {
-        lhs_bits.setValue(c - 'a', true);
-    }
-
-    for (rhs) |c| {
-        rhs_bits.setValue(c - 'a', true);
-    }
+    for (lhs) |c| lhs_bits.setValue(c - 'a', true);
+    for (rhs) |c| rhs_bits.setValue(c - 'a', true);
 
     const union_bits = lhs_bits.unionWith(rhs_bits);
     const inter_bits = lhs_bits.intersectWith(rhs_bits);
@@ -97,6 +92,20 @@ pub fn isPermutationUnique(comptime lhs: []const u8, comptime rhs: []const u8) b
 
     // order of bits doesn't matter, but they have to be the same
     return all_unique and (lhs_bits.eql(rhs_bits));
+}
+
+// check that a permutation is both complete and has unique elements
+pub fn isSubset(comptime sub: []const u8, comptime set: []const u8) bool {
+    const N = 26;
+
+    comptime var lhs_bits = std.StaticBitSet(N).initEmpty();
+    comptime var rhs_bits = std.StaticBitSet(N).initEmpty();
+
+    for (sub) |c| lhs_bits.setValue(c - 'a', true);
+    for (set) |c| rhs_bits.setValue(c - 'a', true);
+
+    return lhs_bits.subsetOf(rhs_bits);
+
 }
 
 pub fn countUniqueAlpha(comptime string: []const u8) usize {
@@ -244,14 +253,13 @@ pub fn permutateSizes(comptime str: []const u8) struct { perm: []const usize, le
 ////////////////////////////////////////////
 ///////// INNER PRODUCT ////////////////////
 
-// optimized permutation patterns
-
-// Contraction parsing expects strings of the form:
+// Inner product parsing expects strings of the form:
 //
-//     example: ijk->jik
+//     example: ij,jk->ik
 //
-// The left and right operands must be alpha-characters.
-// Both sides of the arrow operand must be permutations of each other.
+// The left, right, and output operands must be alpha-characters.
+// Output string must be the symetric difference of left and right operands.
+// There must be common indicies in the left and right operands.
 //
 
 pub fn innerProductExpression(comptime str: []const u8) []const u8 {
@@ -315,14 +323,14 @@ pub fn softmaxExpression(comptime str: []const u8) []const u8 {
         @compileError("Softmax requires that right hand index specifies either a row or column:" ++ str);
     }
     const trn = comptime translateIndices(str);
-    const lhs = comptime translateIndices(trn[0..pipe]);
-    const rhs = comptime translateIndices(trn[pipe + 1 ..]);
+    const lhs = comptime trn[0..pipe];
+    const rhs = comptime trn[pipe + 1 ..];
 
     if (comptime lhs.len < rhs.len) {
         @compileError("Softmax found extra indices in expression:" ++ str);
     }
-    if (comptime std.mem.indexOf(u8, lhs, rhs) == null) {
-        @compileError("Softmax requires that right hand index is a substring of left-hand indices:" ++ str);
+    if (comptime !isSubset(rhs, lhs)) {
+        @compileError("Softmax requires that right hand index is a subset of left-hand indices:" ++ str);
     }
 
     // TODO: More checks plz...

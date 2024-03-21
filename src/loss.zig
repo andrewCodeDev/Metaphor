@@ -92,11 +92,15 @@ pub fn cce(
     }
 
     if (comptime UT.isSlice(TT)) {
+        TenOps.softmaxForward_ij_j(stream, src, trg);
         @compileError("TODO: Implement slice version.");
+
         // copy to scratch memory
         // launch kernel
         // copy and return scalar
     } else if (comptime UT.isInteger(TT)) {
+        // TODO: cleanup this size calculation.
+
         // make a function for this - needs to be the same as grid.x
         const s_size: TC.SizeType = (src_value.len / (32 * 32 * 4)) + 2;
         const scratch = stream.getScratch(ST.DataType, s_size);

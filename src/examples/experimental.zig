@@ -10,40 +10,24 @@ pub fn main() !void {
     const stream = mp.stream.init();
     defer mp.stream.deinit(stream);
 
-    var sgd = mp.optm.SGD.init(.{
-        .rate = 1.0,
-    });
-
-    const G = mp.Graph.init(.{ .optimizer = sgd.optimizer(), .stream = stream, .mode = .train });
+    const G = mp.Graph.init(.{ .stream = stream, .mode = .eval });
     defer G.deinit();
 
-    const M: usize = 32;
+
+    const M: usize = 33;
+    const N: usize = 16;
 
     /////////////////////////////////////////////////////
     // feed forward network...
 
-    const x = G.tensor(.inp, .r32, mp.Rank(1){M});
-    const b = G.tensor(.wgt, .r32, mp.Rank(1){M});
-    const t = G.tensor(.wgt, .r32, mp.Rank(1){M});
+    const x = G.tensor(.inp, .r32, mp.Rank(2){M, N});
 
-    mp.mem.randomize(x);
-    mp.mem.randomize(b);
-    mp.mem.randomize(t);
+    //mp.mem.fill(x, 1.0);
+    mp.mem.sequence(x, 0.0, 0.1);
 
-    var score: f64 = 0.0;
+    const y = mp.ops.softmax(x, "ij|j");
 
-    for (0..10) |_| {
-        const y = mp.ops.add(x, b);
+    try EU.copyAndPrintMatrix("softmax", y.values(), M, N, stream);
 
-        mp.loss.mse(y, t, .{ .grads = true, .score = &score });
-
-        y.reverse(.keep);
-
-        mp.stream.synchronize(stream);
-
-        G.reset(.node, .all);
-
-        std.log.info("score: {d:.4}", .{score});
-    }
     ////////////////////////////////////////////
 }

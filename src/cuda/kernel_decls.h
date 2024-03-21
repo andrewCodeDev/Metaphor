@@ -491,6 +491,27 @@ EXTERN_C void launch_addition_c64(
   c64* c, 
   len_t N
 );
+EXTERN_C void launch_softmax_ij_j_r16(
+  StreamCtx stream,
+  const r16* A, 
+        r16* B, 
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_softmax_ij_j_r32(
+  StreamCtx stream,
+  const r32* A, 
+        r32* B, 
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_softmax_ij_j_r64(
+  StreamCtx stream,
+  const r64* A, 
+        r64* B, 
+  len_t m,
+  len_t n
+);
 EXTERN_C void launch_softmax_i_i_reverse_r16(
   StreamCtx stream,
         r16* a_grads, 
@@ -550,6 +571,33 @@ EXTERN_C void launch_addition_reverse_c64(
   c64* a, 
   const c64* b, 
   len_t N
+);
+EXTERN_C void launch_cce_loss_ij_j_r16(
+  StreamCtx stream,
+  const r16* src_value, 
+        r16* src_grads, 
+  const len_t* trg,
+        double* redux, // scalar
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_cce_loss_ij_j_r32(
+  StreamCtx stream,
+  const r32* src_value, 
+        r32* src_grads, 
+  const len_t* trg,
+        double* redux, // scalar
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_cce_loss_ij_j_r64(
+  StreamCtx stream,
+  const r64* src_value, 
+        r64* src_grads, 
+  const len_t* trg,
+        double* redux, // scalar
+  len_t m,
+  len_t n
 );
 EXTERN_C void launch_sequence_r16(
   StreamCtx stream,
@@ -640,6 +688,30 @@ EXTERN_C void launch_gradient_descent_r64(
   r64 lower,
   r64 upper,
   len_t N
+);
+EXTERN_C void launch_softmax_ij_j_reverse_r16(
+  StreamCtx stream,
+        r16* A_grads,
+  const r16* B_value, 
+  const r16* B_grads,
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_softmax_ij_j_reverse_r32(
+  StreamCtx stream,
+        r32* A_grads,
+  const r32* B_value, 
+  const r32* B_grads,
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_softmax_ij_j_reverse_r64(
+  StreamCtx stream,
+        r64* A_grads,
+  const r64* B_value, 
+  const r64* B_grads,
+  len_t m,
+  len_t n
 );
 EXTERN_C void launch_tanh_reverse_r16(
   StreamCtx stream,

@@ -76,6 +76,17 @@ pub fn cpuMatmul(x: anytype, y: @TypeOf(x), z: @TypeOf(x), M: usize, N: usize, K
     }
 }
 
+pub fn cpuTranspose(x: anytype, y: @TypeOf(x), M: usize, N: usize) void {
+    std.debug.assert(x.len == M * N);
+    std.debug.assert(y.len == N * N);
+
+    for (0..M) |i| {
+        for (0..N) |j| {
+            y[j * M + i] = x[i * N + j];
+        }
+    }
+}
+
 pub fn cpuAdd(x: anytype, y: @TypeOf(x), z: @TypeOf(x)) void {
     std.debug.assert(x.len == y.len);
     std.debug.assert(y.len == z.len);

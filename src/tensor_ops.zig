@@ -672,7 +672,7 @@ pub inline fn linear_ij_kj(
     beta: f16,
     Y: anytype,
 ) void {
-    const T = @TypeOf(Y);
+    const T = Child(@TypeOf(Y));
     const A_sizes = A.sizes();
     const B_sizes = B.sizes();
     const m = A_sizes[0];
@@ -685,7 +685,7 @@ pub inline fn linear_ij_kj(
     std.debug.assert(Y.len() == m * k);
     std.debug.assert(C.len() == Y.len());
 
-    const B_tran = stream.getScratch(T.DataType, B.len());
+    const B_tran = stream.getScratch(T, B.len());
 
     overloads.kernel_permutate_ij_ji.call(.{ stream.context, B.values().ptr, B_tran.ptr, SC.asScalar(T, 0.0), B_sizes[0], B_sizes[1] });
 
@@ -768,14 +768,14 @@ pub inline fn linear_ji_jk(
     beta: f16,
     Y: anytype,
 ) void {
-    const T = @TypeOf(Y);
+    const T = Child(@TypeOf(Y));
     const A_sizes = A.sizes();
     const B_sizes = B.sizes();
     std.debug.assert(A_sizes.len == 2);
     std.debug.assert(B_sizes.len == 2);
     std.debug.assert(C.len() == Y.len());
 
-    const A_tran = stream.getScratch(T.DataType, A.len());
+    const A_tran = stream.getScratch(T, A.len());
 
     overloads.kernel_permutate_ij_ji.call(.{ stream.context, A.values().ptr, A_tran.ptr, SC.asScalar(T, 0.0), A_sizes[0], A_sizes[1] });
 
@@ -802,10 +802,10 @@ inline fn linear_ji_jk_ReverseArg0(
     // (4,3).(4,5) -> (...)
     // (3,4),(4,5) -> (3,5)
     // (4,5),(5,3) -> (4,3)
-    const T = @TypeOf(A);
+    const T = Child(@TypeOf(A));
     const Y_sizes = Y.sizes();
     const B_sizes = B.sizes();
-    const Y_tran = stream.getScratch(T.DataType, Y.len());
+    const Y_tran = stream.getScratch(T, Y.len());
 
     overloads.kernel_permutate_ij_ji.call(.{ stream.context, Y.grads().?.ptr, Y_tran.ptr, SC.asScalar(T, 0.0), Y_sizes[0], Y_sizes[1] });
 
@@ -816,7 +816,7 @@ inline fn linear_ji_jk_ReverseArg0(
     std.debug.assert(n == Y_sizes[1]);
     std.debug.assert(A.len() == m * k);
 
-    __linear_ij_jk(stream, B.values(), Y_tran, alpha, A.grads(), 1.0, A.grads().?, m, n, k);
+    __linear_ij_jk(stream, B.values(), Y_tran, alpha, A.grads().?, 1.0, A.grads().?, m, n, k);
 }
 
 inline fn linear_ji_jk_ReverseArg1(

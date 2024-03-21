@@ -4,9 +4,9 @@ const OverloadSet = @import("overloadset.zig").OverloadSet;
 const decls = @import("cimport.zig").C;
 
 pub const kernel_permutate_ij_ji = OverloadSet(.{
-	decls.launch_transpose_2D_r16,
-	decls.launch_transpose_2D_r32,
-	decls.launch_transpose_2D_r64,
+	decls.launch_permutate_ij_ji_r16,
+	decls.launch_permutate_ij_ji_r32,
+	decls.launch_permutate_ij_ji_r64,
 });
 
 pub const kernel_logistic_reverse = OverloadSet(.{
@@ -52,9 +52,9 @@ pub const kernel_subtraction = OverloadSet(.{
 });
 
 pub const kernel_linear_ij_jk = OverloadSet(.{
-	decls.launch_matmul_2D_r16,
-	decls.launch_matmul_2D_r32,
-	decls.launch_matmul_2D_r64,
+	decls.launch_linear_ij_jk_r16,
+	decls.launch_linear_ij_jk_r32,
+	decls.launch_linear_ij_jk_r64,
 });
 
 pub const kernel_linear_i_ij = OverloadSet(.{

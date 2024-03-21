@@ -8,7 +8,7 @@
     #define EXTERN_C extern
 #endif
 
-EXTERN_C void launch_transpose_2D_r16(
+EXTERN_C void launch_permutate_ij_ji_r16(
     StreamCtx stream,
     const r16* src,
           r16* dst,
@@ -16,7 +16,7 @@ EXTERN_C void launch_transpose_2D_r16(
     len_t row,
     len_t col
 );
-EXTERN_C void launch_transpose_2D_r32(
+EXTERN_C void launch_permutate_ij_ji_r32(
     StreamCtx stream,
     const r32* src,
           r32* dst,
@@ -24,7 +24,7 @@ EXTERN_C void launch_transpose_2D_r32(
     len_t row,
     len_t col
 );
-EXTERN_C void launch_transpose_2D_r64(
+EXTERN_C void launch_permutate_ij_ji_r64(
     StreamCtx stream,
     const r64* src,
           r64* dst,
@@ -212,7 +212,7 @@ EXTERN_C void launch_subtraction_c64(
   c64* c, 
   len_t N
 );
-EXTERN_C void launch_matmul_2D_r16(
+EXTERN_C void launch_linear_ij_jk_r16(
   StreamCtx stream,
   const r16 *A, 
   const r16 *B,
@@ -220,11 +220,11 @@ EXTERN_C void launch_matmul_2D_r16(
   const r16 *C,
         r16 beta, // blends C back in
         r16 *Y,
-  len_t M, 
-  len_t N, 
-  len_t K 
+  len_t m, 
+  len_t n, 
+  len_t k 
 );
-EXTERN_C void launch_matmul_2D_r32(
+EXTERN_C void launch_linear_ij_jk_r32(
   StreamCtx stream,
   const r32 *A, 
   const r32 *B,
@@ -232,11 +232,11 @@ EXTERN_C void launch_matmul_2D_r32(
   const r32 *C,
         r32 beta, // blends C back in
         r32 *Y,
-  len_t M, 
-  len_t N, 
-  len_t K 
+  len_t m, 
+  len_t n, 
+  len_t k 
 );
-EXTERN_C void launch_matmul_2D_r64(
+EXTERN_C void launch_linear_ij_jk_r64(
   StreamCtx stream,
   const r64 *A, 
   const r64 *B,
@@ -244,9 +244,9 @@ EXTERN_C void launch_matmul_2D_r64(
   const r64 *C,
         r64 beta, // blends C back in
         r64 *Y,
-  len_t M, 
-  len_t N, 
-  len_t K 
+  len_t m, 
+  len_t n, 
+  len_t k 
 );
 EXTERN_C void launch_linear_i_ij_r16(
   StreamCtx stream,

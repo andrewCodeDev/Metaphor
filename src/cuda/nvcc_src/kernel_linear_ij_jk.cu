@@ -75,13 +75,14 @@ __global__ void __kernel_linear_ij_jk_RScalar(
   }
 
   C += (K * t_row);
+  Y += (K * t_row);
   
   if ((m_pos < M) && (k_pos < K)) {
     Y[t_col] = out * alpha + C[t_col] * beta;
   }
 }
 
-extern "C" void launch_matmul_2D_RScalar(
+extern "C" void launch_linear_ij_jk_RScalar(
   StreamCtx stream,
   const RScalar *A, 
   const RScalar *B,
@@ -89,13 +90,13 @@ extern "C" void launch_matmul_2D_RScalar(
   const RScalar *C,
         RScalar beta, // blends C back in
         RScalar *Y,
-  len_t M, 
-  len_t N, 
-  len_t K 
+  len_t m, 
+  len_t n, 
+  len_t k 
 ) {
     dim3 grid_block(
-        DIMPAD(K, WARP_SIZE), 
-        DIMPAD(M, WARP_SIZE)
+        DIMPAD(k, WARP_SIZE), 
+        DIMPAD(m, WARP_SIZE)
     );
 
     dim3 tile_block(
@@ -104,5 +105,5 @@ extern "C" void launch_matmul_2D_RScalar(
     );
 
     __kernel_linear_ij_jk_RScalar
-        <<<grid_block, tile_block, 0, getCtx(stream)>>>(A, B, alpha, C, beta, Y, M, N, K);
+        <<<grid_block, tile_block, 0, getCtx(stream)>>>(A, B, alpha, C, beta, Y, m, n, k);
 }

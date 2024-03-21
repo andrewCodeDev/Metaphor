@@ -15,8 +15,8 @@ pub fn main() !void {
     defer G.deinit();
 
     // square matrix for the sake of demonstration
-    const M: usize = 64;
-    const N: usize = 64;
+    const M: usize = 32;
+    const N: usize = 32;
 
     /////////////////////////////////////////////////////
 
@@ -53,64 +53,124 @@ pub fn main() !void {
     // the coefficient beta is equal to 0.0 within a small epsilon.
 
     /////////////////////////////////////////////////////
-
-    // inner product, beta=0.0
-    const x_A = mp.ops.innerProduct(x, A, "i,ij->j");
-    const A_x = mp.ops.innerProduct(A, x, "ij,j->i");
-
-    // linear, beta=1.0
-    const x_A_b = mp.ops.linear(x, A, b, "i,ij->j");
-    const A_x_b = mp.ops.linear(A, x, b, "ij,j->i");
-
-    // to check our work, we can allocate some memory to the
-    // cpu and perform the naive versions of these functions
-    const x_cpu = try EU.copyToCPU(x.values(), stream);
-    defer EU.freeCPU(x_cpu);
-
-    const A_cpu = try EU.copyToCPU(A.values(), stream);
-    defer EU.freeCPU(A_cpu);
-
-    const b_cpu = try EU.copyToCPU(b.values(), stream);
-    defer EU.freeCPU(b_cpu);
-
-    const y_cpu = try EU.allocCPU(mp.scalar.r32, N);
-    defer EU.freeCPU(y_cpu);
-
-    // check x.A, x.A + b
     {
-        EU.cpuMatmul(x_cpu, A_cpu, y_cpu, 1, M, N);
 
-        const x_A_cpu = try EU.copyToCPU(x_A.values(), stream);
-        defer EU.freeCPU(x_A_cpu);
+        // inner product, beta=0.0
+        const x_A = mp.ops.innerProduct(x, A, "i,ij->j");
+        const A_x = mp.ops.innerProduct(A, x, "ij,j->i");
 
-        EU.verifyResults("x_A", x_A_cpu, y_cpu);
+        // linear, beta=1.0
+        const x_A_b = mp.ops.linear(x, A, b, "i,ij->j");
+        const A_x_b = mp.ops.linear(A, x, b, "ij,j->i");
 
-        // now check with added bias
-        const x_A_b_cpu = try EU.copyToCPU(x_A_b.values(), stream);
-        defer EU.freeCPU(x_A_b_cpu);
+        // to check our work, we can allocate some memory to the
+        // cpu and perform the naive versions of these functions
+        const x_cpu = try EU.copyToCPU(x.values(), stream);
+        defer EU.freeCPU(x_cpu);
 
-        EU.cpuAdd(x_A_cpu, b_cpu, y_cpu);
+        const A_cpu = try EU.copyToCPU(A.values(), stream);
+        defer EU.freeCPU(A_cpu);
 
-        EU.verifyResults("x_A_b", x_A_b_cpu, y_cpu);
+        const b_cpu = try EU.copyToCPU(b.values(), stream);
+        defer EU.freeCPU(b_cpu);
+
+        const y_cpu = try EU.allocCPU(mp.scalar.r32, N);
+        defer EU.freeCPU(y_cpu);
+
+        // check x.A, x.A + b
+        {
+            EU.cpuMatmul(x_cpu, A_cpu, y_cpu, 1, M, N);
+
+            const x_A_cpu = try EU.copyToCPU(x_A.values(), stream);
+            defer EU.freeCPU(x_A_cpu);
+
+            EU.verifyResults("x_A", x_A_cpu, y_cpu);
+
+            // now check with added bias
+            const x_A_b_cpu = try EU.copyToCPU(x_A_b.values(), stream);
+            defer EU.freeCPU(x_A_b_cpu);
+
+            EU.cpuAdd(x_A_cpu, b_cpu, y_cpu);
+
+            EU.verifyResults("x_A_b", x_A_b_cpu, y_cpu);
+        }
+
+        // check A.x
+        {
+            EU.cpuMatmul(A_cpu, x_cpu, y_cpu, M, N, 1);
+
+            const A_x_cpu = try EU.copyToCPU(A_x.values(), stream);
+            defer EU.freeCPU(A_x_cpu);
+
+            EU.verifyResults("A_x", A_x_cpu, y_cpu);
+
+            // now check with added bias
+            const A_x_b_cpu = try EU.copyToCPU(A_x_b.values(), stream);
+            defer EU.freeCPU(A_x_b_cpu);
+
+            EU.cpuAdd(A_x_cpu, b_cpu, y_cpu);
+
+            EU.verifyResults("A_x_b", A_x_b_cpu, y_cpu);
+        }
     }
 
-    // check A.x
+    ////////////////////////////////////////////
+    // Now let's do matrices -------------------
+
+    G.reset(.node, .all);
+
+    const B = G.tensor(.inp, .r32, mp.Rank(2){ N, M });
+
+    mp.mem.randomize(B);
+ 
     {
-        EU.cpuMatmul(A_cpu, x_cpu, y_cpu, M, N, 1);
+        // A.B
+        const A_B = mp.ops.innerProduct(A, B, "ij,jk->ik");
 
-        const A_x_cpu = try EU.copyToCPU(A_x.values(), stream);
-        defer EU.freeCPU(A_x_cpu);
+        // T(A).B
+        const AT_B = mp.ops.innerProduct(A, B, "ji,jk->ik");
 
-        EU.verifyResults("A_x", A_x_cpu, y_cpu);
+        // A.T(B)
+        //const A_BT = mp.ops.innerProduct(A, B, "ij,kj->ik");
 
-        // now check with added bias
-        const A_x_b_cpu = try EU.copyToCPU(A_x_b.values(), stream);
-        defer EU.freeCPU(A_x_b_cpu);
+        mp.stream.synchronize(stream);
 
-        EU.cpuAdd(A_x_cpu, b_cpu, y_cpu);
+        const A_cpu = try EU.copyToCPU(A.values(), stream);
+        const B_cpu = try EU.copyToCPU(B.values(), stream);
+        const T_cpu = try EU.allocCPU(mp.scalar.r32, N * M);
+        const C_cpu = try EU.allocCPU(mp.scalar.r32, N * M);
 
-        EU.verifyResults("A_x_b", A_x_b_cpu, y_cpu);
+        {
+            const A_B_cpu = try EU.copyToCPU(A_B.values(), stream);
+            defer EU.freeCPU(A_B_cpu);
+            EU.cpuMatmul(A_cpu, B_cpu, C_cpu, M, N, N);
+            EU.verifyResults("A.B", A_B_cpu, C_cpu);
+        }
+
+        {
+            const AT_B_cpu = try EU.copyToCPU(AT_B.values(), stream);
+            defer EU.freeCPU(AT_B_cpu);
+            EU.cpuTranspose(A_cpu, T_cpu, M, N);
+            EU.cpuMatmul(T_cpu, B_cpu, C_cpu, M, N, N);
+            EU.verifyResults("T(A).B", AT_B_cpu, C_cpu);
+        }
+        //
+        //{
+        //    const A_BT_cpu = EU.copyToCPU(A_BT.values(), stream);
+        //    defer EU.freeCPU(A_BT_cpu);
+        //    EU.cpuTranspose(B_cpu, T_cpu, M, N);
+        //    EU.cpuMatmul(A_cpu, T_cpu, C_cpu, M, N, N);
+        //    EU.verifyResults("A.T(B)", A_BT_cpu, C_cpu);
+        //}
     }
+
+
+
+
+
+
+
+    
 
     ////////////////////////////////////////////
 }

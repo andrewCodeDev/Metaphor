@@ -14,20 +14,39 @@ pub fn main() !void {
     defer G.deinit();
 
 
-    const M: usize = 33;
+    const M: usize = 32;
     const N: usize = 16;
 
     /////////////////////////////////////////////////////
     // feed forward network...
 
+    const trgs_cpu = try EU.allocCPU(mp.types.SizeType, M);
+    defer EU.freeCPU(trgs_cpu);
+
+    var t: usize = 0;
+
+    for (0..M) |i| {
+        trgs_cpu[i] = t;
+        // wrap targets around
+        t = if (i == (N - 1)) 0 else t + 1;
+    }
+
+    const trgs = G.tensor_allocator.allocTensor(mp.types.SizeType, M, stream);
+    defer G.tensor_allocator.freeTensor(trgs, stream);
+
+    mp.mem.copyToDevice(trgs_cpu, trgs, stream);
+
     const x = G.tensor(.inp, .r32, mp.Rank(2){M, N});
 
-    //mp.mem.fill(x, 1.0);
     mp.mem.sequence(x, 0.0, 0.1);
 
-    const y = mp.ops.softmax(x, "ij|j");
+    mp.loss.cce(x, trgs, .{
+        .grads = true,
+        .score = null,
+    });
 
-    try EU.copyAndPrintMatrix("softmax", y.values(), M, N, stream);
+    try EU.copyAndPrintMatrix("x value:", x.values(), M, N, stream);
+    try EU.copyAndPrintMatrix("x grads:", x.grads().?, M, N, stream);
 
     ////////////////////////////////////////////
 }

@@ -576,7 +576,8 @@ EXTERN_C void launch_cce_loss_ij_j_r16(
   StreamCtx stream,
   const r16* src_value, 
         r16* src_grads, 
-  const len_t* trg,
+  const len_t* trgs,
+        r16* scratch,
         double* redux, // scalar
   len_t m,
   len_t n
@@ -585,7 +586,8 @@ EXTERN_C void launch_cce_loss_ij_j_r32(
   StreamCtx stream,
   const r32* src_value, 
         r32* src_grads, 
-  const len_t* trg,
+  const len_t* trgs,
+        r32* scratch,
         double* redux, // scalar
   len_t m,
   len_t n
@@ -594,7 +596,8 @@ EXTERN_C void launch_cce_loss_ij_j_r64(
   StreamCtx stream,
   const r64* src_value, 
         r64* src_grads, 
-  const len_t* trg,
+  const len_t* trgs,
+        r64* scratch,
         double* redux, // scalar
   len_t m,
   len_t n

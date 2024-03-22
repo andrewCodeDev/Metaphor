@@ -40,6 +40,7 @@ pub const stream = struct {
 };
 
 pub const mem = struct {
+    // TODO: make interface function for copy with enum
     pub const copyToDevice = DU.copyToDevice;
     pub const copyFromDevice = DU.copyFromDevice;
     pub const alloc = DU.alloc;
@@ -48,6 +49,8 @@ pub const mem = struct {
     pub const fill = CG.fill;
     pub const sequence = TenOps.sequence;
     pub const randomize = TenOps.randomize;
+    pub const load = @import("tensor_file.zig").loadTensor;
+    pub const save = @import("tensor_file.zig").saveTensor;
 };
 
 pub const types = struct {

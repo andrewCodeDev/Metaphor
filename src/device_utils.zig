@@ -99,7 +99,7 @@ pub fn deinitStream(stream: Stream) void {
 }
 
 pub fn synchronizeStream(stream: Stream) void {
-    cuda.mpDeviceSynchronize(stream.context);
+    cuda.mpStreamSynchronize(stream.context);
 }
 
 pub fn synchronizeDevice() void {

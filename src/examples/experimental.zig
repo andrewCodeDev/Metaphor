@@ -20,18 +20,25 @@ pub fn main() !void {
     /////////////////////////////////////////////////////
     // feed forward network...
 
-    const x = G.tensor(.wgt, .r32, mp.Rank(2){ M, N });
+    const u = G.tensor(.wgt, .r32, mp.Rank(2){ M, N });
+    const v = G.tensor(.wgt, .r32, mp.Rank(2){ M, N });
 
     //mp.mem.sequence(x, 0.0, 1.0);
+    //mp.mem.sequence(u, 0.0, 1.0);
+    //mp.mem.sequence(v, 0.0, 1.0);
 
-    //mp.stream.synchronize(stream);
+    //const z1 = mp.ops.add(x,  u);
+    //const z2 = mp.ops.add(z1, v);
 
-    //try mp.mem.save("src/examples/data", "model", x, stream);
+    //_ = &z2;
 
-    try mp.mem.load("src/examples/data", "model", x, stream);
+    //G.save("data", "G");
 
-    try EU.copyAndPrintMatrix("x value:", x.values(), M, N, stream);
+    G.load("data", "G");
 
+    try EU.copyAndPrintMatrix("u", u.values(), M, N, stream);
+    try EU.copyAndPrintMatrix("v", v.values(), M, N, stream);
+    
     //try mp.readTensor(x, std.heap.c_allocator, "data", stream);
 
 //    const trgs_cpu = try EU.allocCPU(mp.types.SizeType, M);

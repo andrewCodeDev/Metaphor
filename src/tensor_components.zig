@@ -48,7 +48,20 @@ pub const SliceUnion = union(enum) {
             inline else => |x| x.len,
         };
     }
+
+    pub fn bytes(self: anytype) []u8 {
+        return switch(self.*) {
+             .q8 => std.mem.sliceAsBytes(self.q8),
+            .r16 => std.mem.sliceAsBytes(self.r16),
+            .r32 => std.mem.sliceAsBytes(self.r32),
+            .r64 => std.mem.sliceAsBytes(self.r64),
+            .c16 => std.mem.sliceAsBytes(self.c16),
+            .c32 => std.mem.sliceAsBytes(self.c32),
+            .c64 => std.mem.sliceAsBytes(self.c64),
+        };
+    }
 };
+
 
 pub fn computeStrides(sizes: Sizes, strides: []SizeType) void {
     std.debug.assert(sizes.len == strides.len);

@@ -49,8 +49,6 @@ pub const mem = struct {
     pub const fill = CG.fill;
     pub const sequence = TenOps.sequence;
     pub const randomize = TenOps.randomize;
-    pub const load = @import("tensor_file.zig").loadTensor;
-    pub const save = @import("tensor_file.zig").saveTensor;
 };
 
 pub const types = struct {

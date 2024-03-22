@@ -1,6 +1,7 @@
 const DU = @import("device_utils.zig");
 const Child = @import("utility.zig").Child;
 const std = @import("std");
+const TC = @import("tensor_components.zig");
 
 // These are basic tensor utilities for saving data to the disk.
 // Tensor values are read/written as direct binary files.
@@ -21,19 +22,20 @@ const std = @import("std");
 // probably needs to be considered more carefully.
 const SaveError = error { WrongByteCount };
 
-pub fn loadTensor(
+pub fn loadTensorRawBuffered(
     dir: []const u8,
     prefix: []const u8,
-    x: anytype,
+    x_idx: TC.IndexType,
+    x_gpu: []u8,
+    x_cpu: []u8,
     stream: DU.Stream,
 ) !void {
-    const T = Child(@TypeOf(x));
 
     ////////////////////////////////////////////////
     // Create our file name and path ///////////////
     var name = try std.BoundedArray(u8, 128).init(0);
 
-    try std.fmt.format(name.writer(), "{s}_{}", .{ prefix, x.idx });
+    try std.fmt.format(name.writer(), "{s}_{}", .{ prefix, x_idx });
 
     const path = try std.fs.path.join(std.heap.c_allocator, &.{ dir, name.slice() });
     defer std.heap.c_allocator.free(path);
@@ -43,50 +45,42 @@ pub fn loadTensor(
 
     var file = try std.fs.cwd().openFile(path, .{ .mode = .read_only });
 
-    const N = x.len() * @sizeOf(T);
-
-    const values_cpu = try std.heap.c_allocator.alloc(u8, N);
-    defer std.heap.c_allocator.free(values_cpu);
-
-    if (N != try file.readAll(values_cpu)) 
+    if (x_gpu.len != try file.readAll(x_cpu)) 
         return SaveError.WrongByteCount;
 
-    DU.copyToDevice(values_cpu, std.mem.sliceAsBytes(x.values()), stream);
+    DU.copyToDevice(x_cpu, x_gpu, stream);
 
     DU.synchronizeStream(stream);
 }
 
-
-pub fn saveTensor(
+pub fn saveTensorRawBuffered(
     dir: []const u8,
     prefix: []const u8,
-    x: anytype,
+    x_idx: TC.IndexType,
+    x_gpu: []u8,
+    x_cpu: []u8,
     stream: DU.Stream,
 ) !void {
-    const T = Child(@TypeOf(x));
-
     ////////////////////////////////////////////////
     // Create our file name and path ///////////////
     var name = try std.BoundedArray(u8, 128).init(0);
 
-    try std.fmt.format(name.writer(), "{s}_{}", .{ prefix, x.idx });
+    try std.fmt.format(name.writer(), "{s}_{}", .{ prefix, x_idx });
 
     const path = try std.fs.path.join(std.heap.c_allocator, &.{ dir, name.slice() });
     defer std.heap.c_allocator.free(path);
 
     ////////////////////////////////////////////////
     // Write our tensor file as raw bytes //////////
-
-    const values_cpu = try std.heap.c_allocator.alloc(T, x.len());
-    defer std.heap.c_allocator.free(values_cpu);
     
-    DU.copyFromDevice(x.values(), values_cpu, stream);
+    DU.copyFromDevice(x_gpu, x_cpu, stream);
 
     DU.synchronizeStream(stream);
 
     var file = try std.fs.cwd().createFile(path, .{ .truncate = true });
     defer file.close();
 
-    try file.writeAll(std.mem.sliceAsBytes(values_cpu));
+    try file.writeAll(x_cpu);
 }
+
 

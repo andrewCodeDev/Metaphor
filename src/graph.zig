@@ -40,6 +40,10 @@ const isArray = UT.isArray;
 const isStruct = UT.isStruct;
 const isTuple = UT.isTuple;
 
+// for graph save and load functions
+const loadTensorRawBuffered = @import("tensor_file.zig").loadTensorRawBuffered;
+const saveTensorRawBuffered = @import("tensor_file.zig").saveTensorRawBuffered;
+
 // implementation declarations
 const getSlice = TC.getSlice;
 const SliceUnion = TC.SliceUnion;
@@ -242,7 +246,7 @@ pub const Graph = struct {
         strides: ArrayList(Strides),
         dependencies: ArrayList(i8),
         streams: ArrayList(Stream),
-
+        classes: ArrayList(TensorClass),
         pub fn init(allocator: std.mem.Allocator, block_size: usize) !Leaves {
             return @This(){
                 .values = try ArrayList(SliceUnion).initCapacity(allocator, block_size),
@@ -251,6 +255,7 @@ pub const Graph = struct {
                 .strides = try ArrayList(Strides).initCapacity(allocator, block_size),
                 .dependencies = try ArrayList(i8).initCapacity(allocator, block_size),
                 .streams = try ArrayList(Stream).initCapacity(allocator, block_size),
+                .classes = try ArrayList(TensorClass).initCapacity(allocator, block_size),
             };
         }
     };
@@ -438,6 +443,7 @@ pub const Graph = struct {
             try self.leaves.grads.append(null);
             try self.leaves.dependencies.append(0);
             try self.leaves.streams.append(self.stream);
+            try self.leaves.classes.append(class);
         }
 
         const idx = if (class == .hid) self.nodes.values.items.len - 1 else self.leaves.values.items.len - 1;
@@ -643,6 +649,79 @@ pub const Graph = struct {
             }
         }
     }
+
+    pub fn load(self: *Graph, dir: []const u8, prefix: []const u8) void {
+
+        std.debug.assert(self.leaves.values.items.len != 0);
+
+        var max_len: usize = 0;
+
+        for (self.leaves.values.items) |u| {
+            max_len = @max(max_len, u.bytes().len);
+        }
+
+        const buf = std.heap.c_allocator.alloc(u8, max_len) catch @panic("Failed to allocate cpu buffer");
+        defer std.heap.c_allocator.free(buf);
+
+        std.debug.assert(max_len != 0);
+
+        // this is more stable than using the direct index
+        // because inputs can come before or after, but
+        // weights usually have fixed positions
+        var wgt_idx: usize = 0;
+
+        for (0..self.leaves.values.items.len) |i| {
+            if (self.leaves.classes.items[i] == .wgt) {                
+
+                const bytes = self.leaves.values.items[i].bytes();
+                
+                // we have uninitialized weights
+                std.debug.assert(bytes.len != 0);
+                
+                loadTensorRawBuffered(dir, prefix, wgt_idx, bytes, buf[0..bytes.len], self.leaves.streams.items[i])
+                    catch @panic("Failed to load tensor data.");
+
+                wgt_idx += 1;
+            }
+        }
+    }
+
+    pub fn save(self: *Graph, dir: []const u8, prefix: []const u8) void {
+
+        std.debug.assert(self.leaves.values.items.len != 0);
+
+        var max_len: usize = 0;
+
+        for (self.leaves.values.items) |u| {
+            max_len = @max(max_len, u.bytes().len);
+        }
+
+        std.debug.assert(max_len != 0);
+
+        // this is more stable than using the direct index
+        // because inputs can come before or after, but
+        // weights usually have fixed positions
+        var wgt_idx: usize = 0;
+
+        const buf = std.heap.c_allocator.alloc(u8, max_len) catch @panic("Failed to allocate cpu buffer");
+        defer std.heap.c_allocator.free(buf);
+
+        for (0..self.leaves.values.items.len) |i| {
+            if (self.leaves.classes.items[i] == .wgt) {                
+
+                const bytes = self.leaves.values.items[i].bytes();
+                
+                // we have uninitialized weights
+                std.debug.assert(bytes.len != 0);
+                
+                saveTensorRawBuffered(dir, prefix, wgt_idx, bytes, buf[0..bytes.len], self.leaves.streams.items[i])
+                    catch @panic("Failed to save tensor data.");
+
+                wgt_idx += 1;
+            }
+        }
+    }
+    
 };
 
 ////////////////////////////////

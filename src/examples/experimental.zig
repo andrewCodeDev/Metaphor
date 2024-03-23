@@ -14,14 +14,14 @@ pub fn main() !void {
     const G = mp.Graph.init(.{ .stream = stream, .mode = .eval });
     defer G.deinit();
 
-    const M: usize = 32;
-    const N: usize = 16;
+    //const M: usize = 32;
+    //const N: usize = 16;
 
     /////////////////////////////////////////////////////
     // feed forward network...
 
-    const u = G.tensor(.wgt, .r32, mp.Rank(2){ M, N });
-    const v = G.tensor(.wgt, .r32, mp.Rank(2){ M, N });
+    //const u = G.tensor(.wgt, .r32, mp.Rank(2){ M, N });
+    //const v = G.tensor(.wgt, .r32, mp.Rank(2){ M, N });
 
     //mp.mem.sequence(x, 0.0, 1.0);
     //mp.mem.sequence(u, 0.0, 1.0);
@@ -32,12 +32,16 @@ pub fn main() !void {
 
     //_ = &z2;
 
-    //G.save("data", "G");
+    //mp.mem.save("data", "u", u, stream);
+    //mp.mem.save("data", "v", v, stream);
 
-    G.load("data", "G");
+    //mp.mem.load("data", "u", u, stream);
+    //mp.mem.load("data", "u", v, stream);
 
-    try EU.copyAndPrintMatrix("u", u.values(), M, N, stream);
-    try EU.copyAndPrintMatrix("v", v.values(), M, N, stream);
+    //G.load("data", "G");
+
+    //try EU.copyAndPrintMatrix("u", u.values(), M, N, stream);
+    //try EU.copyAndPrintMatrix("v", v.values(), M, N, stream);
     
     //try mp.readTensor(x, std.heap.c_allocator, "data", stream);
 

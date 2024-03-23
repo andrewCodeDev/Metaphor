@@ -27,7 +27,7 @@ pub fn symmetricDifference(comptime lhs: []const u8, comptime rhs: []const u8) [
     comptime var cur: u8 = 'a';
     comptime var len: usize = 0;
 
-    while (cur < 'z') : (cur += 1){
+    while (cur <= 'z') : (cur += 1){
         if (symdif_bits.isSet(cur - 'a')) {
             diff[len] = cur;
             len += 1;

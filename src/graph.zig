@@ -41,8 +41,8 @@ const isStruct = UT.isStruct;
 const isTuple = UT.isTuple;
 
 // for graph save and load functions
-const loadTensorRawBuffered = @import("tensor_file.zig").loadTensorRawBuffered;
-const saveTensorRawBuffered = @import("tensor_file.zig").saveTensorRawBuffered;
+const loadTensorToGraph = @import("tensor_file.zig").loadTensorToGraph;
+const saveTensorFromGraph = @import("tensor_file.zig").saveTensorFromGraph;
 
 // implementation declarations
 const getSlice = TC.getSlice;
@@ -79,7 +79,7 @@ pub fn fill(X: anytype, value: anytype) Contract(isGraphTensor(@TypeOf(X)), Retu
 pub const TensorClass = enum {
     inp,
     wgt,
-    hid,
+    hid, // TODO: change this to res for "result"? These are always the outcome of an operation.
 };
 
 pub fn LeafTensor(comptime T: type, comptime class: TensorClass) type {
@@ -116,10 +116,7 @@ pub fn LeafTensor(comptime T: type, comptime class: TensorClass) type {
         }
 
         pub fn grads(self: Self) ?[]DataType {
-            if (self.raw_grads()) |grd| {
-                return getSlice(DataType, grd);
-            }
-            return null;
+            return if (self.raw_grads()) |grd| getSlice(DataType, grd) else null;
         }
 
         pub fn len(self: Self) SizeType {
@@ -134,7 +131,7 @@ pub fn LeafTensor(comptime T: type, comptime class: TensorClass) type {
             self.ptr.freeTensor(DataType, Class, self.idx);
         }
 
-        fn adjustDependencies(self: Self, comptime direction: i8) i8 {
+        fn adjustDependencies(self: Self, direction: i8) i8 {
             return self.ptr.adjustDependencies(Class, self.idx, direction);
         }
     };
@@ -212,7 +209,7 @@ pub fn NodeTensor(comptime T: type) type {
             // call graph reverse
             self.ptr.reverse(self.idx, cleanup);
         }
-        fn adjustDependencies(self: Self, comptime direction: i8) i8 {
+        fn adjustDependencies(self: Self, direction: i8) i8 {
             return self.ptr.adjustDependencies(.hid, self.idx, direction);
         }
     };
@@ -678,7 +675,7 @@ pub const Graph = struct {
                 // we have uninitialized weights
                 std.debug.assert(bytes.len != 0);
                 
-                loadTensorRawBuffered(dir, prefix, wgt_idx, bytes, buf[0..bytes.len], self.leaves.streams.items[i])
+                loadTensorToGraph(dir, prefix, wgt_idx, bytes, buf[0..bytes.len], self.leaves.streams.items[i])
                     catch @panic("Failed to load tensor data.");
 
                 wgt_idx += 1;
@@ -714,7 +711,7 @@ pub const Graph = struct {
                 // we have uninitialized weights
                 std.debug.assert(bytes.len != 0);
                 
-                saveTensorRawBuffered(dir, prefix, wgt_idx, bytes, buf[0..bytes.len], self.leaves.streams.items[i])
+                saveTensorFromGraph(dir, prefix, wgt_idx, bytes, buf[0..bytes.len], self.leaves.streams.items[i])
                     catch @panic("Failed to save tensor data.");
 
                 wgt_idx += 1;

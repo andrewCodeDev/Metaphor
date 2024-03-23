@@ -22,7 +22,7 @@ const TC = @import("tensor_components.zig");
 // probably needs to be considered more carefully.
 const SaveError = error { WrongByteCount };
 
-pub fn loadTensorRawBuffered(
+pub fn loadTensorToGraph(
     dir: []const u8,
     prefix: []const u8,
     x_idx: TC.IndexType,
@@ -53,7 +53,7 @@ pub fn loadTensorRawBuffered(
     DU.synchronizeStream(stream);
 }
 
-pub fn saveTensorRawBuffered(
+pub fn saveTensorFromGraph(
     dir: []const u8,
     prefix: []const u8,
     x_idx: TC.IndexType,
@@ -61,8 +61,10 @@ pub fn saveTensorRawBuffered(
     x_cpu: []u8,
     stream: DU.Stream,
 ) !void {
+
     ////////////////////////////////////////////////
     // Create our file name and path ///////////////
+
     var name = try std.BoundedArray(u8, 128).init(0);
 
     try std.fmt.format(name.writer(), "{s}_{}", .{ prefix, x_idx });
@@ -83,4 +85,65 @@ pub fn saveTensorRawBuffered(
     try file.writeAll(x_cpu);
 }
 
+//////////////////////////////////////////////////////////////////////
+// These functions requires a full filename. They're for special cases 
+// where the user wants to load in something like an input tensor
+// independent of the network. Word embeddings, for example.
 
+pub fn saveTensor(
+    dir: []const u8,
+    filename: []const u8,
+    x: anytype,
+    stream: DU.Stream,
+) void {
+    const path = std.fs.path.join(std.heap.c_allocator, &.{ dir, filename }) catch @panic("Failed to create save path");
+    defer std.heap.c_allocator.free(path);
+
+    ////////////////////////////////////////////////
+    // Write our tensor file as raw bytes //////////
+
+    const x_bytes = x.raw_values().bytes();
+
+    std.debug.assert(x_bytes.len > 0);
+
+    const x_cpu = std.heap.c_allocator.alloc(u8, x_bytes.len) catch @panic("Failed to allocate save buffer");
+    defer std.heap.c_allocator.free(x_cpu);
+    
+    DU.copyFromDevice(x_bytes, x_cpu, stream);
+
+    DU.synchronizeStream(stream);
+
+    var file = std.fs.cwd().createFile(path, .{ .truncate = true }) catch @panic("Failed to create save file");
+    defer file.close();
+
+    file.writeAll(x_cpu) catch @panic("Failed to write to save file");
+}
+
+pub fn loadTensor(
+    dir: []const u8,
+    filename: []const u8,
+    x: anytype,
+    stream: DU.Stream,
+) void {
+    const path = std.fs.path.join(std.heap.c_allocator, &.{ dir, filename }) catch @panic("Failed to create load path");
+    defer std.heap.c_allocator.free(path);
+
+    ////////////////////////////////////////////////
+    // Read our tensor file as raw bytes ///////////
+
+    const x_bytes = x.raw_values().bytes();
+
+    std.debug.assert(x_bytes.len > 0);
+
+    const x_cpu = std.heap.c_allocator.alloc(u8, x_bytes.len) catch @panic("Failed to allocator load buffer.");
+    defer std.heap.c_allocator.free(x_cpu);
+    
+    var file = std.fs.cwd().openFile(path, .{ .mode = .read_only }) catch @panic("Failed to open load file.");
+
+    if (x_bytes.len != file.readAll(x_cpu) catch @panic("Failed to read into load buffer."))
+        @panic("Byte count loaded does not match provided tensor size.");
+
+    DU.copyToDevice(x_cpu, x_bytes, stream);
+
+    DU.synchronizeStream(stream);
+}

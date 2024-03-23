@@ -98,12 +98,6 @@ __device__ __inline__ r64 rlog(r64 x) { return std::log(x); }
 
 #endif
 
-// TODO: epsilon value?
-template<class T>
-__inline__ __device__ bool epsEql(T x, T y) {
-  return std::abs(static_cast<double>(x) - static_cast<double>(y)) < 0.001;
-}
-
 template<class T>
 __device__ __inline__ T cdiv(T x, T y) { 
   auto u = conjmul(y); return T{ .r = x.r / u, .i = x.i / u };  
@@ -162,10 +156,17 @@ template<> struct Init<r32> {
 };
 template<> struct Init<r64> {
   static constexpr r64 inf_result = std::numeric_limits<r64>::infinity();
-  static constexpr r32 eps_result = std::numeric_limits<r64>::epsilon();
+  static constexpr r64 eps_result = std::numeric_limits<r64>::epsilon();
   static __device__ __inline__ r64 infinity() { return Init<r64>::inf_result; }
   static __device__ __inline__ r64 epsilon()  { return Init<r64>::eps_result; }
 };
+
+// TODO: epsilon value?
+template<class T>
+__inline__ __device__ bool epsEql(T x, T y) {
+  return std::abs(static_cast<double>(x) - static_cast<double>(y)) < 0.001;
+}
+
 
 template <class OP, typename T>
 __inline__ __device__ T warpReduce(T value) {

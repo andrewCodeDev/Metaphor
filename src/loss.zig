@@ -118,6 +118,8 @@ pub fn cce(
     } else if (comptime UT.isInteger(TT)) {
         // TODO: cleanup this size calculation.
 
+        std.debug.assert(src.sizes().len == 1);
+
         // make a function for this - needs to be the same as grid.x
         const s_size: TC.SizeType = (src_value.len / (32 * 32 * 4)) + 2;
         const scratch = stream.getScratch(ST.DataType, s_size);

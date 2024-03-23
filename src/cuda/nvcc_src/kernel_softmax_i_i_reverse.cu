@@ -90,7 +90,7 @@ __global__ void __kernel_softmax_i_i_reverse_RScalar(
     }
     else if (ofs < m) {
       for (len_t i = ofs; i < m; ++i) {
-        a_grads[i] = b_value[i] * (b_grads[i] - grid_sum);  
+        a_grads[i] += b_value[i] * (b_grads[i] - grid_sum);  
       }
     }
   }

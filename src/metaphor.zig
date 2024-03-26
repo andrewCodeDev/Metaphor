@@ -52,6 +52,7 @@ pub const mem = struct {
     pub const randomize = TenOps.randomize;
     pub const load = @import("tensor_file.zig").loadTensor;
     pub const save = @import("tensor_file.zig").saveTensor;
+    pub const allocKeys = Algo.allocKeys;
 };
 
 pub const types = struct {

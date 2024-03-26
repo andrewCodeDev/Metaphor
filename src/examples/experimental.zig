@@ -22,23 +22,12 @@ pub fn main() !void {
 
     mp.mem.fill(X, 1.0);
 
-    const key_len: usize = 10;
+    const key_len: usize = 6;
     
-    const keys_cpu = try EU.allocCPU(u32, key_len);
-        defer EU.freeCPU(keys_cpu);
-
-    for (0..key_len) |i| {
-        keys_cpu[i] = 0;
-    }
-
-    const keys = mp.mem.alloc(mp.types.Key, key_len, stream);
+    const keys = mp.mem.allocKeys(key_len, stream);
         defer mp.mem.free(keys, stream);
 
-    mp.mem.copyToDevice(keys_cpu, keys, stream);
-
-    mp.stream.synchronize(stream);
-
-    mp.algo.key.reduceScaled(X, Y, keys, 0.10, "ij->j");
+    mp.algo.key.reduceScaled(X, Y, keys, 0.1, "ij->j");
 
     try EU.copyAndPrintMatrix("Y", Y.values(), n, 1, stream);
 

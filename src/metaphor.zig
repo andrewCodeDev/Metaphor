@@ -363,31 +363,23 @@ pub const ops = struct {
 };
 
 pub const algo = struct {
+
+    // these functions require an output tensor because we do not
+    // want to encourage appending multiple copies to the graph. 
     
     pub const key = struct {
-        pub fn reduce(X: anytype, keys: []const types.Key, comptime expression: []const u8) NodeTensor(Child(@TypeOf(X))) {
+        pub fn reduce(src: anytype, dst: anytype, keys: []const types.Key, comptime expression: []const u8) void {
+            reduceScaled(src, dst, keys, 1.0, expression);
+        }
+
+        pub fn reduceScaled(src: anytype, dst: anytype, keys: []const types.Key, alpha: f32, comptime expression: []const u8) void {
 
             // TODO: extend this function to scalar output calls, need to address parser first
 
-            if (comptime !isGraphTensor(@TypeOf(X)))
+            if (comptime !isGraphTensor(@TypeOf(src)) or !isGraphTensor(@TypeOf(dst)))
                 @compileError("reduce key requires graph tensors.");
 
-            // tells us which size index to map from x to y
-            const map = comptime Parser.reduceSizes(expression);
-
-            std.debug.assert(X.sizes().len == map.x_map.len);
-
-            var z_sizes: [map.len]types.SizeType = undefined;
-
-            for (X.sizes(), 0..) |elem, i| {
-                if (map.x_map[i]) |idx| z_sizes[idx] = elem;
-            }
-
-            const Y = nodeTensor(X.ptr, z_sizes[0..], UT.Child(@TypeOf(X)));
-
-            Algo.callReduceKey(X.stream(), X, Y, keys, expression);
-
-            return Y;
+            Algo.callReduceKey(dst.stream(), src, dst, keys, alpha, expression);
         }
     };
 };

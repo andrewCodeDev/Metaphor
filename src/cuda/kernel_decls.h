@@ -376,6 +376,7 @@ EXTERN_C void launch_reduce_key_ij_j_r16(
     const r16* src,
           r16* dst,
     const unsigned* keys,
+          r16 alpha,
           r16* scratch,
     len_t src_col,
     len_t key_len
@@ -385,6 +386,7 @@ EXTERN_C void launch_reduce_key_ij_j_r32(
     const r32* src,
           r32* dst,
     const unsigned* keys,
+          r32 alpha,
           r32* scratch,
     len_t src_col,
     len_t key_len
@@ -394,6 +396,7 @@ EXTERN_C void launch_reduce_key_ij_j_r64(
     const r64* src,
           r64* dst,
     const unsigned* keys,
+          r64 alpha,
           r64* scratch,
     len_t src_col,
     len_t key_len

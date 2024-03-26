@@ -18,10 +18,11 @@ pub fn main() !void {
     const n: usize = 16;
 
     const X = G.tensor(.inp, .r32, mp.Rank(2){m, n});
+    const Y = G.tensor(.inp, .r32, mp.Rank(1){n});
 
     mp.mem.fill(X, 1.0);
 
-    const key_len: usize = 6;
+    const key_len: usize = 10;
     
     const keys_cpu = try EU.allocCPU(u32, key_len);
         defer EU.freeCPU(keys_cpu);
@@ -37,7 +38,7 @@ pub fn main() !void {
 
     mp.stream.synchronize(stream);
 
-    const Y = mp.algo.key.reduce(X, keys, "ij->j");
+    mp.algo.key.reduceScaled(X, Y, keys, 0.10, "ij->j");
 
     try EU.copyAndPrintMatrix("Y", Y.values(), n, 1, stream);
 

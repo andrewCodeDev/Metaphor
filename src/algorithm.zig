@@ -32,17 +32,19 @@ pub fn reduceKey_ij_j(
     x: anytype,  
     y: anytype,
     keys: []const Key,
+    alpha: f32,
 ) void {
+    const T = Child(@TypeOf(x));
     const x_sizes = x.sizes();
     std.debug.assert(x_sizes.len == 2);
     std.debug.assert(x_sizes[1] == y.len());
     std.debug.assert(x_sizes[0] >= keys.len);
     std.debug.assert(0 < keys.len);
     const blocks = (keys.len + 1) / 2;
-    const scratch = stream.getScratch(Child(@TypeOf(x)), blocks * x_sizes[1]);
-    TenOps.fillSlice(Child(@TypeOf(x)), scratch, 0.0, stream);
+    const scratch = stream.getScratch(T, blocks * x_sizes[1]);
+    TenOps.fillSlice(T, scratch, 0.0, stream);
     overloads.kernel_reduce_key_ij_j.call(.{
-        stream.context, x.values().ptr, y.values().ptr, keys.ptr, scratch.ptr, x_sizes[1], keys.len        
+        stream.context, x.values().ptr, y.values().ptr, keys.ptr, SC.asScalar(T, alpha), scratch.ptr, x_sizes[1], keys.len        
     });
 }
 
@@ -55,10 +57,11 @@ pub fn callReduceKey(
     x: anytype,  
     y: anytype,
     keys: []const Key,
+    alpha: f32,
     comptime expression: [] const u8,
 ) void {
     if (comptime reduce_key_map.get(expression)) |redux| {
-        redux(stream, x, y, keys);                
+        redux(stream, x, y, keys, alpha);                
     } else {
         @compileError("TODO: Declare General Permutation Kernel: " ++ expression);
     }

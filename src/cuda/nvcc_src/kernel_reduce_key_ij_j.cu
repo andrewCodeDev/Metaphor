@@ -4,6 +4,7 @@ __global__ void __kernel_reduce_key_ij_j_RScalar(
     const RScalar* src,
           RScalar* dst,
     const unsigned* keys,
+          RScalar alpha,
           RScalar* scratch,
     unsigned src_col,
     unsigned key_len
@@ -80,7 +81,7 @@ __global__ void __kernel_reduce_key_ij_j_RScalar(
     if (blockIdx.y == 0) {
       for (unsigned offset = 0; offset < src_col; offset += blockDim.x) {
           if (offset + threadIdx.x < src_col) {
-              dst[threadIdx.x + offset] = scratch[threadIdx.x + offset];
+              dst[threadIdx.x + offset] = scratch[threadIdx.x + offset] * alpha;
           }
       }
     }
@@ -91,6 +92,7 @@ extern "C" void launch_reduce_key_ij_j_RScalar(
     const RScalar* src,
           RScalar* dst,
     const unsigned* keys,
+          RScalar alpha,
           RScalar* scratch,
     len_t src_col,
     len_t key_len
@@ -102,7 +104,7 @@ extern "C" void launch_reduce_key_ij_j_RScalar(
     const unsigned _key_len = static_cast<unsigned>(key_len);
 
     void* args[] = { 
-      (void*)&src, (void*)&dst, (void*)&keys, (void*)&scratch, (void*)&_src_col, (void*)&_key_len
+      (void*)&src, (void*)&dst, (void*)&keys, (void*)&alpha, (void*)&scratch, (void*)&_src_col, (void*)&_key_len
     };
 
     CUDA_ASSERT(cudaLaunchCooperativeKernel(

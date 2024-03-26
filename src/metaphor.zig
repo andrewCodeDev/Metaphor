@@ -21,6 +21,7 @@ const isGraphTensor = CG.isGraphTensor;
 
 const Optimizer = @import("optimizer.zig");
 
+const Algo = @import("algorithm.zig");
 const TenOps = @import("tensor_ops.zig");
 const Loss = @import("loss.zig");
 
@@ -46,7 +47,7 @@ pub const mem = struct {
     pub const alloc = DU.alloc;
     pub const create = DU.create;
     pub const free = DU.free;
-    pub const fill = CG.fill;
+    pub const fill = TenOps.fill;
     pub const sequence = TenOps.sequence;
     pub const randomize = TenOps.randomize;
     pub const load = @import("tensor_file.zig").loadTensor;
@@ -62,6 +63,7 @@ pub const types = struct {
     pub const Strides = TC.Strides;
     pub const Sizes = TC.Sizes;
     pub const Stream = DU.Stream;
+    pub const Key = Algo.Key;
 };
 
 pub const scalar = struct {
@@ -92,11 +94,11 @@ pub const loss = struct {
             _ = enableGradient(graph, T.DataType, T.Class, x.idx);
         }
         const redux: ?[*]f64 = if (config.score != null)
-            graph.tensor_allocator.allocScalar(f64, graph.stream)
+            graph.tensor_allocator.create(f64, graph.stream)
         else
             null;
         defer {
-            if (redux) |ptr| graph.tensor_allocator.freeScalar(ptr);
+            if (redux) |ptr| graph.tensor_allocator.destroy(ptr);
         }
         const score: ?[*]f64 = if (config.score) |ptr|
             @ptrCast(@alignCast(ptr))
@@ -118,9 +120,9 @@ pub const loss = struct {
             _ = enableGradient(graph, T.DataType, T.Class, x.idx);
         }
 
-        const redux: ?[*]f64 = if (config.score != null) graph.tensor_allocator.allocScalar(f64, graph.stream) else null;
+        const redux: ?[*]f64 = if (config.score != null) graph.tensor_allocator.create(f64, graph.stream) else null;
         defer {
-            if (redux) |ptr| graph.tensor_allocator.freeScalar(ptr);
+            if (redux) |ptr| graph.tensor_allocator.destroy(ptr);
         }
 
         const score: ?[*]f64 = if (config.score) |ptr| @ptrCast(@alignCast(ptr)) else null;
@@ -358,6 +360,36 @@ pub const ops = struct {
 
         return if (graph.mode == .eval) Z else appendNode(graph, @TypeOf(lin), .{ X, Y, alpha, B, 1.0 }, Z);
     }
+};
+
+pub const algo = struct {
+    
+    pub const key = struct {
+        pub fn reduce(X: anytype, keys: []const types.Key, comptime expression: []const u8) NodeTensor(Child(@TypeOf(X))) {
+
+            // TODO: extend this function to scalar output calls, need to address parser first
+
+            if (comptime !isGraphTensor(@TypeOf(X)))
+                @compileError("reduce key requires graph tensors.");
+
+            // tells us which size index to map from x to y
+            const map = comptime Parser.reduceSizes(expression);
+
+            std.debug.assert(X.sizes().len == map.x_map.len);
+
+            var z_sizes: [map.len]types.SizeType = undefined;
+
+            for (X.sizes(), 0..) |elem, i| {
+                if (map.x_map[i]) |idx| z_sizes[idx] = elem;
+            }
+
+            const Y = nodeTensor(X.ptr, z_sizes[0..], UT.Child(@TypeOf(X)));
+
+            Algo.callReduceKey(X.stream(), X, Y, keys, expression);
+
+            return Y;
+        }
+    };
 };
 
 /////////////////////////////////////////////

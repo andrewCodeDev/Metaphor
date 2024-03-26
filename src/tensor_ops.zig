@@ -255,7 +255,7 @@ const softmax_expressions = std.ComptimeStringMap(type, .{
 
 pub fn findSoftmax(comptime expression: []const u8) type {
     const parsed = comptime Parser.softmaxExpression(expression);
-    if (softmax_expressions.get(parsed)) |sm| {
+    if (comptime softmax_expressions.get(parsed)) |sm| {
         return sm;
     } else {
         @compileError("TODO: invalid softmax expression:" ++ expression);
@@ -277,7 +277,6 @@ pub fn sequence(tensor: anytype, init: anytype, step: anytype) void {
 pub fn randomize(x: anytype) void {
     //TODO: replace this with a kernel call...?
     //      really though, how often is this called?
-
     var backing = std.rand.DefaultPrng.init(42);
     var random = backing.random();
 
@@ -290,6 +289,23 @@ pub fn randomize(x: anytype) void {
 
     DU.copyToDevice(mem, x.values(), x.ptr.stream);
     DU.synchronizeStream(x.ptr.stream);
+}
+
+// <>--------------------------------------------------------<>
+
+pub fn fillSlice(
+    comptime T: type,
+    x_slice: []T,
+    value: anytype,
+    stream: Stream,
+) void {
+    overloads.kernel_fill.call(.{ stream.context, x_slice.ptr, SC.asScalar(T, value), x_slice.len });
+    DU.synchronizeStream(stream);
+}
+
+pub fn fill(X: anytype, value: anytype) void {
+    const T = Child(@TypeOf(X));
+    fillSlice(T, X.values(), value, X.ptr.stream);
 }
 
 // <>--------------------------------------------------------<>
@@ -327,7 +343,7 @@ const permutation_expressions = std.ComptimeStringMap(type, .{
 
 pub fn findPermutation(comptime expression: []const u8) type {
     const parsed = comptime Parser.permutationExpression(expression);
-    if (permutation_expressions.get(parsed)) |perm| {
+    if (comptime permutation_expressions.get(parsed)) |perm| {
         return perm;
     } else {
         @compileError("TODO: Declare General Permutation Kernel: " ++ expression);
@@ -916,7 +932,7 @@ const inner_product_expressions = std.ComptimeStringMap(type, .{
 
 pub fn findLinear(comptime expression: []const u8, comptime bias: bool) type {
     const parsed = comptime Parser.innerProductExpression(expression);
-    if (inner_product_expressions.get(parsed)) |ip| {
+    if (comptime inner_product_expressions.get(parsed)) |ip| {
         return LinearType(ip, bias);
     } else {
         @compileError("TODO: Declare General Inner Product Kernel: " ++ expression);

@@ -87,6 +87,21 @@ pub const kernel_mse_loss_i_i = OverloadSet(.{
 	decls.launch_mse_loss_i_i_r64,
 });
 
+pub const kernel_reduce_key_ij_j = OverloadSet(.{
+	decls.launch_reduce_key_ij_j_r16,
+	decls.launch_reduce_key_ij_j_r32,
+	decls.launch_reduce_key_ij_j_r64,
+});
+
+pub const kernel_copy_indexed_ij = OverloadSet(.{
+	decls.launch_copy_indexed_ij_kj_r16,
+	decls.launch_copy_indexed_ij_kj_buffered_r16,
+	decls.launch_copy_indexed_ij_kj_r32,
+	decls.launch_copy_indexed_ij_kj_buffered_r32,
+	decls.launch_copy_indexed_ij_kj_r64,
+	decls.launch_copy_indexed_ij_kj_buffered_r64,
+});
+
 pub const kernel_fill = OverloadSet(.{
 	decls.launch_fill_r16,
 	decls.launch_fill_c16,

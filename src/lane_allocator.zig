@@ -119,7 +119,7 @@ pub const LaneAllocator = struct {
         }
     }
 
-    pub fn allocScalar(self: *Self, comptime T: type, stream: Stream) [*]T {
+    pub fn create(self: *Self, comptime T: type, stream: Stream) [*]T {
         const lane = comptime getTypeLane(T);
 
         if (self.scalar_lanes[lane].popFirst()) |node| {
@@ -131,7 +131,7 @@ pub const LaneAllocator = struct {
         return cuda.create(T, stream);
     }
 
-    pub fn freeScalar(self: *Self, scalar: anytype) void {
+    pub fn destroy(self: *Self, scalar: anytype) void {
         var node = self.getFreeNode();
 
         node.data = @ptrCast(@alignCast(scalar));
@@ -141,7 +141,7 @@ pub const LaneAllocator = struct {
         self.scalar_lanes[lane].prepend(node);
     }
 
-    pub fn allocTensor(self: *Self, comptime T: type, N: usize, stream: Stream) []T {
+    pub fn alloc(self: *Self, comptime T: type, N: usize, stream: Stream) []T {
 
         const byte_len = N * @sizeOf(T);
 
@@ -161,7 +161,7 @@ pub const LaneAllocator = struct {
         return cuda.alloc(T, N, stream);
     }
 
-    pub fn freeTensor(self: *Self, tensor: anytype, stream: Stream) void {
+    pub fn free(self: *Self, tensor: anytype, stream: Stream) void {
         const node = self.getFreeNode();
 
         const T = std.meta.Child(@TypeOf(tensor));
@@ -187,7 +187,7 @@ pub const LaneAllocator = struct {
     // load precache values for the tensor allocator to use
     pub fn precache(self: *Self, comptime T: type, size: usize, count: usize, stream: Stream) void {
         for (0..count) |_| {
-            self.freeTensor(cuda.alloc(T, size, stream), stream);
+            self.free(cuda.alloc(T, size, stream), stream);
         }
     }
 
@@ -200,15 +200,15 @@ pub const LaneAllocator = struct {
     }
 
     // TODO: remove this function. The graph needs to do more cleanup and this shouldn't be called directly
-    pub fn freeTensorRaw(self: *Self, raw: SliceUnion, stream: Stream) void {
+    pub fn freeRaw(self: *Self, raw: SliceUnion, stream: Stream) void {
         switch (raw) {
-            .q8 => self.freeTensor(raw.q8, stream),
-            .r16 => self.freeTensor(raw.r16, stream),
-            .r32 => self.freeTensor(raw.r32, stream),
-            .r64 => self.freeTensor(raw.r64, stream),
-            .c16 => self.freeTensor(raw.c16, stream),
-            .c32 => self.freeTensor(raw.c32, stream),
-            .c64 => self.freeTensor(raw.c64, stream),
+            .q8 => self.free(raw.q8, stream),
+            .r16 => self.free(raw.r16, stream),
+            .r32 => self.free(raw.r32, stream),
+            .r64 => self.free(raw.r64, stream),
+            .c16 => self.free(raw.c16, stream),
+            .c32 => self.free(raw.c32, stream),
+            .c64 => self.free(raw.c64, stream),
         }
     }
 

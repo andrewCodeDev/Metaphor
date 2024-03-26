@@ -4,6 +4,7 @@
 #define MAX_DIMS 6
 typedef unsigned long len_t;
 const len_t WARP_SIZE = 32;
+const len_t UINT_BUFFER_SIZE = 32;
 
 // coalesced types for load optimization
 #if defined(__cplusplus)
@@ -116,5 +117,10 @@ typedef struct {
   len_t order[MAX_DIMS];
 } Permutation;
 
+// for small buffer optimizations
+typedef struct {
+  unsigned items[UINT_BUFFER_SIZE];
+  unsigned used;
+} UintBuffer;
 
 #endif

@@ -33,8 +33,8 @@ pub fn symmetricDifference(comptime lhs: []const u8, comptime rhs: []const u8) [
             len += 1;
         }
     }
-
-    return diff[0..len];
+    const _diff = diff;
+    return _diff[0..len];
 }
 
 const std = @import("std");
@@ -198,7 +198,8 @@ pub fn translateIndices(comptime string: []const u8) []const u8 {
 
         buffer[i] = if (min < 'i') c + dif else c - dif;
     }
-    return buffer[0..];
+    const _buffer = buffer;
+    return _buffer[0..];
 }
 
 ////////////////////////////////////////////
@@ -247,7 +248,9 @@ pub fn permutateSizes(comptime str: []const u8) struct { perm: []const usize, le
             if (l == r) indices[i] = j;
         }
     }
-    return .{ .perm = indices[0..], .len = lhs.len };
+    const _indices = indices;
+    
+    return .{ .perm = _indices[0..], .len = lhs.len };
 }
 
 ////////////////////////////////////////////
@@ -302,15 +305,15 @@ pub fn innerProductSizes(comptime str: []const u8) struct { x_map: []const ?usiz
             if (l == o) x_map[i] = j;
         }
     }
-
     // right hand side indices
     for (rhs, 0..) |r, i| {
         for (out, 0..) |o, j| {
             if (r == o) y_map[i] = j;
         }
     }
-
-    return .{ .x_map = x_map[0..], .y_map = y_map[0..], .len = out.len };
+    const _x_map = x_map;
+    const _y_map = x_map;
+    return .{ .x_map = _x_map[0..], .y_map = _y_map[0..], .len = out.len };
 }
 
 ////////////////////////////////////////////////
@@ -326,7 +329,7 @@ pub fn softmaxExpression(comptime str: []const u8) []const u8 {
     const lhs = comptime trn[0..pipe];
     const rhs = comptime trn[pipe + 1 ..];
 
-    if (comptime lhs.len < rhs.len) {
+    if (comptime lhs.len <= rhs.len) {
         @compileError("Softmax found extra indices in expression:" ++ str);
     }
     if (comptime !isSubset(rhs, lhs)) {
@@ -336,4 +339,45 @@ pub fn softmaxExpression(comptime str: []const u8) []const u8 {
     // TODO: More checks plz...
 
     return comptime lhs ++ "|" ++ rhs;
+}
+
+////////////////////////////////////////////////
+// Reduce expression parser
+
+pub fn reduceSizes(comptime str: []const u8) struct { x_map: []const ?usize, len: usize } {
+    const trn = translateIndices(str);
+    const arrow = comptime findArrowOp(trn);
+    const lhs = comptime trn[0..arrow.tail];
+    const rhs = comptime trn[arrow.head + 1..];
+
+    // TODO: add checks for inner product
+
+    comptime var x_map: [lhs.len]?usize = .{null} ** lhs.len;
+
+    // left hand side indices
+    for (lhs, 0..) |l, i| {
+        for (rhs, 0..) |r, j| {
+            if (l == r) x_map[i] = j;
+        }
+    }
+    const _x_map = x_map;
+    return .{ .x_map = _x_map[0..], .len = rhs.len };
+}
+
+pub fn reduceExpression(comptime str: []const u8) []const u8 {
+    const trn = comptime translateIndices(str);
+    const arrow = comptime findArrowOp(trn);
+    const lhs = comptime trn[0..arrow.tail];
+    const rhs = comptime trn[arrow.head + 1 ..];
+
+    if (comptime lhs.len < rhs.len) {
+        @compileError("Reduce found extra indices in expression:" ++ str);
+    }
+    if (comptime !isSubset(rhs, lhs)) {
+        @compileError("Reduce requires that right hand index is a subset of left-hand indices:" ++ str);
+    }
+
+    // TODO: More checks plz...
+
+    return comptime lhs ++ "->" ++ rhs;
 }

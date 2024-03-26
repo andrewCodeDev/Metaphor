@@ -19,15 +19,10 @@ __global__ void __kernel_linear_ij_jk_RScalar(
   len_t t_col = threadIdx.x;
   
   // locate our row position on matrix A
-  const len_t offset_A = WARP_SIZE * blockIdx.y * N + (N * t_row);
-  A += offset_A;
-    
-  const len_t offset_B = WARP_SIZE * blockIdx.x + (K * t_row);
-  B += offset_B;
-
-  const len_t offset_C = (WARP_SIZE * blockIdx.y * K) + (blockIdx.x * WARP_SIZE);
-  C += offset_C;
-  Y += offset_C;
+  A += WARP_SIZE * blockIdx.y * N + (N * t_row);
+  B += WARP_SIZE * blockIdx.x + (K * t_row);
+  C += (WARP_SIZE * blockIdx.y * K) + (blockIdx.x * WARP_SIZE);
+  Y += (WARP_SIZE * blockIdx.y * K) + (blockIdx.x * WARP_SIZE);
 
   // these boundaries don't change, calculate once
   const len_t m_pos = blockIdx.y * WARP_SIZE + t_row;

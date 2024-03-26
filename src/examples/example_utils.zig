@@ -27,11 +27,11 @@ pub fn copyToCPU(src: anytype, stream: anytype) ![]std.meta.Child(@TypeOf(src)) 
 }
 
 pub fn freeCPU(src: anytype) void {
-    std.heap.c_allocator.free(src);
+    std.heap.page_allocator.free(src);
 }
 
 pub fn allocCPU(comptime T: type, N: usize) ![]T {
-    return try std.heap.c_allocator.alloc(T, N);
+    return try std.heap.page_allocator.alloc(T, N);
 }
 
 pub fn cpuPrintMatrix(name: []const u8, src: anytype, row: usize, col: usize) void {

@@ -371,6 +371,87 @@ EXTERN_C void launch_mse_loss_i_i_r64(
         double*  redux, // scalar
   len_t m
 );
+EXTERN_C void launch_reduce_key_ij_j_r16(
+    StreamCtx stream,
+    const r16* src,
+          r16* dst,
+    const unsigned* keys,
+          r16* scratch,
+    len_t src_col,
+    len_t key_len
+);
+EXTERN_C void launch_reduce_key_ij_j_r32(
+    StreamCtx stream,
+    const r32* src,
+          r32* dst,
+    const unsigned* keys,
+          r32* scratch,
+    len_t src_col,
+    len_t key_len
+);
+EXTERN_C void launch_reduce_key_ij_j_r64(
+    StreamCtx stream,
+    const r64* src,
+          r64* dst,
+    const unsigned* keys,
+          r64* scratch,
+    len_t src_col,
+    len_t key_len
+);
+EXTERN_C void launch_copy_indexed_ij_kj_r16(
+    StreamCtx stream,
+    const r16* src,
+          r16* dst,
+    const len_t* idxs,
+    len_t src_row,
+    len_t src_col,
+    len_t out_row
+);
+EXTERN_C void launch_copy_indexed_ij_kj_buffered_r16(
+    StreamCtx stream,
+    const r16* src,
+          r16* dst,
+    UintBuffer idxs,
+    len_t src_row,
+    len_t src_col,
+    len_t out_row
+);
+EXTERN_C void launch_copy_indexed_ij_kj_r32(
+    StreamCtx stream,
+    const r32* src,
+          r32* dst,
+    const len_t* idxs,
+    len_t src_row,
+    len_t src_col,
+    len_t out_row
+);
+EXTERN_C void launch_copy_indexed_ij_kj_buffered_r32(
+    StreamCtx stream,
+    const r32* src,
+          r32* dst,
+    UintBuffer idxs,
+    len_t src_row,
+    len_t src_col,
+    len_t out_row
+);
+EXTERN_C void launch_copy_indexed_ij_kj_r64(
+    StreamCtx stream,
+    const r64* src,
+          r64* dst,
+    const len_t* idxs,
+    len_t src_row,
+    len_t src_col,
+    len_t out_row
+);
+EXTERN_C void launch_copy_indexed_ij_kj_buffered_r64(
+    StreamCtx stream,
+    const r64* src,
+          r64* dst,
+    UintBuffer idxs,
+    len_t src_row,
+    len_t src_col,
+    len_t out_row
+);
 EXTERN_C void launch_fill_r16(
   StreamCtx stream,
   r16* dev_a,

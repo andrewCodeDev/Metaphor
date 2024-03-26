@@ -37,11 +37,11 @@ pub fn main() !void {
 
     // A gets created using the stream in the graph. The
     // graph remembers what stream that A was created with.
-    const A = G.tensor(.inp, .r32, mp.Rank(2){ M, N });
+    const A = G.tensor(.inp, .r32, mp.Rank(2){M, N});
 
     // x gets created using the stream in the graph. The
     // graph remembers what stream that x was created with.
-    const x = G.tensor(.inp, .r32, mp.Rank(1){M});
+    const x = G.tensor(.inp, .r32, mp.Rank(2){N, M});
 
     // both of these fill calls use the currently assigned
     // stream as well. If we had changed this stream,
@@ -53,7 +53,7 @@ pub fn main() !void {
     // tensors to remove the overhead of the initial
     // allocation. This again uses the graph's recent
     // stream that has been assigned.
-    G.precache(mp.scalar.r32, M, 10);
+    G.precache(mp.scalar.r32, M * N, 10);
 
     // this prevents us from moving forward until the
     // stream has finished all the work in its queue.
@@ -79,7 +79,7 @@ pub fn main() !void {
         const start = try std.time.Instant.now();
 
         for (0..10) |_| {
-            const y = mp.ops.innerProduct(A, x, "ij,j->i");
+            const y = mp.ops.innerProduct(A, x, "ij,jk->ik");
             _ = &y;
         }
 
@@ -108,7 +108,7 @@ pub fn main() !void {
         const start = try std.time.Instant.now();
 
         for (0..10) |_| {
-            const y = mp.ops.innerProduct(A, x, "ij,j->i");
+            const y = mp.ops.innerProduct(A, x, "ij,jk->ik");
             _ = &y;
         }
 
@@ -133,14 +133,14 @@ pub fn main() !void {
         G.stream = streams.items[0];
 
         for (0..5) |_| {
-            const y = mp.ops.innerProduct(A, x, "ij,j->i");
+            const y = mp.ops.innerProduct(A, x, "ij,jk->ik");
             _ = &y;
         }
 
         G.stream = streams.items[1];
 
         for (0..5) |_| {
-            const y = mp.ops.innerProduct(A, x, "ij,j->i");
+            const y = mp.ops.innerProduct(A, x, "ij,jk->ik");
             _ = &y;
         }
 
@@ -169,8 +169,8 @@ pub fn main() !void {
     {
         const start = try std.time.Instant.now();
 
-        for (0..10) |_| {
-            EU.cpuMatmul(A_cpu, x_cpu, y_cpu, M, N, 1);
+        for (0..1) |_| {
+            EU.cpuMatmul(A_cpu, x_cpu, y_cpu, M, N, M);
             _ = &y_cpu;
         }
 

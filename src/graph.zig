@@ -31,8 +31,6 @@ const Contract = UT.Contract;
 const Returns = UT.Returns;
 const Child = UT.Child;
 
-const kernel_fill = @import("kernel_overloads.zig").kernel_fill;
-
 const isFunction = UT.isFunction;
 const isPointer = UT.isPointer;
 const isSlice = UT.isSlice;
@@ -52,6 +50,8 @@ const SizeType = TC.SizeType;
 const Strides = TC.Strides;
 const Sizes = TC.Sizes;
 
+const fillSlice = @import("tensor_ops.zig").fillSlice;
+
 pub fn isGraphTensor(comptime T: type) bool {
     return switch (@typeInfo(T)) {
         .Struct => if (!@hasDecl(T, "DataType") or !@hasDecl(T, "Class")) false else (T == GraphTensor(T.DataType, T.Class)),
@@ -59,22 +59,6 @@ pub fn isGraphTensor(comptime T: type) bool {
     };
 }
 
-// TODO: move this function?
-fn fillSlice(
-    comptime T: type,
-    x_slice: []T,
-    value: T,
-    stream: Stream,
-) void {
-    kernel_fill.call(.{ stream.context, x_slice.ptr, value, x_slice.len });
-    DU.synchronizeStream(stream);
-}
-
-pub fn fill(X: anytype, value: anytype) Contract(isGraphTensor(@TypeOf(X)), Returns(void)) {
-    const T = Child(@TypeOf(X));
-
-    fillSlice(T, X.values(), SC.asScalar(T, value), X.ptr.stream);
-}
 
 pub const TensorClass = enum {
     inp,
@@ -203,7 +187,7 @@ pub fn NodeTensor(comptime T: type) type {
                 // if a loss hasn't been applied, this will be null
                 const grd = enableGradient(self.ptr, DataType, .hid, self.idx);
                 // derivative with respect to self is 1
-                fillSlice(DataType, grd, SC.asScalar(DataType, 1.0), self.ptr.stream);
+                fillSlice(DataType, grd, 1.0, self.ptr.stream);
             }
 
             // call graph reverse
@@ -485,7 +469,7 @@ pub const Graph = struct {
         };
         assert(0 < N);
 
-        const values = self.tensor_allocator.allocTensor(data_type, N, self.stream);
+        const values = self.tensor_allocator.alloc(data_type, N, self.stream);
 
         const sizes = UT.dupe(dimensions, allocator);
         const strides = UT.alloc(SizeType, sizes.len, allocator);
@@ -524,7 +508,7 @@ pub const Graph = struct {
     fn freeGradient(self: *Graph, comptime data_type: type, class: TensorClass, idx: IndexType) void {
         const grads_array = if (class == .hid) &self.nodes.grads else &self.leaves.grads;
         if (grads_array.items[idx]) |grads| {
-            self.tensor_allocator.freeTensor(getSlice(data_type, grads), self.stream);
+            self.tensor_allocator.free(getSlice(data_type, grads), self.stream);
             grads_array.items[idx] = null;
         }
     }
@@ -552,7 +536,7 @@ pub const Graph = struct {
 
         const field = comptime SC.scalarName(data_type);
 
-        self.tensor_allocator.freeTensor(@field(values.*, field), stream);
+        self.tensor_allocator.free(@field(values.*, field), stream);
 
         @field(values.*, field).len = 0;
 
@@ -732,7 +716,7 @@ pub fn enableGradient(self: *Graph, comptime T: type, class: TensorClass, idx: I
     const grads = &grads_array.items[idx];
     if (grads.* == null) {
         const size = values_array.items[idx].len();
-        const grd = self.tensor_allocator.allocTensor(T, size, self.stream);
+        const grd = self.tensor_allocator.alloc(T, size, self.stream);
         grads.* = SliceUnion.init(grd);
         return grd;
     } else {
@@ -780,7 +764,7 @@ fn reverseEdge(comptime func: anytype, comptime edge: SizeType, edge_tuple: anyt
     // enable gradients if we don't have them
     if (arg.grads() == null) {
         const grd = enableGradient(graph, DataType, Class, arg.idx);
-        fillSlice(DataType, grd, SC.asScalar(DataType, 0), arg.stream());
+        fillSlice(DataType, grd, 1.0, arg.stream());
     }
 
     @call(.auto, func, .{arg.stream()} ++ edge_tuple);

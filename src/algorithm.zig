@@ -248,8 +248,6 @@ fn mergeRemainderCPU(
     // use second half as swap buffer...
     var cpu_p2 = cpu_p1[gpu_pairs.len..];
 
-    std.log.info("cpu_p1.len: {}", .{cpu_p1.len});
-
     // reset length to buffer size
     cpu_p1.len = gpu_pairs.len;
 
@@ -274,7 +272,6 @@ fn mergeRemainderCPU(
             // is the remainder of the vector. In this case,
             // we need to just copy the tail and return.
             if (mid >= src.len) {
-                std.log.info("Copying from: {}", .{ left });
                 for (left..src.len) |i| dst[i] = src[i];
                 return;
             }
@@ -282,8 +279,6 @@ fn mergeRemainderCPU(
             // adjust boundary for non-power of 2 sizing
             const right = if (src.len < right_assumed)
                 @as(u32, @intCast(src.len)) else right_assumed; 
-
-            std.log.info("left: {}, mid: {}, right: {}", .{ left, mid, right });
 
             // mobile indices for reading and writing
             var l_head = left;

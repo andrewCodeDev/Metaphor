@@ -1,9 +1,5 @@
 #include "../kernel_header.h"
 
-#include <cassert>
-#include <thread>
-#include <vector>
-
 /*
     This is a brutal sorting algorithm. We're caught between two hard
     choices - leave the value vector untouched or suffer massive cache

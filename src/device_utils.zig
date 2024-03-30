@@ -106,6 +106,10 @@ pub fn synchronizeDevice() void {
     cuda.mpDeviceSynchronize();
 }
 
+pub fn checkLastError() void {
+    cuda.mpCheckLastError(); // calls device sync
+}
+
 pub fn alloc(comptime T: type, N: usize, stream: Stream) []T {
     // std.debug.assert(stream != null);
     const ptr: *anyopaque = cuda.mpMemAlloc(@sizeOf(T) * N, stream.context) orelse unreachable;

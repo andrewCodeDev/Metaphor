@@ -278,11 +278,11 @@ pub fn generate(self: *Self) void {
 
         modded_abspaths.append(self.system_allocator, trg_path) catch @panic("Failed to append to modded_targets");
 
-        var gen_success: bool = false;
-
         const content = self.fileToString(src_path);
 
         for (MIN_LEVEL..MAX_LEVEL + 1) |cur_level| {
+            
+            var gen_success: bool = false;
 
             // to enable multiple replacements per file, recycle
             // the last replacement to our current generation
@@ -299,10 +299,14 @@ pub fn generate(self: *Self) void {
                     }
                 }
             }
+            if (gen_success) {
+                generations.append(self.system_allocator, current_gen) catch @panic("Failed to append generation.");
+            }
+        }
 
-            if (!gen_success) @panic("Generation failed.");
-
-            generations.append(self.system_allocator, current_gen) catch @panic("Failed to append generation.");
+        // TODO: patch for files that don't have generated content - consider moving them to new directory?
+        if (generations.items.len == 0) {
+            generations.append(self.system_allocator, content) catch @panic("Failed to append generation.");
         }
 
         // join generations and write to file
@@ -446,25 +450,6 @@ fn stringToFile(path: []const u8, string: []const u8) void {
     var writer = file.writer();
     _ = writer.writeAll(string[0..end]) catch @panic("Failed to write file.");
 }
-
-//fn appendTargetBuffer(
-//    buffer: []u8,
-//    start: usize,
-//    tail: []const u8,
-//) usize {
-//
-//    const end = std.mem.indexOfScalar(u8, tail, 0)
-//        orelse tail.len;
-//
-//    if ((buffer.len - start) < end)
-//        @panic("Buffer size too small");
-//
-//    const slice = buffer[start..start + end];
-//
-//    @memcpy(slice, tail[0..end]);
-//
-//    return start + end;
-//}
 
 fn replaceExtension(
     buffer: []u8,

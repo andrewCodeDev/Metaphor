@@ -58,3 +58,13 @@ extern "C" void initDevice(unsigned device_number) {
 
     CURESULT_ASSERT(cuCtxCreate(&context, 0, device));
 }
+
+// Convenience wrapper for cudaGetLastError.
+extern "C" void mpCheckLastError()
+{
+  CUDA_ASSERT(cudaDeviceSynchronize());
+  auto err = cudaGetLastError();
+  if (err != cudaSuccess) {
+      fprintf(stderr, "Error %s: %s", cudaGetErrorName(err), cudaGetErrorString(err));
+  }
+}

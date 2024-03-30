@@ -261,52 +261,6 @@ pub fn findSoftmax(comptime expression: []const u8) type {
         @compileError("TODO: invalid softmax expression:" ++ expression);
     }
 }
-// <>--------------------------------------------------------<>
-
-pub fn sequence(tensor: anytype, init: anytype, step: anytype) void {
-    const T = UT.Child(@TypeOf(tensor));
-    const _init = SC.asScalar(T, init);
-    const _step = SC.asScalar(T, step);
-    const values = tensor.values();
-
-    overloads.kernel_sequence.call(.{ tensor.ptr.stream.context, values.ptr, _init, _step, values.len });
-}
-
-// <>--------------------------------------------------------<>
-
-pub fn randomize(x: anytype) void {
-    //TODO: replace this with a kernel call...?
-    //      really though, how often is this called?
-    var backing = std.rand.DefaultPrng.init(42);
-    var random = backing.random();
-
-    const mem = std.heap.c_allocator.alloc(@TypeOf(x).DataType, x.len()) catch @panic("randomize out of memory");
-    defer std.heap.c_allocator.free(mem);
-
-    for (0..x.len()) |i| {
-        mem[i] = random.float(@TypeOf(x).DataType);
-    }
-
-    DU.copyToDevice(mem, x.values(), x.ptr.stream);
-    DU.synchronizeStream(x.ptr.stream);
-}
-
-// <>--------------------------------------------------------<>
-
-pub fn fillSlice(
-    comptime T: type,
-    x_slice: []T,
-    value: anytype,
-    stream: Stream,
-) void {
-    overloads.kernel_fill.call(.{ stream.context, x_slice.ptr, SC.asScalar(T, value), x_slice.len });
-    DU.synchronizeStream(stream);
-}
-
-pub fn fill(X: anytype, value: anytype) void {
-    const T = Child(@TypeOf(X));
-    fillSlice(T, X.values(), value, X.ptr.stream);
-}
 
 // <>--------------------------------------------------------<>
 

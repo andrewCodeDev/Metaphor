@@ -36,6 +36,19 @@ pub fn scalarName(comptime T: type) []const u8 {
     };
 }
 
+pub fn Native(comptime T: type) []const u8 {
+    return switch (T) {
+        q8 => u8,
+        r16 => f16,
+        r32 => f32,
+        r64 => f64,
+        c16 => std.math.Complex(f16),
+        c32 => std.math.Complex(f32),
+        c64 => std.math.Complex(f64),
+        else => @compileError("Invalid type for scalarName: " ++ @typeName(T)),
+    };
+}
+
 pub const ScalarTag = enum {
     q8,
     r16,

@@ -57,6 +57,35 @@ typedef struct {
   r64 i;
 } c64;
 
+/////////////////////////
+// used for key sorting
+
+// TODO:
+//  Consider making these only r32
+//  The padding doesn't make sense
+//  for larger types. Could cause
+//  problems for large r64?
+
+typedef struct {
+  r16 val;
+  unsigned key;
+} SortPair_r16;
+
+
+typedef struct {
+  r32 val;
+  unsigned key;
+} SortPair_r32;
+
+
+typedef struct {
+  r64 val;
+  unsigned key;
+} SortPair_r64;
+
+////////////////////////
+// C tensors variants
+
 typedef struct {
   r16* values;
   len_t sizes[MAX_DIMS];

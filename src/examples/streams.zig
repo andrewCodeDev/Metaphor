@@ -160,11 +160,13 @@ pub fn main() !void {
     const A_cpu = try EU.allocCPU(f32, M * N);
     defer EU.freeCPU(A_cpu);
 
-    const x_cpu = try EU.allocCPU(f32, M);
+    const x_cpu = try EU.allocCPU(f32, N * M);
     defer EU.freeCPU(x_cpu);
 
-    const y_cpu = try EU.allocCPU(f32, N);
+    const y_cpu = try EU.allocCPU(f32, M * M);
     defer EU.freeCPU(y_cpu);
+
+    std.log.info("Running single matrix multiplication on CPU (warning - takes a while)", .{});
 
     {
         const start = try std.time.Instant.now();

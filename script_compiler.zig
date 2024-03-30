@@ -146,6 +146,7 @@ pub fn objectFilesArgv(
     const comp_head: []const []const u8 = &.{ "nvcc", "-c" };
     const comp_tail: []const []const u8 = &.{
         "-O3",
+        "-std=c++20",
         "--allow-unsupported-compiler",
         "-ccbin",
         config.gcc_bin_path,

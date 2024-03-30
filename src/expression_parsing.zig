@@ -312,7 +312,7 @@ pub fn innerProductSizes(comptime str: []const u8) struct { x_map: []const ?usiz
         }
     }
     const _x_map = x_map;
-    const _y_map = x_map;
+    const _y_map = y_map;
     return .{ .x_map = _x_map[0..], .y_map = _y_map[0..], .len = out.len };
 }
 

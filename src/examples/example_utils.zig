@@ -14,6 +14,50 @@ pub fn copyAndPrintFlat(name: []const u8, src: anytype, stream: anytype) !void {
     std.debug.print("\n{s}: {any} ", .{ name, dst });
 }
 
+pub fn copyAndPrintKeys(src: anytype, keys: []mp.types.Key, stream: anytype) !void {
+    std.debug.assert(src.len == keys.len);
+    
+    const cpu_src = try std.heap.c_allocator.alloc(std.meta.Child(@TypeOf(src)), keys.len);
+    defer std.heap.c_allocator.free(cpu_src);
+
+    const cpu_keys = try std.heap.c_allocator.alloc(mp.types.Key, keys.len);
+    defer std.heap.c_allocator.free(cpu_keys);
+
+    mp.stream.synchronize(stream);
+
+    mp.mem.copyFromDevice(keys, cpu_keys, stream);
+    mp.mem.copyFromDevice(src, cpu_src, stream);
+
+    mp.stream.synchronize(stream);
+
+    for (cpu_keys) |k| {
+        std.debug.print("{}: {d:.4}\n", .{ k, cpu_src[k] });
+    }
+}
+
+pub fn copyAndValidateKeys(src: anytype, keys: []mp.types.Key, stream: anytype) !void {
+    std.debug.assert(src.len == keys.len);
+    
+    const cpu_src = try std.heap.c_allocator.alloc(std.meta.Child(@TypeOf(src)), keys.len);
+    defer std.heap.c_allocator.free(cpu_src);
+
+    const cpu_keys = try std.heap.c_allocator.alloc(mp.types.Key, keys.len);
+    defer std.heap.c_allocator.free(cpu_keys);
+
+    mp.stream.synchronize(stream);
+
+    mp.mem.copyFromDevice(keys, cpu_keys, stream);
+    mp.mem.copyFromDevice(src, cpu_src, stream);
+
+    mp.stream.synchronize(stream);
+
+    var last: f32 = -std.math.inf(f32);
+    for (cpu_keys) |k| {
+        std.debug.assert(cpu_src[k] >= last);
+        last = cpu_src[k];
+    }
+}
+
 pub fn copyToCPU(src: anytype, stream: anytype) ![]std.meta.Child(@TypeOf(src)) {
     const dst = try std.heap.c_allocator.alloc(std.meta.Child(@TypeOf(src)), src.len);
 
@@ -27,11 +71,11 @@ pub fn copyToCPU(src: anytype, stream: anytype) ![]std.meta.Child(@TypeOf(src)) 
 }
 
 pub fn freeCPU(src: anytype) void {
-    std.heap.page_allocator.free(src);
+    std.heap.c_allocator.free(src);
 }
 
 pub fn allocCPU(comptime T: type, N: usize) ![]T {
-    return try std.heap.page_allocator.alloc(T, N);
+    return try std.heap.c_allocator.alloc(T, N);
 }
 
 pub fn cpuPrintMatrix(name: []const u8, src: anytype, row: usize, col: usize) void {

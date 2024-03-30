@@ -61,7 +61,7 @@ inline fn castSlice(comptime T: type, ptr: *anyopaque, N: usize) []T {
 // MAX_DIMS is the highest rank a tensor can be
 
 const MAX_TYPES: usize = 4;
-const MAX_NODES = 256;
+const MAX_NODES = 1024;
 
 pub const LaneAllocator = struct {
     const Self = @This();
@@ -70,7 +70,7 @@ pub const LaneAllocator = struct {
 
     const AnyNode = AnyList.Node;
 
-    const TensorStackSize = 256;
+    const TensorStackSize = 1024;
 
     const TensorStack = std.BoundedArray(struct { list: AnyList, len: usize }, TensorStackSize);
 
@@ -199,18 +199,6 @@ pub const LaneAllocator = struct {
         return count;
     }
 
-    // TODO: remove this function. The graph needs to do more cleanup and this shouldn't be called directly
-    pub fn freeRaw(self: *Self, raw: SliceUnion, stream: Stream) void {
-        switch (raw) {
-            .q8 => self.free(raw.q8, stream),
-            .r16 => self.free(raw.r16, stream),
-            .r32 => self.free(raw.r32, stream),
-            .r64 => self.free(raw.r64, stream),
-            .c16 => self.free(raw.c16, stream),
-            .c32 => self.free(raw.c32, stream),
-            .c64 => self.free(raw.c64, stream),
-        }
-    }
 
     ///////////////////////////////////////////
     // internal functions for the LaneAllocator

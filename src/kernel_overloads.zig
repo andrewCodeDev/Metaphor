@@ -21,10 +21,22 @@ pub const kernel_tanh = OverloadSet(.{
 	decls.launch_tanh_r64,
 });
 
+pub const kernel_extract_sort_keys_i = OverloadSet(.{
+	decls.launch_extract_sort_keys_i_r16,
+	decls.launch_extract_sort_keys_i_r32,
+	decls.launch_extract_sort_keys_i_r64,
+});
+
 pub const kernel_cce_loss_i_i = OverloadSet(.{
 	decls.launch_cce_loss_i_i_r16,
 	decls.launch_cce_loss_i_i_r32,
 	decls.launch_cce_loss_i_i_r64,
+});
+
+pub const kernel_setup_sort_pairs_i = OverloadSet(.{
+	decls.launch_setup_sort_pairs_i_r16,
+	decls.launch_setup_sort_pairs_i_r32,
+	decls.launch_setup_sort_pairs_i_r64,
 });
 
 pub const kernel_hadamard_reverse = OverloadSet(.{
@@ -135,6 +147,12 @@ pub const kernel_addition = OverloadSet(.{
 	decls.launch_addition_c64,
 });
 
+pub const kernel_sort_key_i = OverloadSet(.{
+	decls.launch_kernel_sort_key_i_r16,
+	decls.launch_kernel_sort_key_i_r32,
+	decls.launch_kernel_sort_key_i_r64,
+});
+
 pub const kernel_softmax_ij_j = OverloadSet(.{
 	decls.launch_softmax_ij_j_r16,
 	decls.launch_softmax_ij_j_r32,
@@ -214,5 +232,11 @@ pub const kernel_linear_ij_j = OverloadSet(.{
 	decls.launch_linear_ij_j_r16,
 	decls.launch_linear_ij_j_r32,
 	decls.launch_linear_ij_j_r64,
+});
+
+pub const kernel_copy = OverloadSet(.{
+	decls.launch_copy_r16,
+	decls.launch_copy_r32,
+	decls.launch_copy_r64,
 });
 

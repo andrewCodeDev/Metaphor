@@ -71,6 +71,24 @@ EXTERN_C void launch_tanh_r64(
         r64* b, 
   len_t N
 );
+EXTERN_C void launch_extract_sort_keys_i_r16(
+  StreamCtx stream, 
+  const SortPair_r16* pairs, 
+  unsigned* keys, 
+  len_t n
+);
+EXTERN_C void launch_extract_sort_keys_i_r32(
+  StreamCtx stream, 
+  const SortPair_r32* pairs, 
+  unsigned* keys, 
+  len_t n
+);
+EXTERN_C void launch_extract_sort_keys_i_r64(
+  StreamCtx stream, 
+  const SortPair_r64* pairs, 
+  unsigned* keys, 
+  len_t n
+);
 EXTERN_C void launch_cce_loss_i_i_r16(
   StreamCtx stream,
   const r16* src_value, 
@@ -97,6 +115,24 @@ EXTERN_C void launch_cce_loss_i_i_r64(
         r64* scratch,
         double*  redux, // scalar
   len_t m
+);
+EXTERN_C void launch_setup_sort_pairs_i_r16(
+  StreamCtx stream,
+  const r16* src, 
+  SortPair_r16* pairs, 
+  len_t n
+);
+EXTERN_C void launch_setup_sort_pairs_i_r32(
+  StreamCtx stream,
+  const r32* src, 
+  SortPair_r32* pairs, 
+  len_t n
+);
+EXTERN_C void launch_setup_sort_pairs_i_r64(
+  StreamCtx stream,
+  const r64* src, 
+  SortPair_r64* pairs, 
+  len_t n
 );
 EXTERN_C void launch_hadamard_reverse_r16(
   StreamCtx stream,
@@ -575,6 +611,24 @@ EXTERN_C void launch_addition_c64(
   c64* c, 
   len_t N
 );
+EXTERN_C void launch_kernel_sort_key_i_r16(
+  StreamCtx stream,
+  SortPair_r16* gpu_p1,
+  unsigned* per_thread_remaining,
+  len_t n
+);
+EXTERN_C void launch_kernel_sort_key_i_r32(
+  StreamCtx stream,
+  SortPair_r32* gpu_p1,
+  unsigned* per_thread_remaining,
+  len_t n
+);
+EXTERN_C void launch_kernel_sort_key_i_r64(
+  StreamCtx stream,
+  SortPair_r64* gpu_p1,
+  unsigned* per_thread_remaining,
+  len_t n
+);
 EXTERN_C void launch_softmax_ij_j_r16(
   StreamCtx stream,
   const r16* A, 
@@ -913,4 +967,22 @@ EXTERN_C void launch_linear_ij_j_r64(
         r64 *y,
   len_t M, 
   len_t N
+);
+EXTERN_C void launch_copy_r16(
+  StreamCtx stream, 
+  const r16* src, 
+        r16* dst, 
+  len_t n
+);
+EXTERN_C void launch_copy_r32(
+  StreamCtx stream, 
+  const r32* src, 
+        r32* dst, 
+  len_t n
+);
+EXTERN_C void launch_copy_r64(
+  StreamCtx stream, 
+  const r64* src, 
+        r64* dst, 
+  len_t n
 );

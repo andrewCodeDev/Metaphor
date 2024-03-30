@@ -120,3 +120,25 @@ pub fn Child(comptime T: type) type {
         else => @compileError("Child function expects tensor or slice type."),
     };
 }
+
+// same as ceiling division - named after kernel macro
+pub inline fn dimpad(n: anytype, m: @TypeOf(n)) @TypeOf(n) {
+    return (n + (m - 1)) / m;
+}
+
+pub inline fn swap(x: anytype, y: @TypeOf(x)) void {
+    if (comptime !isPointer(@TypeOf(x))) {
+        @compileError("Swap requires pointer types");
+    }
+    const tmp = x.*;
+    x.* = y.*;
+    y.* = tmp;
+}
+
+pub inline fn isEven(x: anytype) bool {
+    return (x & 1) == 0;
+}
+
+pub inline fn isOdd(x: anytype) bool {
+    return !isEven(x);
+}

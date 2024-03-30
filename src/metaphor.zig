@@ -31,6 +31,7 @@ const Loss = @import("loss.zig");
 pub const device = struct {
     pub const init = DU.initDevice;
     pub const synchronize = DU.synchronizeDevice;
+    pub const check = DU.checkLastError();
 };
 
 pub const stream = struct {
@@ -47,12 +48,14 @@ pub const mem = struct {
     pub const alloc = DU.alloc;
     pub const create = DU.create;
     pub const free = DU.free;
-    pub const fill = TenOps.fill;
-    pub const sequence = TenOps.sequence;
-    pub const randomize = TenOps.randomize;
+    pub const fill = Algo.fill;
+    pub const fillSlice = Algo.fillSlice;
+    pub const copy = Algo.copy;
+    pub const copySlice = Algo.copySlice;
+    pub const sequence = Algo.sequence;
+    pub const randomize = Algo.randomize;
     pub const load = @import("tensor_file.zig").loadTensor;
     pub const save = @import("tensor_file.zig").saveTensor;
-    pub const allocKeys = Algo.allocKeys;
 };
 
 pub const types = struct {
@@ -382,7 +385,15 @@ pub const algo = struct {
 
             Algo.callReduceKey(dst.stream(), src, dst, keys, alpha, expression);
         }
+
+        pub fn sort(src: anytype, keys: []types.Key) void {
+            if (comptime !isGraphTensor(@TypeOf(src)))
+                @compileError("reduce key requires graph tensors.");
+            
+            Algo.callSortKey(src.stream(), src, keys);
+        }
     };
+
 };
 
 /////////////////////////////////////////////

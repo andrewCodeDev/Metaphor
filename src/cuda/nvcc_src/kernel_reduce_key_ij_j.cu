@@ -32,7 +32,7 @@ __global__ void __kernel_reduce_key_ij_j_RScalar(
                 // reduce x + y to blockIdx.y
                 for (unsigned offset = 0; offset < src_col; offset += blockDim.x) {
                     // traverse 2 src_column in chunks and sum into scratch
-                    if (offset + blockIdx.x < src_col) {
+                    if (offset + threadIdx.x < src_col) {
                         scratch[(blockIdx.y * src_col) + threadIdx.x + offset] += 
                           src[lower_src + threadIdx.x + offset] + src[upper_src + threadIdx.x + offset];
                     }
@@ -41,7 +41,7 @@ __global__ void __kernel_reduce_key_ij_j_RScalar(
                 // only reduce x to blockIdx.y
                 for (unsigned offset = 0; offset < src_col; offset += blockDim.x) {
                     // traverse 2 src_column in chunks and sum into scratch
-                    if (offset + blockIdx.x < src_col) {
+                    if (offset + threadIdx.x < src_col) {
                         scratch[(blockIdx.y * src_col) + threadIdx.x + offset] += src[lower_src + threadIdx.x + offset];
                     }
                 }

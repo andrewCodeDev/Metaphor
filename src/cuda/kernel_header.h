@@ -15,6 +15,7 @@ typedef struct {
 #define CScalar c32
 #define RTensor RTensor32
 #define CTensor CTensor32
+#define SortPair_RScalar SortPair_r32
 
 #define DIMPAD(M, N) (((M) + ((N) - 1)) / (N))
 
@@ -30,11 +31,49 @@ typedef struct {
 #include "../../deps/cuda/include/cuda_runtime.h"
 #include "../../deps/cuda/include/cooperative_groups.h"
 
+// guarentee cleanup reguardles of exit
+// acts like a defer statement for malloc
+template<class T>
+struct ScopedHostPtr {
+    T* ptr = nullptr;
+    ScopedHostPtr(len_t n) {
+      this->ptr = static_cast<T*>(std::malloc(n * sizeof(T)));
+    }
+    ~ScopedHostPtr() { 
+      std::free(ptr); 
+    }
+};
+
+// TODO: may not be portable
+inline uint32_t nextPow2(uint32_t n) {
+  return (n == 1) ? 1 : 1 << (32 - __builtin_clzl(n - 1)); 
+}
+
+// TODO: may not be portable
+inline uint64_t nextPow2(uint64_t n) {
+  return (n == 1) ? 1 : 1 << (64 - __builtin_clzl(n - 1)); 
+}
+
 #if defined(__CUDACC__)
 
 inline CUstream getCtx(StreamCtx context) {
   return static_cast<CUstream>(context.ptr);
 }
+
+template<class T>
+struct ScopedCudaPtr {
+    T* ptr;
+    StreamCtx stream;
+    ScopedCudaPtr(len_t n, StreamCtx _stream) {
+      CUdeviceptr dptr = 0;
+      cuMemAllocAsync(&dptr, n * sizeof(T), getCtx(_stream));
+      this->ptr = reinterpret_cast<T*>(dptr);
+      this->stream = _stream;
+    }
+    ~ScopedCudaPtr() { 
+      cuMemFreeAsync(reinterpret_cast<CUdeviceptr>(ptr), getCtx(stream)); 
+    }
+};
 
 namespace cg = cooperative_groups;
 

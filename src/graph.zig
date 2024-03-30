@@ -50,7 +50,7 @@ const SizeType = TC.SizeType;
 const Strides = TC.Strides;
 const Sizes = TC.Sizes;
 
-const fillSlice = @import("tensor_ops.zig").fillSlice;
+const fillSlice = @import("algorithm.zig").fillSlice;
 
 pub fn isGraphTensor(comptime T: type) bool {
     return switch (@typeInfo(T)) {

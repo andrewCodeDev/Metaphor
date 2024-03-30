@@ -8,28 +8,55 @@ const std = @import("std");
 pub fn main() !void {
     mp.device.init(0);
 
+    //mp.device.reset();
+
     const stream = mp.stream.init();
         defer mp.stream.deinit(stream);
 
     const G = mp.Graph.init(.{ .stream = stream, .mode = .eval });
         defer G.deinit();
 
-    const m: usize = 32;
-    const n: usize = 16;
+    const m: usize = 1048;
 
-    const X = G.tensor(.inp, .r32, mp.Rank(2){m, n});
-    const Y = G.tensor(.inp, .r32, mp.Rank(1){n});
+    const x = G.tensor(.inp, .r32, mp.Rank(1){m});
+        defer x.free();
 
-    mp.mem.fill(X, 1.0);
+    mp.mem.randomize(x);
 
-    const key_len: usize = 6;
-    
-    const keys = mp.mem.allocKeys(key_len, stream);
+    const keys = mp.mem.alloc(mp.types.Key, x.len(), stream);
         defer mp.mem.free(keys, stream);
 
-    mp.algo.key.reduceScaled(X, Y, keys, 0.1, "ij->j");
+    mp.algo.key.sort(x, keys);
 
-    try EU.copyAndPrintMatrix("Y", Y.values(), n, 1, stream);
+    try EU.copyAndPrintKeys(x.values(), keys, x.stream());
+
+    //const W = G.tensor(.inp, .r32, mp.Rank(2){m, n});
+    //const c = G.tensor(.inp, .r32, mp.Rank(1){n});
+
+    //mp.mem.randomize(x);
+    //mp.mem.randomize(W);
+    //
+    //const keys = mp.mem.allocKeys(n, stream);
+    //    defer mp.mem.free(keys, stream);
+
+    //const top_k: usize = 10;
+    //const alpha: f32 = 0.10;
+
+    //for (0..10) |_| {
+
+    //    // get highest overlap:
+    //    const y = mp.ops.innerProduct(W, x, "ij,j->i");
+    //        defer y.free();
+
+    //    mp.algo.key.sort(y, keys);
+    //    
+    //    mp.algo.key.reduceScaled(W, c, keys[0..top_k], alpha, "ij->j");
+    //    
+    //    mp.mem.resetKeys(keys, c.stream());
+    //}
+
+
+    //try EU.copyAndPrintMatrix("Y", Y.values(), n, 1, stream);
 
     ////////////////////////////////////////////
 }

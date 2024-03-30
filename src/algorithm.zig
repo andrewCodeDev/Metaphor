@@ -317,7 +317,7 @@ fn mergeRemainderCPU(
 
     const memo = cpu_p1.ptr;
     
-    while (UT.dimpad(per_thread, total) <= 2) : (per_thread *= 2){
+    while (UT.dimpad(per_thread, total - 1) <= 2) : (per_thread *= 2){
         
         var left: u32 = 0;
 

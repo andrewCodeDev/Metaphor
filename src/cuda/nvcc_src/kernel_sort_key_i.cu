@@ -14,16 +14,17 @@
 __global__ void __kernel_merge_sort_key_i_RScalar(
       const SortPair_RScalar* src_pairs, // pairs for reading value and index
             SortPair_RScalar* dst_pairs, // pairs for writing value and index
-      unsigned merges, // number of unmerged subsections
       unsigned per_thread, // number of elements per thrad
       unsigned n
 ) {
     const unsigned tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (tid < merges) {
+    const unsigned left = tid * per_thread;
 
-        const unsigned left = tid * per_thread;
+    if (left < n) {
+
         unsigned right = left + per_thread;
+
         const unsigned mid = ((right - left) / 2) + left;
 
         // this check sees if we're in a partition that
@@ -81,16 +82,17 @@ __global__ void __kernel_merge_sort_key_i_RScalar(
 template <unsigned CacheSize>
 __global__ void __kernel_merge_sort_key_cached_i_RScalar(
   SortPair_RScalar* pairs, // pairs containing value and index
-  unsigned merges, // number of merge pairs remaining
   unsigned per_thread, // number of elements per thrad
   unsigned n // total length of vector
 ){
     const unsigned tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (tid < merges) {
+    unsigned src_idx = tid * per_thread;
 
-        unsigned src_idx = tid * per_thread;
+    if (src_idx < n) {
+
         const unsigned mid = per_thread / 2;
+
         unsigned right = per_thread;
 
         // this thread assumes that it has per_thread items to merge. However,
@@ -170,13 +172,13 @@ extern "C" void launch_kernel_sort_key_i_RScalar(
     // until we've hit the hard cache limit (512)
     while (per_thread <= 512) {
 
-        if (DIMPAD(per_thread, total) > 2) {
+        if (DIMPAD(per_thread, total - 1) > 2) {
             merges = 0;
             break;
         }
 
         __kernel_merge_sort_key_cached_i_RScalar<512>
-            <<<thread_blocks, gpu_threads, 0, getCtx(stream)>>>(gpu_p1, merges, per_thread, n);
+            <<<thread_blocks, gpu_threads, 0, getCtx(stream)>>>(gpu_p1, per_thread, n);
 
         per_thread *= 2;
 
@@ -200,7 +202,7 @@ extern "C" void launch_kernel_sort_key_i_RScalar(
         while (merges > 256) {
                         
             __kernel_merge_sort_key_i_RScalar
-                <<<thread_blocks, gpu_threads, 0, getCtx(stream)>>>(gpu_p1, gpu_p2, merges, per_thread, n);
+                <<<thread_blocks, gpu_threads, 0, getCtx(stream)>>>(gpu_p1, gpu_p2, per_thread, n);
 
             per_thread *= 2;
             merges = DIMPAD(total, per_thread);

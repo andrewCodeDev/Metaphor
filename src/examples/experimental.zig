@@ -16,7 +16,7 @@ pub fn main() !void {
     const G = mp.Graph.init(.{ .stream = stream, .mode = .eval });
         defer G.deinit();
 
-    const m: usize = 1048;
+    const m: usize = 9;
 
     const x = G.tensor(.inp, .r32, mp.Rank(1){m});
         defer x.free();

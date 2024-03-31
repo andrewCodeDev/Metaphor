@@ -140,4 +140,7 @@ pub fn main() !void {
     }
 
     ////////////////////////////////////////////
+    mp.device.check();
+
+    std.log.info("Feedforward: SUCCESS", .{});
 }

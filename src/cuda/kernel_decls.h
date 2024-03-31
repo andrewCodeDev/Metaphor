@@ -134,6 +134,24 @@ EXTERN_C void launch_setup_sort_pairs_i_r64(
   SortPair_r64* pairs, 
   len_t n
 );
+EXTERN_C void launch_norm_l2_i_i_r16(
+  StreamCtx stream, 
+  const r16* src, 
+        r16* dst, 
+  len_t n
+);
+EXTERN_C void launch_norm_l2_i_i_r32(
+  StreamCtx stream, 
+  const r32* src, 
+        r32* dst, 
+  len_t n
+);
+EXTERN_C void launch_norm_l2_i_i_r64(
+  StreamCtx stream, 
+  const r64* src, 
+        r64* dst, 
+  len_t n
+);
 EXTERN_C void launch_hadamard_reverse_r16(
   StreamCtx stream,
   r16 *grads_a,
@@ -406,6 +424,27 @@ EXTERN_C void launch_mse_loss_i_i_r64(
         r64* scratch,
         double*  redux, // scalar
   len_t m
+);
+EXTERN_C void launch_norm_l2_i_i_reverse_r16(
+  StreamCtx stream, 
+  const r16* src_value,
+        r16* src_grads, 
+  const r16* dst_grads, 
+  len_t n
+);
+EXTERN_C void launch_norm_l2_i_i_reverse_r32(
+  StreamCtx stream, 
+  const r32* src_value,
+        r32* src_grads, 
+  const r32* dst_grads, 
+  len_t n
+);
+EXTERN_C void launch_norm_l2_i_i_reverse_r64(
+  StreamCtx stream, 
+  const r64* src_value,
+        r64* src_grads, 
+  const r64* dst_grads, 
+  len_t n
 );
 EXTERN_C void launch_reduce_key_ij_j_r16(
     StreamCtx stream,

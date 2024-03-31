@@ -31,7 +31,7 @@ const Loss = @import("loss.zig");
 pub const device = struct {
     pub const init = DU.initDevice;
     pub const synchronize = DU.synchronizeDevice;
-    pub const check = DU.checkLastError();
+    pub const check = DU.checkLastError;
 };
 
 pub const stream = struct {
@@ -364,6 +364,26 @@ pub const ops = struct {
 
         return if (graph.mode == .eval) Z else appendNode(graph, @TypeOf(lin), .{ X, Y, alpha, B, 1.0 }, Z);
     }
+
+    pub const norm = struct {
+
+        pub fn l2(X: anytype, comptime expression: []const u8) NodeTensor(Child(@TypeOf(X))) {
+            if (comptime !isGraphTensor(@TypeOf(X))){
+                @compileError("Linear requires graph tensors.");
+            }
+            const graph = X.ptr;
+    
+            const Y = nodeTensor(graph, X.sizes(), UT.Child(@TypeOf(X)));
+
+            // locate inner product by expression
+            const l2_norm = TenOps.findNormL2(expression){};
+
+            // cancel out addition using 0.0 for beta
+            l2_norm.forward(X.stream(), X, Y);
+
+            return if (graph.mode == .eval) Y else appendNode(graph, @TypeOf(l2_norm), .{ X }, Y);
+        }
+    };
 };
 
 pub const algo = struct {

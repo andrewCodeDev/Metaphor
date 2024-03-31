@@ -7,18 +7,6 @@ const len_t WARP_SIZE = 32;
 const len_t UINT_BUFFER_SIZE = 32;
 
 // coalesced types for load optimization
-#if defined(__cplusplus)
-
-template <class T>
-struct coalesce {
-  using c_ptr = const coalesce<T>*;
-  using ptr = coalesce<T>*;
-  static constexpr len_t warp_step = WARP_SIZE / 4;
-  T w, x, y, z;
-};
-
-#else
-#endif
 
 // fundamental types
 
@@ -41,6 +29,27 @@ typedef struct {
 
 typedef float  r32;
 typedef double r64;
+
+// C++ helper classes
+#if defined(__cplusplus)
+
+template <class T>
+struct coalesce {
+  using c_ptr = const coalesce<T>*;
+  using ptr = coalesce<T>*;
+  static constexpr len_t warp_step = WARP_SIZE / 4;
+  T w, x, y, z;
+};
+
+// used to adjust precision up on r16
+template <class T> struct precision;
+template <> struct precision<r16>{ using type = r32; static __device__ type cast(type x){ return x; }};
+template <> struct precision<r32>{ using type = r32; static __device__ type cast(type x){ return x; }};
+template <> struct precision<r64>{ using type = r64; static __device__ type cast(type x){ return x; }};
+
+#else
+#endif
+
 
 typedef struct {
   r16 r;

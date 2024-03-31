@@ -319,21 +319,22 @@ pub fn innerProductSizes(comptime str: []const u8) struct { x_map: []const ?usiz
 ////////////////////////////////////////////////
 // Softmax expression parser
 
-pub fn softmaxExpression(comptime str: []const u8) []const u8 {
+// TODO: come up with a better name
+pub fn transformExpression(comptime str: []const u8) []const u8 {
     const pipe = comptime std.mem.indexOfScalar(u8, str, '|') orelse @compileError("No pipe operator found on softmax.");
 
     if (comptime pipe != str.len - 2) {
-        @compileError("Softmax requires that right hand index specifies either a row or column:" ++ str);
+        @compileError("Transform requires that right hand index specifies either a row or column: " ++ str);
     }
     const trn = comptime translateIndices(str);
     const lhs = comptime trn[0..pipe];
     const rhs = comptime trn[pipe + 1 ..];
 
-    if (comptime lhs.len <= rhs.len) {
-        @compileError("Softmax found extra indices in expression:" ++ str);
+    if (comptime lhs.len < rhs.len) {
+        @compileError("Transform found extra indices in expression: " ++ str);
     }
     if (comptime !isSubset(rhs, lhs)) {
-        @compileError("Softmax requires that right hand index is a subset of left-hand indices:" ++ str);
+        @compileError("Transform requires that right hand index is a subset of left-hand indices: " ++ str);
     }
 
     // TODO: More checks plz...
@@ -371,10 +372,10 @@ pub fn reduceExpression(comptime str: []const u8) []const u8 {
     const rhs = comptime trn[arrow.head + 1 ..];
 
     if (comptime lhs.len < rhs.len) {
-        @compileError("Reduce found extra indices in expression:" ++ str);
+        @compileError("Reduce found extra indices in expression: " ++ str);
     }
     if (comptime !isSubset(rhs, lhs)) {
-        @compileError("Reduce requires that right hand index is a subset of left-hand indices:" ++ str);
+        @compileError("Reduce requires that right hand index is a subset of left-hand indices: " ++ str);
     }
 
     // TODO: More checks plz...

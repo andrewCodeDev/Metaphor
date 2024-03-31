@@ -39,6 +39,12 @@ pub const kernel_setup_sort_pairs_i = OverloadSet(.{
 	decls.launch_setup_sort_pairs_i_r64,
 });
 
+pub const kernel_norm_l2_i_i = OverloadSet(.{
+	decls.launch_norm_l2_i_i_r16,
+	decls.launch_norm_l2_i_i_r32,
+	decls.launch_norm_l2_i_i_r64,
+});
+
 pub const kernel_hadamard_reverse = OverloadSet(.{
 	decls.launch_hadamard_reverse_r16,
 	decls.launch_hadamard_reverse_c16,
@@ -97,6 +103,12 @@ pub const kernel_mse_loss_i_i = OverloadSet(.{
 	decls.launch_mse_loss_i_i_r16,
 	decls.launch_mse_loss_i_i_r32,
 	decls.launch_mse_loss_i_i_r64,
+});
+
+pub const kernel_norm_l2_i_i_reverse = OverloadSet(.{
+	decls.launch_norm_l2_i_i_reverse_r16,
+	decls.launch_norm_l2_i_i_reverse_r32,
+	decls.launch_norm_l2_i_i_reverse_r64,
 });
 
 pub const kernel_reduce_key_ij_j = OverloadSet(.{

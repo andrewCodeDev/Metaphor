@@ -98,6 +98,7 @@ const EXAMPLE_NAMES = &[_][]const u8{
     "streams",
     "subgraphs",
     "feedforward",
+    "keys",
 
     // this is for development purposes
     "experimental",

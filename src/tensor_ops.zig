@@ -155,9 +155,7 @@ pub fn tanhReverse(stream: Stream, x: anytype, y: anytype) void {
 }
 
 pub const TanhCallback = CallbackBuilder(
-    tanhForward,
-    .{.{ tanhReverse, 0 }},
-    NoCleanup,
+    tanhForward, .{.{ tanhReverse, 0 }}, NoCleanup,
 );
 
 // <>--------------------------------------------------------<>
@@ -171,10 +169,39 @@ pub fn seluReverse(stream: Stream, x: anytype, y: anytype) void {
 }
 
 pub const SeluCallback = CallbackBuilder(
-    seluForward,
-    .{.{ seluReverse, 0 }},
-    NoCleanup,
+    seluForward, .{.{ seluReverse, 0 }}, NoCleanup,
 );
+
+// <>--------------------------------------------------------<>
+
+pub fn norm_l2_i_i_forward(stream: Stream, x: anytype, y: anytype) void {
+    std.debug.assert(x.sizes().len == 1);
+    std.debug.assert(y.sizes().len == 1);
+    std.debug.assert(x.len() == y.len());
+    overloads.kernel_norm_l2_i_i.call(.{ stream.context, x.values().ptr, y.values().ptr, y.len() });
+}
+pub fn norm_l2_i_i_reverse(stream: Stream, x: anytype, y: anytype) void {
+    std.debug.assert(x.sizes().len == 1);
+    std.debug.assert(y.sizes().len == 1);
+    std.debug.assert(x.len() == y.len());
+    overloads.kernel_norm_l2_i_i_reverse.call(.{ stream.context, x.values().ptr, x.grads().?.ptr, y.grads().?.ptr, y.len() });
+}
+pub const NormL2_i_i_Callback = CallbackBuilder(
+    norm_l2_i_i_forward, .{.{ norm_l2_i_i_reverse, 0 }}, NoCleanup
+);
+
+const norm_l2_expressions = std.ComptimeStringMap(type, .{
+    .{ "i|i", NormL2_i_i_Callback },
+});
+
+pub fn findNormL2(comptime expression: []const u8) type {
+    const parsed = comptime Parser.transformExpression(expression);
+    if (comptime norm_l2_expressions.get(parsed)) |norm| {
+        return norm;
+    } else {
+        @compileError("TODO: invalid softmax expression:" ++ expression);
+    }
+}
 
 // <>--------------------------------------------------------<>
 
@@ -248,13 +275,12 @@ pub const SM_ij_j_Callback = CallbackBuilder(
     NoCleanup,
 );
 const softmax_expressions = std.ComptimeStringMap(type, .{
-    // Rank-1-to-Rank-2
     .{ "i|i", SM_i_i_Callback },
     .{ "ij|j", SM_ij_j_Callback },
 });
 
 pub fn findSoftmax(comptime expression: []const u8) type {
-    const parsed = comptime Parser.softmaxExpression(expression);
+    const parsed = comptime Parser.transformExpression(expression);
     if (comptime softmax_expressions.get(parsed)) |sm| {
         return sm;
     } else {

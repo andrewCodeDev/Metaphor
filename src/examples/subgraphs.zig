@@ -134,6 +134,7 @@ pub fn main() !void {
     // You cannot reuse the nodes again after you do this.
 
     ////////////////////////////////////////////
+    mp.device.check();
 
     std.log.info("Subgraphs: SUCCESS", .{});
 }

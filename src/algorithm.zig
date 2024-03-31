@@ -50,7 +50,7 @@ pub fn reduceKey_ij_j(
     const scratch = stream.getScratch(T, blocks * x_sizes[1]);
 
     // TODO: consider making this unnecessary - would need kernel update
-    TenOps.fillSlice(T, scratch, 0.0, stream);
+    fillSlice(T, scratch, 0.0, stream);
 
     overloads.kernel_reduce_key_ij_j.call(.{
         stream.context, x.values().ptr, y.values().ptr, keys.ptr, SC.asScalar(T, alpha), scratch.ptr, x_sizes[1], keys.len        

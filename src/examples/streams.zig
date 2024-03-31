@@ -183,5 +183,8 @@ pub fn main() !void {
         std.log.info("CPU 1 thread elapsed (ns): {}", .{delta});
     }
 
+    mp.device.check();
+
+    std.log.info("Keys: SUCCESS", .{});
     ////////////////////////////////////////////
 }

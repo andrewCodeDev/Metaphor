@@ -190,8 +190,27 @@ pub const NormL2_i_i_Callback = CallbackBuilder(
     norm_l2_i_i_forward, .{.{ norm_l2_i_i_reverse, 0 }}, NoCleanup
 );
 
+pub fn norm_l2_ij_j_forward(stream: Stream, x: anytype, y: anytype) void {
+    std.debug.assert(x.sizes().len == 2);
+    std.debug.assert(y.sizes().len == 2);
+    std.debug.assert(std.mem.eql(TC.SizeType, x.sizes(), y.sizes()));
+    const x_sizes = x.sizes();
+    overloads.kernel_norm_l2_ij_j.call(.{ stream.context, x.values().ptr, y.values().ptr, x_sizes[0], x_sizes[1] });
+}
+pub fn norm_l2_ij_j_reverse(stream: Stream, x: anytype, y: anytype) void {
+    std.debug.assert(x.sizes().len == 2);
+    std.debug.assert(y.sizes().len == 2);
+    std.debug.assert(std.mem.eql(TC.SizeType, x.sizes(), y.sizes()));
+    const x_sizes = x.sizes();
+    overloads.kernel_norm_l2_ij_j_reverse.call(.{ stream.context, x.values().ptr, x.grads().?.ptr, y.grads().?.ptr, x_sizes[0], x_sizes[1] });
+}
+pub const NormL2_ij_j_Callback = CallbackBuilder(
+    norm_l2_ij_j_forward, .{.{ norm_l2_ij_j_reverse, 0 }}, NoCleanup
+);
+
 const norm_l2_expressions = std.ComptimeStringMap(type, .{
     .{ "i|i", NormL2_i_i_Callback },
+    .{ "ij|j", NormL2_ij_j_Callback },
 });
 
 pub fn findNormL2(comptime expression: []const u8) type {

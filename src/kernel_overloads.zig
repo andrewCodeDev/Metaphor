@@ -3,6 +3,12 @@ const OverloadSet = @import("overloadset.zig").OverloadSet;
 
 const decls = @import("cimport.zig").C;
 
+pub const kernel_norm_l2_ij_j = OverloadSet(.{
+	decls.launch_norm_l2_ij_j_r16,
+	decls.launch_norm_l2_ij_j_r32,
+	decls.launch_norm_l2_ij_j_r64,
+});
+
 pub const kernel_permutate_ij_ji = OverloadSet(.{
 	decls.launch_permutate_ij_ji_r16,
 	decls.launch_permutate_ij_ji_r32,
@@ -85,6 +91,12 @@ pub const kernel_softmax_i_i = OverloadSet(.{
 	decls.launch_softmax_i_i_r16,
 	decls.launch_softmax_i_i_r32,
 	decls.launch_softmax_i_i_r64,
+});
+
+pub const kernel_norm_l2_ij_j_reverse = OverloadSet(.{
+	decls.launch_norm_l2_ij_j_reverse_r16,
+	decls.launch_norm_l2_ij_j_reverse_r32,
+	decls.launch_norm_l2_ij_j_reverse_r64,
 });
 
 pub const kernel_selu_reverse = OverloadSet(.{

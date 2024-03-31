@@ -8,6 +8,27 @@
     #define EXTERN_C extern
 #endif
 
+EXTERN_C void launch_norm_l2_ij_j_r16(
+  StreamCtx stream, 
+  const r16* src, 
+        r16* dst, 
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_norm_l2_ij_j_r32(
+  StreamCtx stream, 
+  const r32* src, 
+        r32* dst, 
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_norm_l2_ij_j_r64(
+  StreamCtx stream, 
+  const r64* src, 
+        r64* dst, 
+  len_t m,
+  len_t n
+);
 EXTERN_C void launch_permutate_ij_ji_r16(
     StreamCtx stream,
     const r16* src,
@@ -355,6 +376,30 @@ EXTERN_C void launch_softmax_i_i_r64(
         r64* B, 
         r64* scratch,
   len_t m
+);
+EXTERN_C void launch_norm_l2_ij_j_reverse_r16(
+  StreamCtx stream,
+  const r16* src_value, // input
+        r16* src_grads, // output
+  const r16* dst_grads, // input
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_norm_l2_ij_j_reverse_r32(
+  StreamCtx stream,
+  const r32* src_value, // input
+        r32* src_grads, // output
+  const r32* dst_grads, // input
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_norm_l2_ij_j_reverse_r64(
+  StreamCtx stream,
+  const r64* src_value, // input
+        r64* src_grads, // output
+  const r64* dst_grads, // input
+  len_t m,
+  len_t n
 );
 EXTERN_C void launch_selu_reverse_r16(
   StreamCtx stream,

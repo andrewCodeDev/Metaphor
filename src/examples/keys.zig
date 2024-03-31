@@ -39,15 +39,27 @@ pub fn main() !void {
 
     const n: usize = 512;
 
-    // call normalize just for this example...
-    const x = mp.ops.norm.l2(G.tensor(.inp, .r32, mp.Rank(1){n}), "i|i");
+    // create unormalized tensors to setup example
+    const x_unorm = G.tensor(.inp, .r32, mp.Rank(1){n});
+    const W_unorm = G.tensor(.inp, .r32, mp.Rank(2){n, n});
+
+    mp.mem.randomize(x_unorm);
+    mp.mem.randomize(W_unorm);
+
+    // normalize across the i dimension
+    const x = mp.ops.norm.l2(x_unorm, "i|i");
     defer x.free();
 
-    const W = mp.ops.norm.l2(G.tensor(.inp, .r32, mp.Rank(2){n, n}), "ij|j");
+    // normalize across the j dimension
+    const W = mp.ops.norm.l2(W_unorm, "ij|j");
     defer W.free();
 
-    mp.mem.randomize(x);
-    mp.mem.randomize(W);
+    // wait until normalization is done
+    mp.stream.synchronize(stream);
+
+    // no need for the unormalized tensors
+    x_unorm.free();
+    W_unorm.free();
 
     ///////////////////////////////////////////////
     // Creating and initializing keys /////////////
@@ -117,6 +129,8 @@ pub fn main() !void {
     // of keys and why algorithms have the choice of their
     // intepretation of what keys represents.
     
-    ////////////////////////////////////////////
+    ////////////////////////////////////////////    
     mp.device.check();
+
+    std.log.info("Keys: SUCCESS", .{});
 }

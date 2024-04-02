@@ -43,8 +43,8 @@ pub fn main() !void {
     const x_unorm = G.tensor(.inp, .r32, mp.Rank(1){n});
     const W_unorm = G.tensor(.inp, .r32, mp.Rank(2){n, n});
 
-    mp.mem.randomize(x_unorm);
-    mp.mem.randomize(W_unorm);
+    mp.mem.randomize(x_unorm, .uniform);
+    mp.mem.randomize(W_unorm, .uniform);
 
     // normalize across the i dimension
     const x = mp.ops.norm.l2(x_unorm, "i|i");

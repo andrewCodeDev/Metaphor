@@ -323,6 +323,30 @@ EXTERN_C void launch_linear_ij_jk_r64(
   len_t n, 
   len_t k 
 );
+EXTERN_C void launch_reduce_ij_j_r16(
+    StreamCtx stream,
+    const r16* src,
+          r16* dst,
+          r16 alpha,
+    len_t m,
+    len_t n
+);
+EXTERN_C void launch_reduce_ij_j_r32(
+    StreamCtx stream,
+    const r32* src,
+          r32* dst,
+          r32 alpha,
+    len_t m,
+    len_t n
+);
+EXTERN_C void launch_reduce_ij_j_r64(
+    StreamCtx stream,
+    const r64* src,
+          r64* dst,
+          r64 alpha,
+    len_t m,
+    len_t n
+);
 EXTERN_C void launch_linear_i_ij_r16(
   StreamCtx stream,
   const r16 *x,
@@ -695,6 +719,30 @@ EXTERN_C void launch_addition_c64(
   c64* c, 
   len_t N
 );
+EXTERN_C void launch_broadcast_j_ij_r16(
+  StreamCtx stream, 
+  const r16* src, 
+        r16* dst, 
+        r16 alpha,
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_broadcast_j_ij_r32(
+  StreamCtx stream, 
+  const r32* src, 
+        r32* dst, 
+        r32 alpha,
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_broadcast_j_ij_r64(
+  StreamCtx stream, 
+  const r64* src, 
+        r64* dst, 
+        r64 alpha,
+  len_t m,
+  len_t n
+);
 EXTERN_C void launch_kernel_sort_key_i_r16(
   StreamCtx stream,
   SortPair_r16* gpu_p1,
@@ -757,6 +805,36 @@ EXTERN_C void launch_softmax_i_i_reverse_r64(
   const r64* b_grads,
         r64* scratch,
   len_t m
+);
+EXTERN_C void launch_cce_loss_ij_j_r16(
+  StreamCtx stream,
+  const r16* src_value, 
+        r16* src_grads, 
+  const len_t* trgs,
+        r16* scratch,
+        double* redux, // scalar
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_cce_loss_ij_j_r32(
+  StreamCtx stream,
+  const r32* src_value, 
+        r32* src_grads, 
+  const len_t* trgs,
+        r32* scratch,
+        double* redux, // scalar
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_cce_loss_ij_j_r64(
+  StreamCtx stream,
+  const r64* src_value, 
+        r64* src_grads, 
+  const len_t* trgs,
+        r64* scratch,
+        double* redux, // scalar
+  len_t m,
+  len_t n
 );
 EXTERN_C void launch_addition_reverse_r16(
   StreamCtx stream,
@@ -935,6 +1013,27 @@ EXTERN_C void launch_softmax_ij_j_reverse_r64(
         r64* A_grads,
   const r64* B_value, 
   const r64* B_grads,
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_max_key_ij_j_r16(
+  StreamCtx stream, 
+  const r16* src, 
+       unsigned* keys, // output
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_max_key_ij_j_r32(
+  StreamCtx stream, 
+  const r32* src, 
+       unsigned* keys, // output
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_max_key_ij_j_r64(
+  StreamCtx stream, 
+  const r64* src, 
+       unsigned* keys, // output
   len_t m,
   len_t n
 );

@@ -14,7 +14,7 @@ pub fn copyAndPrintFlat(name: []const u8, src: anytype, stream: anytype) !void {
     std.debug.print("\n{s}: {any} ", .{ name, dst });
 }
 
-pub fn copyAndPrintKeys(src: anytype, keys: []mp.types.Key, stream: anytype) !void {
+pub fn copyAndPrintKeyValues(src: anytype, keys: []mp.types.Key, stream: anytype) !void {
     std.debug.assert(src.len == keys.len);
     
     const cpu_src = try std.heap.c_allocator.alloc(std.meta.Child(@TypeOf(src)), keys.len);
@@ -31,7 +31,23 @@ pub fn copyAndPrintKeys(src: anytype, keys: []mp.types.Key, stream: anytype) !vo
     mp.stream.synchronize(stream);
 
     for (cpu_keys) |k| {
-        std.debug.print("{}: {d:.4}\n", .{ k, cpu_src[k] });
+        std.debug.print("{}: {d:.4}\n", .{ k, mp.scalar.as(f32, cpu_src[k]) });
+    }
+}
+
+pub fn copyAndPrintKey(keys: []mp.types.Key, stream: anytype) !void {
+    
+    const cpu_keys = try std.heap.c_allocator.alloc(mp.types.Key, keys.len);
+    defer std.heap.c_allocator.free(cpu_keys);
+
+    mp.stream.synchronize(stream);
+
+    mp.mem.copyFromDevice(keys, cpu_keys, stream);
+
+    mp.stream.synchronize(stream);
+
+    for (cpu_keys) |k| {
+        std.debug.print("{}\n", .{ k });
     }
 }
 

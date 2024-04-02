@@ -21,8 +21,8 @@ pub fn FeedForward(comptime Tag: mp.scalar.Tag) type {
         }
 
         pub fn randomize(self: *Self) void {
-            mp.mem.randomize(self.W);
-            mp.mem.randomize(self.b);
+            mp.mem.randomize(self.W, .gauss);
+            mp.mem.randomize(self.b, .gauss);
         }
 
         pub fn forward(self: *Self, x: anytype) mp.types.NodeTensor(T) {
@@ -118,7 +118,7 @@ pub fn main() !void {
     const x = G.tensor(.inp, .r32, mp.Rank(1){n});
     const t = 16;
 
-    mp.mem.randomize(x);
+    mp.mem.randomize(x, .gauss);
     net.randomize();
 
     var score: f64 = 0.0;

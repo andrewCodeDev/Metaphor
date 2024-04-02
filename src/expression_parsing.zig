@@ -382,3 +382,37 @@ pub fn reduceExpression(comptime str: []const u8) []const u8 {
 
     return comptime lhs ++ "->" ++ rhs;
 }
+
+////////////////////////////////////////////////
+// Reduce expression parser
+
+// TODO: 
+//  Broadcasting requiers that the user provides sizes,
+//  so this is more of a checking function than deduction.
+//  This is debatably only a debugging utility than a
+//  runtime deduction. Currently checked at the assertion
+//  level for any given tensor op.
+
+//pub fn broadcastSizes(comptime str: []const u8) struct { 
+//        y_map: []const ?usize, 
+//        x_len: usize,
+//        y_len: usize,
+//    } {
+//    const trn = translateIndices(str);
+//    const arrow = comptime findArrowOp(trn);
+//    const lhs = comptime trn[0..arrow.tail];
+//    const rhs = comptime trn[arrow.head + 1..];
+//
+//    // TODO: add checks for inner product
+//
+//    comptime var y_map: [lhs.len]?usize = .{null} ** rhs.len;
+//
+//    // left hand side indices
+//    for (lhs, 0..) |l, i| {
+//        for (rhs, 0..) |r, j| {
+//            if (l == r) y_map[i] = j;
+//        }
+//    }
+//    const _y_map = y_map;
+//    return .{ .x_map = _y_map[0..], .x_len = lhs.len, .y_len = rhs.len };
+//}

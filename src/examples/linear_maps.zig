@@ -24,9 +24,9 @@ pub fn main() !void {
     const A = G.tensor(.inp, .r32, mp.Rank(2){ M, N });
     const b = G.tensor(.inp, .r32, mp.Rank(1){N});
 
-    mp.mem.randomize(x);
-    mp.mem.randomize(A);
-    mp.mem.randomize(b);
+    mp.mem.randomize(x, .gauss);
+    mp.mem.randomize(A, .gauss);
+    mp.mem.randomize(b, .gauss);
 
     // in this example, we'll explore using the innerProduct
     // and linear functions. Linear transformations have the

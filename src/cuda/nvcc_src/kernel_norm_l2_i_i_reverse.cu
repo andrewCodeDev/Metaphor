@@ -66,10 +66,10 @@ __global__ void __kernel_norm_l2_i_i_reverse_RScalar(
     if ((ofs + 4) < n) {
       auto u = *reinterpret_cast<coalesce<RScalar>::c_ptr>(&src_value[ofs]);
       auto g = *reinterpret_cast<coalesce<RScalar>::c_ptr>(&dst_grads[ofs]);
-      u.w = __grad_calc_RScalar(u.w, g.w, s_sum, g_sum, denom);
-      u.x = __grad_calc_RScalar(u.x, g.x, s_sum, g_sum, denom);
-      u.y = __grad_calc_RScalar(u.y, g.w, s_sum, g_sum, denom);
-      u.z = __grad_calc_RScalar(u.z, g.z, s_sum, g_sum, denom);
+      u.w = __grad_calc_RScalar(u.w, g.w, s_sum, g_sum, denom) + g.w;
+      u.x = __grad_calc_RScalar(u.x, g.x, s_sum, g_sum, denom) + g.x;
+      u.y = __grad_calc_RScalar(u.y, g.y, s_sum, g_sum, denom) + g.y;
+      u.z = __grad_calc_RScalar(u.z, g.z, s_sum, g_sum, denom) + g.z;
       *reinterpret_cast<coalesce<RScalar>::ptr>(&src_grads[ofs]) = u;
     }
     else if (ofs < n) {

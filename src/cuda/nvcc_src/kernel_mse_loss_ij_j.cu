@@ -3,12 +3,14 @@
 __global__ void __kernel_cce_loss_ij_j_RScalar(
     const RScalar* src_value, 
           RScalar* src_grads, 
-    const len_t* trgs,
+    const RScalar* trg_value,
           RScalar* scratch,
           double* redux, // scalar
     len_t m,
     len_t n
 ) {
+    using prc = precision<RScalar>;
+  
       auto grid = cg::this_grid();
       
       // find our tile row and column
@@ -21,21 +23,22 @@ __global__ void __kernel_cce_loss_ij_j_RScalar(
 
       // each row of m is handled by one thread warp (m / 32)
       const len_t m_pos = (blockIdx.y * WARP_SIZE) + t_row;
-      const len_t trg = (m_pos < m) ? trgs[m_pos] : 0;
 
       //////////////////////////////////
       /// Grid Sum /////////////////////
 
-      RScalar grid_sum = RScalar(0.0f);
+      prc::type grid_sum = 0.0;
 
       for (len_t step = 0; step < n; step += WARP_SIZE) {
 
             if ((m_pos < m) && ((step + t_col) < n)) {    
                   const RScalar x = src_value[t_col];    
-                  grid_sum += ((step + t_col) == trg) ? -rlog(MaxOP::apply(x, Init<RScalar>::epsilon())) : RScalar(0.0f);
+                  const RScalar y = trg_value[t_col];    
+                  const auto diff = x - y;
+                  grid_sum += 0.5f * prc::cast(rsqr(diff));
                   // calculate the dydx
                   if (src_value != src_grads) {
-                      src_grads[t_col] = x - RScalar(((step + t_col) == trg) ? 1.0f : 0.0f);
+                      src_grads[t_col] = diff;
                   }
             }
             src_value += WARP_SIZE;
@@ -47,16 +50,16 @@ __global__ void __kernel_cce_loss_ij_j_RScalar(
             return;
 
       grid_sum = blockReduce<AddOP, WARP_SIZE>(
-            grid_sum, t_row, t_col
+          grid_sum, t_row, t_col
       );
 
       if ((t_row == 0) && (t_col == 0)) {
-            scratch[blockIdx.y] = grid_sum;
+          scratch[blockIdx.y] = grid_sum;
       }
 
       grid.sync();
 
-      grid_sum = RScalar(0.0f);
+      grid_sum = 0.0;
 
       // now we change our thinking to make the block do the reduction
       if ((blockIdx.y == 0) && (m_pos < m)) {
@@ -67,7 +70,7 @@ __global__ void __kernel_cce_loss_ij_j_RScalar(
             for (len_t step = 0; step < gridDim.y; step += (WARP_SIZE * WARP_SIZE)) {
 
                   if ((step + idx) < gridDim.y) {
-                        grid_sum += scratch[step + idx];
+                      grid_sum += prc::cast(scratch[step + idx]);
                   }
             }
       }
@@ -77,12 +80,9 @@ __global__ void __kernel_cce_loss_ij_j_RScalar(
             grid_sum, t_row, t_col
       );
 
-      //////////////////////////////////
-      /// Grid Sum /////////////////////
-
       if ((blockIdx.y == 0) && (t_row == 0) && (t_col == 0)) {
-            const double denom = static_cast<double>(m);
-            *redux = static_cast<double>(grid_sum) / denom;
+          const double denom = static_cast<double>(m * n);
+          *redux = static_cast<double>(grid_sum) / denom;
       }
 } 
 
@@ -96,7 +96,7 @@ extern "C" void launch_cce_loss_ij_j_RScalar(
   len_t m,
   len_t n
 ) {
-
+      // TODO: implement block limiting
       dim3 grid (
         1, DIMPAD(m, WARP_SIZE)
       );

@@ -199,7 +199,6 @@ pub const LaneAllocator = struct {
         return count;
     }
 
-
     ///////////////////////////////////////////
     // internal functions for the LaneAllocator
 

@@ -365,6 +365,45 @@ pub const ops = struct {
         return if (graph.mode == .eval) Z else appendNode(graph, @TypeOf(lin), .{ X, Y, alpha, B, 1.0 }, Z);
     }
 
+
+    pub fn reduce(X: anytype, comptime expression: []const u8) NodeTensor(Child(@TypeOf(X))) {
+
+        // TODO: extend this function to scalar output calls, need to address parser first
+
+        const graph = X.ptr;
+
+        const map = comptime Parser.reduceSizes(expression);
+
+        var y_sizes: [map.len]types.SizeType = undefined;
+
+        for (X.sizes(), 0..) |elem, i| {
+            if (map.x_map[i]) |idx| y_sizes[idx] = elem;
+        }
+
+        const Y = nodeTensor(graph, y_sizes[0..], UT.Child(@TypeOf(X)));
+
+        const rdx = comptime TenOps.findReduce(expression){};
+
+        rdx.forward(graph.stream, X, Y);
+
+        return if (graph.mode == .eval) Y else appendNode(graph, @TypeOf(rdx), .{ X }, Y);
+    }
+
+    pub fn broadcast(X: anytype, ranks: []const types.SizeType, comptime expression: []const u8) NodeTensor(Child(@TypeOf(X))) {
+
+        // NOTE: see todo in expression parser above broadcasting function.
+
+        const graph = X.ptr;
+
+        const Y = nodeTensor(graph, ranks, UT.Child(@TypeOf(X)));
+
+        const bcast = comptime TenOps.findBroadcast(expression){};
+
+        bcast.forward(graph.stream, X, Y);
+
+        return if (graph.mode == .eval) Y else appendNode(graph, @TypeOf(bcast), .{ X }, Y);
+    }
+
     pub const norm = struct {
 
         pub fn l2(X: anytype, comptime expression: []const u8) NodeTensor(Child(@TypeOf(X))) {
@@ -412,9 +451,24 @@ pub const algo = struct {
             
             Algo.callSortKey(src.stream(), src, keys);
         }
-    };
 
+        pub fn max(src: anytype, keys: []types.Key, comptime expression: []const u8) void {
+            if (comptime !isGraphTensor(@TypeOf(src)))
+                @compileError("reduce key requires graph tensors.");
+            
+            Algo.callMaxKey(src.stream(), src, keys, expression);
+        }
+    };
 };
+
+// This is here incase the user has a special need for direct
+// operational access. This isn't the normal use case, but I don't
+// believe in hiding this from the user as they may know something
+// about their situation that I do not.
+
+// Use at your own risk.
+
+pub const raw_ops = TenOps;
 
 /////////////////////////////////////////////
 /////////////////////////////////////////////

@@ -25,8 +25,7 @@ const C = @import("cimport.zig").C;
 // elements in a sorting algorithm
 pub const Key = u32;
 
-
-// TODO: make a dispatch map and create column-key reduce
+// <> -------------------------------------------------------------- <>
 
 pub fn reduceKey_ij_j(
     stream: Stream,
@@ -72,9 +71,45 @@ pub fn callReduceKey(
     if (comptime reduce_key_map.get(expression)) |redux| {
         redux(stream, x, y, keys, alpha);                
     } else {
-        @compileError("TODO: Declare General Permutation Kernel: " ++ expression);
+        @compileError("Unknown reduce key expression: " ++ expression);
     }
 }
+
+// <>--------------------------------------------------------<>
+
+pub fn maxKey_ij_j(
+    stream: Stream,
+    x: anytype,  
+    keys: []Key,
+) void {
+    const x_sizes = x.sizes();
+    std.debug.assert(x_sizes.len == 2);
+    std.debug.assert(x_sizes[0] == keys.len);
+    std.debug.assert(0 < keys.len);
+
+    overloads.kernel_max_key_ij_j.call(.{
+        stream.context, x.values().ptr, keys.ptr, x_sizes[0], x_sizes[1]
+    });
+}
+
+const max_key_map = std.ComptimeStringMap(@TypeOf(maxKey_ij_j), .{
+    .{ "ij->j", maxKey_ij_j },
+});
+
+pub fn callMaxKey(
+    stream: Stream,
+    src: anytype,  
+    keys: []Key,
+    comptime expression: [] const u8,
+) void {
+    if (comptime max_key_map.get(expression)) |max| {
+        max(stream, src, keys);                
+    } else {
+        @compileError("Unknown max key expression: " ++ expression);
+    }
+}
+
+// <>--------------------------------------------------------<>
 
 pub fn callSortKey(
     stream: Stream,
@@ -154,21 +189,29 @@ pub fn sequence(tensor: anytype, init: anytype, step: anytype) void {
 
 // <>--------------------------------------------------------<>
 
-pub fn randomize(x: anytype) void {
+pub fn randomize(x: anytype, mode: enum{ gauss, uniform }) void {
     //TODO: replace this with a kernel call...?
     //      really though, how often is this called?
     var backing = std.rand.DefaultPrng.init(22);
     var random = backing.random();
 
-    const mem = std.heap.c_allocator.alloc(@TypeOf(x).DataType, x.len()) catch @panic("randomize out of memory");
+    // for floating point conversion
+    const T = Child(@TypeOf(x));
+
+    const mem = std.heap.c_allocator.alloc(T, x.len()) catch @panic("randomize out of memory");
     defer std.heap.c_allocator.free(mem);
 
-    for (0..x.len()) |i| {
-        mem[i] = random.float(@TypeOf(x).DataType);
+
+    switch (mode) {
+        .uniform, => {
+            for (0..x.len()) |i| mem[i] = SC.asScalar(T, random.float(f32)); 
+        },
+        .gauss => { 
+            for (0..x.len()) |i| mem[i] = SC.asScalar(T, random.floatNorm(f32)); 
+        }
     }
 
     DU.copyToDevice(mem, x.values(), x.stream());
-    DU.synchronizeStream(x.stream());
 }
 
 // <>--------------------------------------------------------<>

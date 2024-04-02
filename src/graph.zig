@@ -764,7 +764,7 @@ fn reverseEdge(comptime func: anytype, comptime edge: SizeType, edge_tuple: anyt
     // enable gradients if we don't have them
     if (arg.grads() == null) {
         const grd = enableGradient(graph, DataType, Class, arg.idx);
-        fillSlice(DataType, grd, 1.0, arg.stream());
+        fillSlice(DataType, grd, 0.0, arg.stream());
     }
 
     @call(.auto, func, .{arg.stream()} ++ edge_tuple);

@@ -19,9 +19,9 @@ pub fn main() !void {
     const w1 = G.tensor(.wgt, .r32, mp.Rank(1){M});
     const w2 = G.tensor(.wgt, .r32, mp.Rank(1){M});
 
-    mp.mem.randomize(x);
-    mp.mem.randomize(w1);
-    mp.mem.randomize(w2);
+    mp.mem.randomize(x, .gauss);
+    mp.mem.randomize(w1, .gauss);
+    mp.mem.randomize(w2, .gauss);
 
     /////////////////////////////////////////////////////
 

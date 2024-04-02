@@ -81,6 +81,12 @@ pub const kernel_linear_ij_jk = OverloadSet(.{
 	decls.launch_linear_ij_jk_r64,
 });
 
+pub const kernel_reduce_ij_j = OverloadSet(.{
+	decls.launch_reduce_ij_j_r16,
+	decls.launch_reduce_ij_j_r32,
+	decls.launch_reduce_ij_j_r64,
+});
+
 pub const kernel_linear_i_ij = OverloadSet(.{
 	decls.launch_linear_i_ij_r16,
 	decls.launch_linear_i_ij_r32,
@@ -171,6 +177,12 @@ pub const kernel_addition = OverloadSet(.{
 	decls.launch_addition_c64,
 });
 
+pub const kernel_broadcast_j_ij = OverloadSet(.{
+	decls.launch_broadcast_j_ij_r16,
+	decls.launch_broadcast_j_ij_r32,
+	decls.launch_broadcast_j_ij_r64,
+});
+
 pub const kernel_sort_key_i = OverloadSet(.{
 	decls.launch_kernel_sort_key_i_r16,
 	decls.launch_kernel_sort_key_i_r32,
@@ -187,6 +199,12 @@ pub const kernel_softmax_i_i_reverse = OverloadSet(.{
 	decls.launch_softmax_i_i_reverse_r16,
 	decls.launch_softmax_i_i_reverse_r32,
 	decls.launch_softmax_i_i_reverse_r64,
+});
+
+pub const kernel_mse_loss_ij_j = OverloadSet(.{
+	decls.launch_cce_loss_ij_j_r16,
+	decls.launch_cce_loss_ij_j_r32,
+	decls.launch_cce_loss_ij_j_r64,
 });
 
 pub const kernel_addition_reverse = OverloadSet(.{
@@ -229,6 +247,12 @@ pub const kernel_softmax_ij_j_reverse = OverloadSet(.{
 	decls.launch_softmax_ij_j_reverse_r16,
 	decls.launch_softmax_ij_j_reverse_r32,
 	decls.launch_softmax_ij_j_reverse_r64,
+});
+
+pub const kernel_max_key_ij_j = OverloadSet(.{
+	decls.launch_max_key_ij_j_r16,
+	decls.launch_max_key_ij_j_r32,
+	decls.launch_max_key_ij_j_r64,
 });
 
 pub const kernel_tanh_reverse = OverloadSet(.{

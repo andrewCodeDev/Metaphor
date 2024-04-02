@@ -33,15 +33,14 @@ pub fn main() !void {
     //     ex: G.stream = stream2;
 
     const M: usize = 2096;
-    const N: usize = 2096;
 
     // A gets created using the stream in the graph. The
     // graph remembers what stream that A was created with.
-    const A = G.tensor(.inp, .r32, mp.Rank(2){M, N});
+    const A = G.tensor(.inp, .r32, mp.Rank(2){M, M});
 
     // x gets created using the stream in the graph. The
     // graph remembers what stream that x was created with.
-    const x = G.tensor(.inp, .r32, mp.Rank(2){N, M});
+    const x = G.tensor(.inp, .r32, mp.Rank(1){M});
 
     // both of these fill calls use the currently assigned
     // stream as well. If we had changed this stream,
@@ -53,7 +52,7 @@ pub fn main() !void {
     // tensors to remove the overhead of the initial
     // allocation. This again uses the graph's recent
     // stream that has been assigned.
-    G.precache(mp.scalar.r32, M * N, 10);
+    G.precache(mp.scalar.r32, M, 10);
 
     // this prevents us from moving forward until the
     // stream has finished all the work in its queue.
@@ -79,7 +78,7 @@ pub fn main() !void {
         const start = try std.time.Instant.now();
 
         for (0..10) |_| {
-            const y = mp.ops.innerProduct(A, x, "ij,jk->ik");
+            const y = mp.ops.innerProduct(A, x, "ij,j->i");
             _ = &y;
         }
 
@@ -108,7 +107,7 @@ pub fn main() !void {
         const start = try std.time.Instant.now();
 
         for (0..10) |_| {
-            const y = mp.ops.innerProduct(A, x, "ij,jk->ik");
+            const y = mp.ops.innerProduct(A, x, "ij,j->i");
             _ = &y;
         }
 
@@ -133,14 +132,14 @@ pub fn main() !void {
         G.stream = streams.items[0];
 
         for (0..5) |_| {
-            const y = mp.ops.innerProduct(A, x, "ij,jk->ik");
+            const y = mp.ops.innerProduct(A, x, "ij,j->i");
             _ = &y;
         }
 
         G.stream = streams.items[1];
 
         for (0..5) |_| {
-            const y = mp.ops.innerProduct(A, x, "ij,jk->ik");
+            const y = mp.ops.innerProduct(A, x, "ij,j->i");
             _ = &y;
         }
 
@@ -157,22 +156,20 @@ pub fn main() !void {
 
     // for fun, we'll compare to the CPU
 
-    const A_cpu = try EU.allocCPU(f32, M * N);
+    const A_cpu = try EU.allocCPU(f32, M * M);
     defer EU.freeCPU(A_cpu);
 
-    const x_cpu = try EU.allocCPU(f32, N * M);
+    const x_cpu = try EU.allocCPU(f32, M);
     defer EU.freeCPU(x_cpu);
 
-    const y_cpu = try EU.allocCPU(f32, M * M);
+    const y_cpu = try EU.allocCPU(f32, M);
     defer EU.freeCPU(y_cpu);
-
-    std.log.info("Running single matrix multiplication on CPU (warning - takes a while)", .{});
 
     {
         const start = try std.time.Instant.now();
 
         for (0..1) |_| {
-            EU.cpuMatmul(A_cpu, x_cpu, y_cpu, M, N, M);
+            EU.cpuMatmul(A_cpu, x_cpu, y_cpu, M, M, 1);
             _ = &y_cpu;
         }
 

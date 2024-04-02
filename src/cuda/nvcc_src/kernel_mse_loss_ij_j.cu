@@ -1,6 +1,6 @@
 #include "../kernel_header.h"
 
-__global__ void __kernel_cce_loss_ij_j_RScalar(
+__global__ void __kernel_mse_loss_ij_j_RScalar(
     const RScalar* src_value, 
           RScalar* src_grads, 
     const RScalar* trg_value,
@@ -86,7 +86,7 @@ __global__ void __kernel_cce_loss_ij_j_RScalar(
       }
 } 
 
-extern "C" void launch_cce_loss_ij_j_RScalar(
+extern "C" void launch_mse_loss_ij_j_RScalar(
   StreamCtx stream,
   const RScalar* src_value, 
         RScalar* src_grads, 
@@ -117,6 +117,6 @@ extern "C" void launch_cce_loss_ij_j_RScalar(
       };
 
       CUDA_ASSERT(cudaLaunchCooperativeKernel(
-        (void*)(__kernel_cce_loss_ij_j_RScalar), grid, block, args, 0, getCtx(stream)
+        (void*)(__kernel_mse_loss_ij_j_RScalar), grid, block, args, 0, getCtx(stream)
       ));
 }

@@ -121,7 +121,7 @@ pub fn main() !void {
 
     const B = G.tensor(.inp, .r32, mp.Rank(2){ N, M });
 
-    mp.mem.randomize(B);
+    mp.mem.randomize(B, .gauss);
  
     {
         // A.B

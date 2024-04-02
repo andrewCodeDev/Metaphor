@@ -202,9 +202,9 @@ pub const kernel_softmax_i_i_reverse = OverloadSet(.{
 });
 
 pub const kernel_mse_loss_ij_j = OverloadSet(.{
-	decls.launch_cce_loss_ij_j_r16,
-	decls.launch_cce_loss_ij_j_r32,
-	decls.launch_cce_loss_ij_j_r64,
+	decls.launch_mse_loss_ij_j_r16,
+	decls.launch_mse_loss_ij_j_r32,
+	decls.launch_mse_loss_ij_j_r64,
 });
 
 pub const kernel_addition_reverse = OverloadSet(.{

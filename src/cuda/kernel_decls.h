@@ -806,7 +806,7 @@ EXTERN_C void launch_softmax_i_i_reverse_r64(
         r64* scratch,
   len_t m
 );
-EXTERN_C void launch_cce_loss_ij_j_r16(
+EXTERN_C void launch_mse_loss_ij_j_r16(
   StreamCtx stream,
   const r16* src_value, 
         r16* src_grads, 
@@ -816,7 +816,7 @@ EXTERN_C void launch_cce_loss_ij_j_r16(
   len_t m,
   len_t n
 );
-EXTERN_C void launch_cce_loss_ij_j_r32(
+EXTERN_C void launch_mse_loss_ij_j_r32(
   StreamCtx stream,
   const r32* src_value, 
         r32* src_grads, 
@@ -826,7 +826,7 @@ EXTERN_C void launch_cce_loss_ij_j_r32(
   len_t m,
   len_t n
 );
-EXTERN_C void launch_cce_loss_ij_j_r64(
+EXTERN_C void launch_mse_loss_ij_j_r64(
   StreamCtx stream,
   const r64* src_value, 
         r64* src_grads, 

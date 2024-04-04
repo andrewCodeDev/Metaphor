@@ -9,8 +9,6 @@ const SC = @import("scalar.zig");
 const TC = @import("tensor_components.zig");
 const DU = @import("device_utils.zig");
 
-const Optm = @import("optimizer.zig");
-const Optimizer = Optm.Optimizer;
 const LaneAllocator = @import("lane_allocator.zig").LaneAllocator;
 const Stream = DU.Stream;
 
@@ -23,9 +21,6 @@ const c16 = SC.c16;
 const c32 = SC.c32;
 const c64 = SC.c64;
 const ScalarTag = SC.ScalarTag;
-
-// default optimizer if null is passed via graph config
-const null_optimizer = Optm.NullOptimizer.optimizer();
 
 const Contract = UT.Contract;
 const Returns = UT.Returns;
@@ -61,8 +56,8 @@ pub fn isGraphTensor(comptime T: type) bool {
 
 
 pub const TensorClass = enum {
-    inp,
-    wgt,
+    inp, // non-trainable, but can have gradients
+    wgt, // trainable and has gradients
     hid, // TODO: change this to res for "result"? These are always the outcome of an operation.
 };
 
@@ -209,7 +204,6 @@ const Mode = enum {
 };
 
 pub const GraphConfig = struct {
-    optimizer: ?Optimizer = null,
     stream: Stream,
     mode: Mode,
 };
@@ -273,9 +267,6 @@ pub const Graph = struct {
 
     tensor_allocator: LaneAllocator,
 
-    // optimizer interface to update weights
-    optimizer: Optimizer,
-
     // tensor stuff...
     leaves: Leaves,
     nodes: Nodes,
@@ -302,8 +293,6 @@ pub const Graph = struct {
 
     pub fn init(config: GraphConfig) *Graph {
         const self = std.heap.c_allocator.create(Graph) catch @panic("Graph.init: Out of Memory");
-
-        self.optimizer = config.optimizer orelse null_optimizer;
 
         self.stream = config.stream;
 
@@ -448,7 +437,10 @@ pub const Graph = struct {
     // here only exposes the two valid options
 
     fn userTensor(comptime class: anytype) TensorClass {
-        return if (comptime class == .inp) TensorClass.inp else TensorClass.wgt;
+        return switch (class) {
+            .inp => TensorClass.inp,
+            .wgt => TensorClass.wgt,
+        };
     }
 
     fn constructTensor(
@@ -702,7 +694,6 @@ pub const Graph = struct {
             }
         }
     }
-    
 };
 
 ////////////////////////////////
@@ -759,6 +750,10 @@ fn reverseEdge(comptime func: anytype, comptime edge: SizeType, edge_tuple: anyt
     const arg = edge_tuple[edge];
     const DataType = @TypeOf(arg).DataType;
     const Class = @TypeOf(arg).Class;
+    
+    if (comptime Class == .inp) 
+        return null;
+    
     const graph = arg.ptr;
 
     // enable gradients if we don't have them
@@ -776,16 +771,7 @@ fn reverseEdge(comptime func: anytype, comptime edge: SizeType, edge_tuple: anyt
 
     // ensure all partial-gradients are calculated
     if (arg.adjustDependencies(-1) == 0) {
-        if (comptime Class == .wgt) {
-
-            // by optimizing as we go along, we can free
-            // gradients as soon as we're done using them
-            graph.optimizer.update(graph.id(), arg.idx, arg.raw_values(), arg.raw_grads().?, arg.stream());
-
-            // since we've collected all of our dependencies,
-            // we check to see if we're a hidden tensor (node)
-            // and return our node index if so
-        } else if (comptime Class == .hid) {
+        if (comptime Class == .hid) {
             return arg.idx; // signal to keep reversing
         }
     }

@@ -40,7 +40,7 @@ __global__ void __kernel_reduce_ij_j_RScalar(
     }
 
     if (threadIdx.x == 0 && (threadIdx.y + blockDim.x * blockIdx.x) < n) {
-      dst[threadIdx.y] = col_sum;// + alpha * dst[threadIdx.x];
+      dst[threadIdx.y] = col_sum + alpha * dst[threadIdx.x];
     }
 
 }

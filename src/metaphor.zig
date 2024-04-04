@@ -79,6 +79,8 @@ pub const scalar = struct {
     pub const c64 = SC.c64;
     pub const Tag = SC.ScalarTag;
     pub const as = SC.asScalar;
+    pub const Native = SC.Native;
+    pub const Child = UT.Child;
 };
 
 pub const optm = struct {
@@ -289,6 +291,12 @@ pub const ops = struct {
     pub fn innerProduct(X: anytype, Y: anytype, comptime expression: []const u8) NodeTensor(Child(@TypeOf(X))) {
         if (comptime !isGraphTensor(@TypeOf(X)) or !isGraphTensor(@TypeOf(Y)))
             @compileError("innerProduct requires graph tensors.");
+        return innerProductScaled(X, Y, 1.0, expression);
+    }
+
+    pub fn innerProductScaled(X: anytype, Y: anytype, alpha: f32, comptime expression: []const u8) NodeTensor(Child(@TypeOf(X))) {
+        if (comptime !isGraphTensor(@TypeOf(X)) or !isGraphTensor(@TypeOf(Y)))
+            @compileError("innerProduct requires graph tensors.");
 
         const graph = X.ptr;
 
@@ -319,7 +327,7 @@ pub const ops = struct {
         // cancel out addition using 0.0 for beta
         ip.forward(graph.stream, X, Y, 1.0, Z, 0.0, Z);
 
-        return if (graph.mode == .eval) Z else appendNode(graph, @TypeOf(ip), .{ X, Y, 1.0, Z, 0.0 }, Z);
+        return if (graph.mode == .eval) Z else appendNode(graph, @TypeOf(ip), .{ X, Y, alpha, Z, 0.0 }, Z);
     }
 
     pub fn linear(X: anytype, Y: anytype, B: anytype, comptime expression: []const u8) NodeTensor(Child(@TypeOf(X))) {
@@ -468,7 +476,11 @@ pub const algo = struct {
 
 // Use at your own risk.
 
-pub const raw_ops = TenOps;
+//pub const raw = struct {
+//    const ops = TenOps;
+//    // TODO: think of a better name?
+//    const ovl = @import("kernel_overloads.zig");
+//};
 
 /////////////////////////////////////////////
 /////////////////////////////////////////////

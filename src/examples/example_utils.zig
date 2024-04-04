@@ -99,7 +99,7 @@ pub fn cpuPrintMatrix(name: []const u8, src: anytype, row: usize, col: usize) vo
 
     for (0..row) |i| {
         for (0..col) |j| {
-            std.debug.print("{d:.4} ", .{src[i * col + j]});
+            std.debug.print("{d:.2} ", .{ mp.scalar.as(f32, src[i * col + j]) });
         }
         std.debug.print("\n", .{});
     }

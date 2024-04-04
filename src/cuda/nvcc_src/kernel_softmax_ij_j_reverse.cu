@@ -23,17 +23,19 @@ __global__ void __kernel_softmax_ij_j_reverse_RScalar(
   //////////////////////////////////
   /// Grid Sum /////////////////////
 
-  auto B_tmp = B_grads;
+  auto B_val = B_value;
+  auto B_grd = B_grads;
 
   RScalar grid_sum = RScalar(0.0f);
 
   for (len_t step = 0; step < m; step += WARP_SIZE) {
 
     if ((m_bound < m) && (step + t_col) < n) {    
-      grid_sum = B_tmp[t_col];
+      grid_sum += B_val[t_col] * B_grd[t_col];
     }
     // move A along the columns
-    B_tmp += WARP_SIZE;
+    B_val += WARP_SIZE;
+    B_grd += WARP_SIZE;
   }
 
   grid_sum = warpReduce<AddOP>(grid_sum);

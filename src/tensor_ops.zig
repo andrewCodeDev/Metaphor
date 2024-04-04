@@ -367,9 +367,9 @@ inline fn __linear_i_ij(
     stream: Stream,
     x_values: anytype,
     A_values: anytype,
-    alpha: f16,
+    alpha: f32,
     b_values: anytype,
-    beta: f16,
+    beta: f32,
     y_values: anytype,
     m: TC.SizeType,
     n: TC.SizeType,
@@ -383,9 +383,9 @@ inline fn __linear_ij_j(
     stream: Stream,
     A_values: anytype,
     x_values: anytype,
-    alpha: f16,
+    alpha: f32,
     b_values: anytype,
-    beta: f16,
+    beta: f32,
     y_values: anytype,
     m: TC.SizeType,
     n: TC.SizeType,
@@ -399,9 +399,9 @@ pub fn linear_ij_j(
     stream: Stream,
     A: anytype,
     x: anytype,
-    alpha: f16,
+    alpha: f32,
     b: anytype,
-    beta: f16,
+    beta: f32,
     y: anytype,
 ) void {
     std.debug.assert(A.sizes().len == 2);
@@ -424,9 +424,9 @@ pub fn linear_ij_j_reverseArg0(
     stream: Stream,
     A: anytype,
     x: anytype,
-    alpha: f16,
+    alpha: f32,
     _: anytype,
-    _: f16,
+    _: f32,
     y: anytype,
 ) void {
     // outer product i,j to get ij
@@ -448,9 +448,9 @@ pub fn linear_ij_j_reverseArg1(
     stream: Stream,
     A: anytype,
     x: anytype,
-    alpha: f16,
+    alpha: f32,
     _: anytype,
-    _: f16,
+    _: f32,
     y: anytype,
 ) void {
     // inner product i,ij to get j
@@ -472,9 +472,9 @@ pub inline fn linear_bias_reverseArg3(
     stream: Stream,
     _: anytype,
     _: anytype,
-    _: f16,
+    _: f32,
     b: anytype,
-    _: f16,
+    _: f32,
     y: anytype,
 ) void {
     additionReverseArg0(stream, b, NoArg, y);
@@ -494,9 +494,9 @@ pub fn linear_i_ij(
     stream: Stream,
     x: anytype,
     A: anytype,
-    alpha: f16,
+    alpha: f32,
     b: anytype,
-    beta: f16,
+    beta: f32,
     y: anytype,
 ) void {
     std.debug.assert(x.sizes().len == 1);
@@ -517,9 +517,9 @@ pub fn linear_i_ij_reverseArg0(
     stream: Stream,
     x: anytype,
     A: anytype,
-    alpha: f16,
+    alpha: f32,
     _: anytype,
-    _: f16,
+    _: f32,
     y: anytype,
 ) void {
     // inner product ij,j to get i
@@ -541,9 +541,9 @@ pub fn linear_i_ij_reverseArg1(
     stream: Stream,
     x: anytype,
     A: anytype,
-    alpha: f16,
+    alpha: f32,
     _: anytype,
-    _: f16,
+    _: f32,
     y: anytype,
 ) void {
     // outer product i,j to get ij
@@ -571,15 +571,15 @@ const Linear_i_ij_Callback = CallbackBuilder(
     NoCleanup,
 );
 
-pub fn linear_i_ji(stream: Stream, x: anytype, A: anytype, alpha: f16, b: anytype, beta: f16, y: anytype) void {
+pub fn linear_i_ji(stream: Stream, x: anytype, A: anytype, alpha: f32, b: anytype, beta: f32, y: anytype) void {
     return linear_ij_j(stream, A, x, alpha, b, beta, y);
 }
 
-pub fn linear_i_ji_reverseArg0(stream: Stream, x: anytype, A: anytype, alpha: f16, b: anytype, beta: f16, y: anytype) void {
+pub fn linear_i_ji_reverseArg0(stream: Stream, x: anytype, A: anytype, alpha: f32, b: anytype, beta: f32, y: anytype) void {
     return linear_ij_j_reverseArg0(stream, A, x, alpha, b, beta, y);
 }
 
-pub fn linear_i_ji_reverseArg1(stream: Stream, x: anytype, A: anytype, alpha: f16, b: anytype, beta: f16, y: anytype) void {
+pub fn linear_i_ji_reverseArg1(stream: Stream, x: anytype, A: anytype, alpha: f32, b: anytype, beta: f32, y: anytype) void {
     return linear_ij_j_reverseArg1(stream, A, x, alpha, b, beta, y);
 }
 
@@ -593,15 +593,15 @@ const Linear_i_ji_Callback = CallbackBuilder(
     NoCleanup,
 );
 
-pub fn linear_ij_i(stream: Stream, x: anytype, A: anytype, alpha: f16, b: anytype, beta: f16, y: anytype) void {
+pub fn linear_ij_i(stream: Stream, x: anytype, A: anytype, alpha: f32, b: anytype, beta: f32, y: anytype) void {
     return linear_i_ij(stream, A, x, alpha, b, beta, y);
 }
 
-pub fn linear_ij_i_reverseArg0(stream: Stream, x: anytype, A: anytype, alpha: f16, b: anytype, beta: f16, y: anytype) void {
+pub fn linear_ij_i_reverseArg0(stream: Stream, x: anytype, A: anytype, alpha: f32, b: anytype, beta: f32, y: anytype) void {
     return linear_i_ij_reverseArg0(stream, A, x, alpha, b, beta, y);
 }
 
-pub fn linear_ij_i_reverseArg1(stream: Stream, x: anytype, A: anytype, alpha: f16, b: anytype, beta: f16, y: anytype) void {
+pub fn linear_ij_i_reverseArg1(stream: Stream, x: anytype, A: anytype, alpha: f32, b: anytype, beta: f32, y: anytype) void {
     return linear_i_ij_reverseArg1(stream, A, x, alpha, b, beta, y);
 }
 
@@ -622,9 +622,9 @@ inline fn __linear_ij_jk(
     stream: Stream,
     A_values: anytype,
     B_values: anytype,
-    alpha: f16,
+    alpha: f32,
     C_values: anytype,
-    beta: f16,
+    beta: f32,
     Y_values: anytype,
     m: TC.SizeType,
     n: TC.SizeType,
@@ -639,9 +639,9 @@ pub inline fn linear_ij_jk(
     stream: Stream,
     A: anytype,
     B: anytype,
-    alpha: f16,
+    alpha: f32,
     C: anytype,
-    beta: f16,
+    beta: f32,
     Y: anytype,
 ) void {
     const A_sizes = A.sizes();
@@ -663,9 +663,9 @@ inline fn linear_ij_jk_reverseArg0(
     stream: Stream,
     A: anytype,
     B: anytype,
-    alpha: f16,
+    alpha: f32,
     _: anytype,
-    _: f16,
+    _: f32,
     Y: anytype,
 ) void {
     const T = Child(@TypeOf(A));
@@ -685,9 +685,9 @@ inline fn linear_ij_jk_reverseArg1(
     stream: Stream,
     A: anytype,
     B: anytype,
-    alpha: f16,
+    alpha: f32,
     _: anytype,
-    _: f16,
+    _: f32,
     Y: anytype,
 ) void {
     const T = Child(@TypeOf(A));
@@ -717,9 +717,9 @@ pub inline fn linear_ij_kj(
     stream: Stream,
     A: anytype,
     B: anytype,
-    alpha: f16,
+    alpha: f32,
     C: anytype,
-    beta: f16,
+    beta: f32,
     Y: anytype,
 ) void {
     const T = Child(@TypeOf(Y));
@@ -746,9 +746,9 @@ inline fn linear_ij_kj_reverseArg0(
     stream: Stream,
     A: anytype,
     B: anytype,
-    alpha: f16,
+    alpha: f32,
     _: anytype,
-    _: f16,
+    _: f32,
     Y: anytype,
 ) void {
     // ij,kj->ik... ik,jk->ij
@@ -760,7 +760,11 @@ inline fn linear_ij_kj_reverseArg0(
 
     const m = Y_sizes[0];
     const n = Y_sizes[1];
-    const k = B_sizes[0];
+    const k = B_sizes[1];
+
+    std.log.info("Y sizes: {any}", .{ Y_sizes });
+    std.log.info("B sizes: {any}", .{ B_sizes });
+    std.log.info("A sizes: {any}", .{ A.sizes() });
 
     std.debug.assert(n == B_sizes[0]);
     std.debug.assert(A.len() == m * k);
@@ -772,9 +776,9 @@ inline fn linear_ij_kj_reverseArg1(
     stream: Stream,
     A: anytype,
     B: anytype,
-    alpha: f16,
+    alpha: f32,
     _: anytype,
-    _: f16,
+    _: f32,
     Y: anytype,
 ) void {
     // ij,kj->ik... ki,ij->kj
@@ -813,9 +817,9 @@ pub inline fn linear_ji_jk(
     stream: Stream,
     A: anytype,
     B: anytype,
-    alpha: f16,
+    alpha: f32,
     C: anytype,
-    beta: f16,
+    beta: f32,
     Y: anytype,
 ) void {
     const T = Child(@TypeOf(Y));
@@ -843,9 +847,9 @@ inline fn linear_ji_jk_reverseArg0(
     stream: Stream,
     A: anytype,
     B: anytype,
-    alpha: f16,
+    alpha: f32,
     _: anytype,
-    _: f16,
+    _: f32,
     Y: anytype,
 ) void {
     // ji,kj->ik... jk,ki->ji
@@ -873,9 +877,9 @@ inline fn linear_ji_jk_reverseArg1(
     stream: Stream,
     A: anytype,
     B: anytype,
-    alpha: f16,
+    alpha: f32,
     _: anytype,
-    _: f16,
+    _: f32,
     Y: anytype,
 ) void {
     // ji,jk->ik... ji,ik->jk
@@ -945,9 +949,9 @@ inline fn __outerProduct_i_j(
     stream: Stream,
     x_values: anytype,
     y_values: anytype,
-    alpha: f16,
+    alpha: f32,
     z_values: anytype,
-    beta: f16,
+    beta: f32,
     m: TC.SizeType,
     n: TC.SizeType,
 ) void {

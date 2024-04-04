@@ -2,207 +2,132 @@ const mp = @import("metaphor");
 const EU = @import("example_utils.zig");
 const std = @import("std");
 
-// TODO: actually explain the basics here
-
-pub fn populateCentroids(
-    stream: mp.types.Stream,
-    W: anytype,
-    C: anytype,
-    CT: anytype,
-    R: anytype,
-    max_gpu: []mp.types.Key,
-    max_cpu: []mp.types.Key,
-    rdx_gpu: []mp.types.Key,
-    rdx_cpu: []mp.types.Key,
-) void {
-    // these could be moved outside of this function
-    mp.mem.copyFromDevice(max_gpu, max_cpu, stream);
-
-    mp.stream.synchronize(stream);
-
-    const ct_sizes = CT.sizes();
-
-    const m = ct_sizes[0];
-    const n = ct_sizes[1];
-
-    for (0..m) |c| {
-
-        var rdx_len: usize = 0;
-
-        for (0..max_cpu.len) |i| {
-
-            if (c == max_cpu[i]) {
-                rdx_cpu[rdx_len] = mp.scalar.as(mp.types.Key, i);
-                rdx_len += 1;
-            }
-        }
-
-        mp.mem.copyToDevice(rdx_cpu, rdx_gpu, stream);
-
-        const coef: f32 = mp.scalar.as(f32, rdx_len);
-
-        mp.algo.key.reduceScaled(W, R, rdx_gpu[0..rdx_len], 1.0 / coef, "ij->j");
-
-        // locate the row
-        const a: usize = n * c;
-
-        // locate end col
-        const b: usize = a + n;
-
-        mp.mem.copySlice(@TypeOf(R).DataType, R.values(), CT.values()[a..b], stream);
-    }
-
-    mp.raw_ops.norm_l2_ij_j(stream, CT, CT);
-
-    // write our values back to C for next computation
-    mp.raw_ops.permutate_ij_ji(stream, CT, C);
-}
-
-
-//pub fn populateCentroids(
-//    stream: mp.types.Stream,
-//    W: anytype,
-//    WB: anytype,
-//    CT: anytype,
-//    max_gpu: []mp.types.Key,
-//    max_cpu: []mp.types.Key,
-//    rdx_gpu: []mp.types.Key,
-//    rdx_cpu: []mp.types.Key,
-//) void {
-//    // these could be moved outside of this function
-//    mp.mem.copyFromDevice(max_gpu, max_cpu, stream);
+// assumes n % 2 == 0
+//pub fn encode(x: anytype) void {
+//    const T = mp.scalar.Child(@TypeOf(x));
 //
-//    mp.stream.synchronize(stream);
+//    const tmp = std.heap.c_allocator.alloc(f32, x.len()) catch unreachable;
+//        defer std.heap.c_allocator.free(tmp);
+//    
+//    const out = std.heap.c_allocator.alloc(T, x.len()) catch unreachable;
+//        defer std.heap.c_allocator.free(out);
 //
-//    const ct_sizes = CT.sizes();
+//    const m = x.sizes()[0];
+//    const n = x.sizes()[1];
+//    const _n: f32 = @floatFromInt(n);
 //
-//    const m = ct_sizes[0];
-//    const n = ct_sizes[1];
-//
-//    for (0..m) |c| {
-//
-//        var rdx_len: usize = 0;
-//
-//        for (0..max_cpu.len) |i| {
-//
-//            if (c == max_cpu[i]) {
-//                rdx_cpu[rdx_len] = mp.scalar.as(mp.types.Key, i);
-//                rdx_len += 1;
-//            }
+//    for (0..m) |i| {
+//        var j: usize = 0;
+//        while (j < n) : (j += 2) {
+//            const _i: f32 = mp.scalar.as(f32, i);            
+//            const _j: f32 = mp.scalar.as(f32, j);            
+//            const theta = _i / std.math.pow(f32, 100.0, _j / _n);
+//            tmp[i * n + j + 0] = std.math.sin(theta);
+//            tmp[i * n + j + 1] = std.math.cos(theta);
 //        }
-//
-//        for (0..max_cpu.len)
-//
-//        mp.mem.copyToDevice(rdx_cpu, rdx_gpu, stream);
-//
-//        const coef: f32 = mp.scalar.as(f32, rdx_len);
-//
-//        mp.algo.key.reduceScaled(W, R, rdx_gpu[0..rdx_len], 1.0 / coef, "ij->j");
-//
-//        // locate the row
-//        const a: usize = n * c;
-//
-//        // locate end col
-//        const b: usize = a + n;
 //    }
 //
-//    mp.raw_ops.norm_l2_ij_j(stream, CT, CT);
+//    for (0..x.len()) |i| {
+//        out[i] = mp.scalar.as(T, tmp[i]);
+//    }
 //
-//    // write our values back to C for next computation
-//    mp.raw_ops.permutate_ij_ji(stream, CT, C);
+//    mp.mem.copyToDevice(out, x.values(), x.stream());
 //}
+
 
 pub fn main() !void {
     mp.device.init(0);
-    
+
     const stream = mp.stream.init();
-        defer mp.stream.deinit(stream);
+    defer mp.stream.deinit(stream);
+
+    var sgd = mp.optm.SGD.init(.{ 
+        .rate = 0.1, 
+        .clip = .{
+            .lower = -2.0,
+            .upper =  2.0,
+        } 
+    });
+
+    _ = &sgd;
 
     const G = mp.Graph.init(.{ .stream = stream, .mode = .train });
-        defer G.deinit();
+    defer G.deinit();
 
-    const m: usize = 32;
-    const n: usize = 16;
-    //const k: usize = 3;
+    const m: usize = 16;
+    const n: usize = 32;
 
-    //////////////////////////////////////////////////
+    const X1 = G.tensor(.wgt, .r32, mp.Rank(2){ m, n });
+    //const X2 = G.tensor(.inp, .r32, mp.Rank(2){ m, n });
 
-    // W: tensors that we want to cluster
-    //const W   = G.tensor(.inp, .r32, mp.Rank(2){ m, n });
-  //  const WB  = G.tensor(.inp, .r32, mp.Rank(2){ m, n });
+    //const Q = G.tensor(.wgt, .r32, mp.Rank(2){ m, n });
+    //const K = G.tensor(.wgt, .r32, mp.Rank(2){ m, n });
+    //const V = G.tensor(.wgt, .r32, mp.Rank(2){ m, n });
+    //const alpha: f32 = 1.0 / @as(f32, @floatFromInt(n));
 
-    //// C: centroid matrix (centroids are columns)
-    //const C  = G.tensor(.inp, .r32, mp.Rank(2){ n, k });    
+    ///////////////////////////////////////////////////
+    // feed forward network...
 
-    //// CT: centroid matrix transposed (used to write back to C)
-    //const CT = G.tensor(.inp, .r32, mp.Rank(2){ k, n });    
+    // project to squared dimensions...
 
-    //// S: similarity score between W and C
-    //const S  = G.tensor(.inp, .r32, mp.Rank(2){ m, k });    
-
-    // R: storage for row reduce to calculate average tensor
-    const R  = G.tensor(.inp, .r32, mp.Rank(1){ n });    
-
-    mp.mem.sequence(R, 0.0, 1.0);
-
-    const Y = mp.ops.broadcast(R, &.{ m, n }, "j->ij");
+    mp.mem.sequence(X1, 0.0, 0.1);
 
     Y.reverse(.keep);
 
-    try EU.copyAndPrintMatrix("Broadcast", Y.values(), m, n, stream);
-    try EU.copyAndPrintMatrix("Broadcast Reverse", R.grads().?, 1, n, stream);
+    try EU.copyAndPrintMatrix("Y Values", Y.values(),   m, n, stream);
+    try EU.copyAndPrintMatrix("X1 grads", X1.grads().?, m, n, stream);
+    
+    //mp.mem.fill(X2, 1.0);
+    //mp.mem.fill(Q, 1.0);
+    //mp.mem.fill(K, 1.0);
 
-    // We can make all of our key allocations upfront, too.
+    //const QX = mp.ops.innerProduct(Q,  X1, "ij,jk->ik");
+    //const KX = mp.ops.innerProduct(K,  X2, "ij,jk->ik");
+    //const VX = mp.ops.innerProduct(V,  X1, "ij,jk->ik");
+    //const QK = mp.ops.innerProduct(QX, KX, "ij,kj->ik");
+    //const SM = mp.ops.softmax(QK, "ij|j");
+    //const SV = mp.ops.innerProductScaled(SM, VX, alpha, "ij,jk->ik");
 
-    //const max_gpu = mp.mem.alloc(mp.types.Key, m, stream);
-    //    defer mp.mem.free(max_gpu, stream);
+    //std.log.info("QX sizes: {any}", .{ QX.sizes() });
+    //std.log.info("KX sizes: {any}", .{ KX.sizes() });
+    //std.log.info("QK sizes: {any}", .{ QK.sizes() });
 
-    //const rdx_gpu = mp.mem.alloc(mp.types.Key, max_gpu.len, stream);
-    //    defer mp.mem.free(rdx_gpu, stream);
+    //QK.reverse(.keep);
 
-    //const max_cpu = std.heap.c_allocator.alloc(mp.types.Key, max_gpu.len) catch unreachable;
-    //    defer std.heap.c_allocator.free(max_cpu);
-    //
-    //const rdx_cpu = std.heap.c_allocator.alloc(mp.types.Key, max_gpu.len) catch unreachable;
-    //    defer std.heap.c_allocator.free(rdx_cpu);
+    //try EU.copyAndPrintMatrix("QX Values", QX.values(), m, m, stream);
+    //try EU.copyAndPrintMatrix("KX Values", KX.values(), m, m, stream);
 
-    //mp.mem.randomize(CT, .gauss);
-    //mp.mem.randomize(W,  .gauss);
+    //try EU.copyAndPrintMatrix("QX Grads", QX.grads().?, m, m, stream);
+    //try EU.copyAndPrintMatrix("KX Grads", KX.grads().?, m, m, stream);
+    
 
-    /////////////////////////////////////////////////////////
-    // In this example, we'll use the raw_ops namespace to
-    // do inplace operations that don't interact with the
-    // graph to setup our input tensors. Note that these
-    // cannot create a reversal trail.
+    //var net = NeuralNet(.r32, 3).init(G, m, n, true);
+    //const x = G.tensor(.inp, .r32, mp.Rank(1){n});
+    //const t = 16;
 
-    // Sometimes, raw_ops can save memory and compute faster
-    // if you already know what dimensions your tensors have.
+    //mp.mem.randomize(x, .gauss);
+    //net.randomize();
 
-    // normalize matrix rows to itself
-    //mp.raw_ops.norm_l2_ij_j(stream, W, W);
+    //var score: f64 = 0.0;
 
-    ////// normalize matrix rows to itself
-    //mp.raw_ops.norm_l2_ij_j(stream, CT, CT);
+    //for (0..100) |_| {
+    //    const y = net.forward(x);
 
-    ////// transpose values from CT to C
-    //mp.raw_ops.permutate_ij_ji(stream, CT, C);
+    //    mp.loss.cce(y, t, .{
+    //        .grads = true,
+    //        .score = &score,
+    //    });
 
-    //try EU.copyAndPrintMatrix("\nCentroids", C.values(), n, k, stream);
+    //    net.reverse();
 
-    //for (0..10) |_| {
-    //        
-    //    // calculate similarity:
-    //    mp.raw_ops.linear_ij_jk(stream, W, C, 1.0, S, 0.0, S);
+    //    G.reset(.node, .all);
+    //    G.reset(.leaf, .grd);
 
-    //    // find top matches:
-    //    mp.algo.key.max(S, max_gpu, "ij->j");
-
-    //    populateCentroids(
-    //        stream, W, C, CT, R, max_gpu, max_cpu, rdx_gpu, rdx_cpu
-    //    );
-
-    //    try EU.copyAndPrintMatrix("\nCentroids", C.values(), n, k, stream);
-
-    //    mp.stream.synchronize(stream);
+    //    std.log.info("score: {d:.4}", .{score});
     //}
+
+    ////////////////////////////////////////////
+    mp.device.check();
+
+    std.log.info("Experimental: SUCCESS", .{});
 }

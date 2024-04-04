@@ -105,7 +105,7 @@ pub fn main() !void {
         .upper = 2.0,
     } });
 
-    const G = mp.Graph.init(.{ .optimizer = sgd.optimizer(), .stream = stream, .mode = .train });
+    const G = mp.Graph.init(.{ .stream = stream, .mode = .train });
     defer G.deinit();
 
     const m: usize = 128;
@@ -132,6 +132,8 @@ pub fn main() !void {
         });
 
         net.reverse();
+
+        sgd.update(G);
 
         G.reset(.node, .all);
         G.reset(.leaf, .grd);

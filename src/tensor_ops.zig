@@ -109,7 +109,7 @@ pub const HadamardCallback = CallbackBuilder(
 
 // <>--------------------------------------------------------<>
 
-pub fn leakyReluForward(stream: Stream, x: anytype, coef: anytype, y: anytype) void {
+pub fn leakyReluForward(stream: Stream, x: anytype, coef: f32, y: anytype) void {
     const T = Child(@TypeOf(x));
     const x_values = x.values();
     const y_values = y.values();
@@ -117,12 +117,17 @@ pub fn leakyReluForward(stream: Stream, x: anytype, coef: anytype, y: anytype) v
     overloads.kernel_leaky_relu.call(.{ stream.context, x_values.ptr, y_values.ptr, SC.asScalar(T, coef), y_values.len });
 }
 
-pub fn leakyReluReverse(stream: Stream, x: anytype, coef: anytype, y: anytype) void {
+pub fn leakyReluReverse(stream: Stream, x: anytype, coef: f32, y: anytype) void {
     const T = Child(@TypeOf(x));
-    const x_values = x.values();
-    const y_values = y.values();
 
-    overloads.kernel_leaky_relu_reverse.call(.{ stream.context, x_values.ptr, y_values.ptr, SC.asScalar(T, coef), y_values.len });
+    overloads.kernel_leaky_relu_reverse.call(.{ 
+        stream.context, 
+        x.values().ptr, 
+        x.grads().?.ptr,
+        y.grads().?.ptr, 
+        SC.asScalar(T, coef), 
+        y.len(),
+    });
 }
 
 pub const LeakyReluCallback = CallbackBuilder(

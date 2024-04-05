@@ -173,25 +173,25 @@ pub const ops = struct {
         assert(std.mem.eql(types.SizeType, X.sizes(), Y.sizes()));
         const graph = X.ptr;
         const DataType = SC.ScalarResult(@TypeOf(X).DataType, @TypeOf(Y).DataType);
-        const Z = nodeTensor(graph, X.sizes(), DataType);
+        const Z = CG.nodeTensor(graph, X.sizes(), DataType);
         const callback = Callback{}; // instance for comptime fields
         callback.forward(graph.stream, X, Y, Z);
         if (graph.mode == .train){
             _ = CG.adjustDependencies(X, 1);
             _ = CG.adjustDependencies(Y, 1);
-            CG.appendNode(graph, TenOps.LeakyReluCallback, .{ X, Y, Z });
+            CG.appendNode(graph, Callback, .{ X, Y, Z });
         }
-        return Y;
+        return Z;
     }
 
     inline fn activationDispatch(comptime Callback: type, X: anytype) NodeTensor(Child(@TypeOf(X))) {
         const graph = X.ptr;
-        const Y = nodeTensor(graph, X.sizes(), @TypeOf(X).DataType);
+        const Y = CG.nodeTensor(graph, X.sizes(), @TypeOf(X).DataType);
         const callback = Callback{}; // instance for comptime fields
         callback.forward(graph.stream, X, Y);
         if (graph.mode == .train){
             _ = CG.adjustDependencies(X, 1);
-            CG.appendNode(graph, TenOps.LeakyReluCallback, .{ X, Y });
+            CG.appendNode(graph, Callback, .{ X, Y });
         }
         return Y;
     }
@@ -225,7 +225,7 @@ pub const ops = struct {
 
     // <>--------------------------------------------------------<>
 
-    pub fn leakyRelu(X: anytype, coef: f16) NodeTensor(Child(@TypeOf(X))) {
+    pub fn leakyRelu(X: anytype, coef: f32) NodeTensor(Child(@TypeOf(X))) {
         if (comptime !isGraphTensor(@TypeOf(X)))
             @compileError("Leaky Relu requires graph tensor.");
 
@@ -233,13 +233,13 @@ pub const ops = struct {
 
         assert((0.0 <= coef) and (coef < 1.0));
 
-        const Y = nodeTensor(graph, X.sizes(), @TypeOf(X).DataType);
+        const Y = CG.nodeTensor(graph, X.sizes(), @TypeOf(X).DataType);
 
         TenOps.leakyReluForward(graph.stream, X, coef, Y);
 
         if (graph.mode == .train){
             _ = CG.adjustDependencies(X, 1);
-            CG.appendNode(graph, TenOps.LeakyReluCallback, .{ X, Y });
+            CG.appendNode(graph, TenOps.LeakyReluCallback, .{ X, coef, Y });
         }
         return Y;
     }
@@ -356,7 +356,7 @@ pub const ops = struct {
             }
         }
 
-        const Z = nodeTensor(graph, z_sizes[0..], UT.Child(@TypeOf(X)));
+        const Z = CG.nodeTensor(graph, z_sizes[0..], UT.Child(@TypeOf(X)));
 
         // locate inner product by expression
         const ip = TenOps.findLinear(expression, false){};
@@ -377,7 +377,7 @@ pub const ops = struct {
         return linearScaled(X, Y, 1.0, B, expression);
     }
 
-    pub fn linearScaled(X: anytype, Y: anytype, alpha: f16, B: anytype, comptime expression: []const u8) NodeTensor(Child(@TypeOf(X))) {
+    pub fn linearScaled(X: anytype, Y: anytype, alpha: f32, B: anytype, comptime expression: []const u8) NodeTensor(Child(@TypeOf(X))) {
         if (comptime !isGraphTensor(@TypeOf(X)) or !isGraphTensor(@TypeOf(Y)) or !isGraphTensor(@TypeOf(B)))
             @compileError("Linear requires graph tensors.");
 
@@ -405,7 +405,7 @@ pub const ops = struct {
         // bias needs to have the same dimensions as output
         std.debug.assert(std.mem.eql(types.SizeType, z_sizes[0..], B.sizes()));
 
-        const Z = nodeTensor(graph, z_sizes[0..], UT.Child(@TypeOf(X)));
+        const Z = CG.nodeTensor(graph, z_sizes[0..], UT.Child(@TypeOf(X)));
 
         // locate inner product by expression
         const lin = TenOps.findLinear(expression, true){};

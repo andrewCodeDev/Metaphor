@@ -10,7 +10,7 @@ pub fn FeedForward(comptime Tag: mp.scalar.Tag) type {
         W: mp.types.LeafTensor(T, .wgt),
         b: mp.types.LeafTensor(T, .wgt),
         y: mp.types.NodeTensor(T) = undefined,
-        alpha: f16,
+        alpha: f32,
 
         pub fn init(G: *mp.Graph, m: usize, n: usize) Self {
             return .{
@@ -121,7 +121,7 @@ pub fn main() !void {
     mp.mem.randomize(x, .gauss);
     net.randomize();
 
-    var score: f64 = 0.0;
+    var score: f32 = 0.0;
 
     for (0..100) |_| {
         const y = net.forward(x);

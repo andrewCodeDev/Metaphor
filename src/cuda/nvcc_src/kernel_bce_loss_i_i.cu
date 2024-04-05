@@ -1,9 +1,18 @@
 #include "../kernel_header.h"
 
-__global__ void __kernel_cce_loss_i_i_RScalar(
+__device__ __inline__ RScalar __cross_entropy_RScalar(
+  RScalar y,
+  RScalar t
+){
+  // TODO: break apart this expression - we don't need to run both logs
+  const RScalar adj = (y > Init<RScalar>::epsilon()) ? y : Init<RScalar>::epsilon();
+  return -((RScalar(1.0f) - t) * rlog(RScalar(1.0f) - adj) + y * rlog(adj));
+}
+
+__global__ void __kernel_bce_loss_i_i_RScalar(
     const RScalar* src_value, 
           RScalar* src_grads, 
-          unsigned trg,
+    const RScalar* trg_value,
           RScalar* scratch,
           float* redux, // scalar
     len_t m
@@ -25,30 +34,36 @@ __global__ void __kernel_cce_loss_i_i_RScalar(
 
     if ((ofs + 4) < m) {
       auto u = *reinterpret_cast<coalesce<RScalar>::c_ptr>(&src_value[ofs]);
+      auto v = *reinterpret_cast<coalesce<RScalar>::c_ptr>(&trg_value[ofs]);
       // calculate the loss
-      const RScalar w = (ofs + 0 == trg) ? -rlog(MaxOP::apply(u.w, Init<RScalar>::epsilon())) : RScalar(0.0f);
-      const RScalar x = (ofs + 1 == trg) ? -rlog(MaxOP::apply(u.x, Init<RScalar>::epsilon())) : RScalar(0.0f);
-      const RScalar y = (ofs + 2 == trg) ? -rlog(MaxOP::apply(u.y, Init<RScalar>::epsilon())) : RScalar(0.0f);
-      const RScalar z = (ofs + 3 == trg) ? -rlog(MaxOP::apply(u.z, Init<RScalar>::epsilon())) : RScalar(0.0f);
-      grid_sum += static_cast<double>(w + x + y + z);
+      if (redux != nullptr) {
+        const RScalar w = __cross_entropy_RScalar(u.w, v.w);
+        const RScalar x = __cross_entropy_RScalar(u.x, v.x);
+        const RScalar y = __cross_entropy_RScalar(u.y, v.y);
+        const RScalar z = __cross_entropy_RScalar(u.z, v.z);
+        grid_sum += static_cast<double>(w + x + y + z);
+      }
       // calculate the dydx
       if (src_value != src_grads) {
         auto s = reinterpret_cast<coalesce<RScalar>::ptr>(&src_grads[ofs]);
-        u.w = u.w - RScalar((ofs + 0 == trg) ? 1.0f : 0.0f);
-        u.x = u.x - RScalar((ofs + 1 == trg) ? 1.0f : 0.0f);
-        u.y = u.y - RScalar((ofs + 2 == trg) ? 1.0f : 0.0f);
-        u.z = u.z - RScalar((ofs + 3 == trg) ? 1.0f : 0.0f);
+        u.w -= v.w;
+        u.x -= v.x;
+        u.y -= v.y;
+        u.z -= v.z;
         *s = u;
       }
     }
     else if (ofs < m) {
       for (len_t i = ofs; i < m; ++i) {
         const RScalar x = src_value[i];
-        const RScalar y = (i == trg) ? -rlog(MaxOP::apply(x, Init<RScalar>::epsilon())) : RScalar(0.0f);
-        grid_sum += y;
+        const RScalar t = trg_value[i];
+        if (redux != nullptr) {
+            grid_sum += __cross_entropy_RScalar(x, t);
+        }
+        
         // calculate the dydx
         if (src_value != src_grads) {
-          src_grads[i] = x - RScalar((i == trg) ? 1.0f : 0.0f);
+          src_grads[i] = x - t;
         }
       }
     }
@@ -95,11 +110,11 @@ __global__ void __kernel_cce_loss_i_i_RScalar(
   }
 } 
 
-extern "C" void launch_cce_loss_i_i_RScalar(
+extern "C" void launch_bce_loss_i_i_RScalar(
   StreamCtx stream,
   const RScalar* src_value, 
         RScalar* src_grads, 
-        unsigned trg,
+  const RScalar* trg_value,
         RScalar* scratch,
         float* redux, // scalar
   len_t m
@@ -117,13 +132,13 @@ extern "C" void launch_cce_loss_i_i_RScalar(
   void* args[] = { 
     (void*)&src_value, 
     (void*)&src_grads, 
-    (void*)&trg, 
+    (void*)&trg_value,
     (void*)&scratch, 
     (void*)&redux, 
     (void*)&m
   };
 
   CUDA_ASSERT(cudaLaunchCooperativeKernel(
-    (void*)(__kernel_cce_loss_i_i_RScalar), grid, block, args, 0, getCtx(stream)
+    (void*)(__kernel_bce_loss_i_i_RScalar), grid, block, args, 0, getCtx(stream)
   ));
 }

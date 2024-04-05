@@ -5,7 +5,7 @@ __global__ void __kernel_mse_loss_ij_j_RScalar(
           RScalar* src_grads, 
     const RScalar* trg_value,
           RScalar* scratch,
-          double* redux, // scalar
+          float* redux, // scalar
     len_t m,
     len_t n
 ) {
@@ -81,8 +81,8 @@ __global__ void __kernel_mse_loss_ij_j_RScalar(
       );
 
       if ((blockIdx.y == 0) && (t_row == 0) && (t_col == 0)) {
-          const double denom = static_cast<double>(m * n);
-          *redux = static_cast<double>(grid_sum) / denom;
+          const double denom = static_cast<float>(m * n);
+          *redux = static_cast<float>(grid_sum) / denom;
       }
 } 
 
@@ -92,7 +92,7 @@ extern "C" void launch_mse_loss_ij_j_RScalar(
         RScalar* src_grads, 
   const len_t* trgs,
         RScalar* scratch,
-        double* redux, // scalar
+        float* redux, // scalar
   len_t m,
   len_t n
 ) {

@@ -20,8 +20,8 @@ pub fn mse(
     stream: Stream,
     src: anytype,
     trg: anytype,
-    redux: ?[*]f64, // gpu
-    score: ?[*]f64, // cpu
+    redux: ?[*]f32, // gpu
+    score: ?[*]f32, // cpu
 ) void {
     const T = @TypeOf(src);
 
@@ -69,13 +69,71 @@ pub fn mse(
     }
 }
 
+pub fn bce(
+    stream: Stream,
+    src: anytype,
+    trg: anytype,
+    redux: ?[*]f32, // gpu
+    score: ?[*]f32, // cpu
+) void {
+    const T = @TypeOf(src);
+
+    const src_value = src.values();
+
+    // if grads do not exist, we
+    // assign to the src_value and
+    // that is checked by the kernel
+    var src_grads = src_value;
+
+    if (src.grads()) |grads| {
+        src_grads = grads;
+    }
+
+    const r = src.sizes().len;
+
+    if (r == 2) {
+        @panic("TODO: Implement bce Rank-2.");
+
+        // copy to scratch memory
+        // launch kernel
+        // copy and return scalar
+    } else if (r == 1) {
+        // make a function for this - needs to be the same as grid.x
+        const s_size: TC.SizeType = (src_value.len / (32 * 32 * 4)) + 2;
+
+        const scratch = stream.getScratch(T.DataType, s_size);
+
+        overloads.kernel_sigmoid.call(.{
+            stream.context, src.values().ptr, src.values().ptr, src.len()
+        });
+
+        overloads.kernel_bce_loss_i_i.call(.{
+            stream.context,
+            src_value.ptr,
+            src_grads.ptr,
+            trg.values().ptr,
+            scratch.ptr,
+            redux,
+            src_value.len,
+        });
+
+    } else {
+        @panic("MSE requires Rank[1,2] tensors.");
+    }
+
+    if (score) |ptr| {
+        DU.copyFromDevice(redux.?, @ptrCast(@alignCast(ptr)), stream);
+        DU.synchronizeStream(stream);
+    }
+}
+
 /// CCE
 pub fn cce(
     stream: Stream,
     src: anytype, // tensor input
     trg: anytype, // single integer or column of integers
-    redux: ?[*]f64, // gpu
-    score: ?[*]f64, // cpu
+    redux: ?[*]f32, // gpu
+    score: ?[*]f32, // cpu
 ) void {
     const ST = @TypeOf(src);
     const TT = @TypeOf(trg);

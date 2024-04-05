@@ -3,9 +3,9 @@
 __global__ void __kernel_cce_loss_ij_j_RScalar(
     const RScalar* src_value, 
           RScalar* src_grads, 
-    const len_t* trgs,
+    const unsigned* trgs,
           RScalar* scratch,
-          double* redux, // scalar
+          float* redux, // scalar
     len_t m,
     len_t n
 ) {
@@ -81,8 +81,8 @@ __global__ void __kernel_cce_loss_ij_j_RScalar(
       /// Grid Sum /////////////////////
 
       if ((blockIdx.y == 0) && (t_row == 0) && (t_col == 0)) {
-            const double denom = static_cast<double>(m);
-            *redux = static_cast<double>(grid_sum) / denom;
+            const double denom = static_cast<float>(m);
+            *redux = static_cast<float>(grid_sum) / denom;
       }
 } 
 
@@ -90,9 +90,9 @@ extern "C" void launch_cce_loss_ij_j_RScalar(
   StreamCtx stream,
   const RScalar* src_value, 
         RScalar* src_grads, 
-  const len_t* trgs,
+  const unsigned* trgs,
         RScalar* scratch,
-        double* redux, // scalar
+        float* redux, // scalar
   len_t m,
   len_t n
 ) {

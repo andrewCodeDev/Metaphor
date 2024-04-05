@@ -143,10 +143,10 @@ pub inline fn isOdd(x: anytype) bool {
     return !isEven(x);
 }
 
-pub inline fn assertEqualTensorLayout(comptime rank: usize, x: anytype, y: anytype) bool {
-    if (comptime debug) {
-        const x_sizes = x.sizes();
-        const y_sizes = y.sizes();
-        std.debug.assert((x_sizes.len == rank) and std.mem.eql(std.meta.Child(@TypeOf(x_sizes)), x_sizes, y_sizes));
+pub fn product(comptime T: type, slice: []const T) T {
+    var tmp: T = 1;
+    for (slice) |val| {
+        tmp *= val;
     }
+    return tmp;
 }

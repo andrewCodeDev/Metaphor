@@ -204,7 +204,7 @@ pub fn randomize(x: anytype, mode: enum{ gauss, uniform }) void {
 
     switch (mode) {
         .uniform, => {
-            for (0..x.len()) |i| mem[i] = SC.asScalar(T, random.float(f32)); 
+            for (0..x.len()) |i| mem[i] = 2.0 * SC.asScalar(T, random.float(f32)) - 1.0; 
         },
         .gauss => { 
             for (0..x.len()) |i| mem[i] = SC.asScalar(T, random.floatNorm(f32)); 

@@ -12,6 +12,8 @@ const DU = @import("device_utils.zig");
 const LaneAllocator = @import("lane_allocator.zig").LaneAllocator;
 const Stream = DU.Stream;
 
+const CG = @This();
+
 const isReal = SC.isReal;
 const isFloat = SC.isFloat;
 const isInteger = SC.isInteger;
@@ -109,10 +111,6 @@ pub fn LeafTensor(comptime T: type, comptime class: TensorClass) type {
         pub fn free(self: Self) void {
             self.ptr.freeTensor(DataType, Class, self.idx);
         }
-
-        fn adjustDependencies(self: Self, direction: i8) i8 {
-            return self.ptr.adjustDependencies(Class, self.idx, direction);
-        }
     };
 }
 
@@ -187,9 +185,6 @@ pub fn NodeTensor(comptime T: type) type {
 
             // call graph reverse
             self.ptr.reverse(self.idx, cleanup);
-        }
-        fn adjustDependencies(self: Self, direction: i8) i8 {
-            return self.ptr.adjustDependencies(.hid, self.idx, direction);
         }
     };
 }
@@ -487,16 +482,6 @@ pub const Graph = struct {
         return self.constructTensor(_class, dimensions[0..], _data_type, self.leaf_arena.allocator());
     }
 
-    fn adjustDependencies(self: *Graph, class: TensorClass, idx: IndexType, direction: i8) i8 {
-        const array = if (class == .hid) &self.nodes.dependencies else &self.leaves.dependencies;
-
-        std.debug.assert(@abs(direction) <= 1);
-
-        array.items[idx] -= direction;
-
-        return array.items[idx];
-    }
-
     fn freeGradient(self: *Graph, comptime data_type: type, class: TensorClass, idx: IndexType) void {
         const grads_array = if (class == .hid) &self.nodes.grads else &self.leaves.grads;
         if (grads_array.items[idx]) |grads| {
@@ -575,6 +560,7 @@ pub const Graph = struct {
         const callbacks = self.nodes.callbacks.items[0..];
 
         while (call_stack.getLastOrNull()) |last| {
+            
             // result tells us if we can do a depth-wise
             // traversal and wether we've hit the last
             // reverse-child node with 'stop_call'
@@ -591,12 +577,13 @@ pub const Graph = struct {
                     free_stack.append(popped) catch @panic("Graph.reverse: Out of Memory");
                 }
 
-                continue;
+                //continue;
             }
 
             // if there is a another node we're connected to,
             // put it on the stack and continue depth-wise
             if (result.next_node) |next| {
+                
                 if (!self.attached(next)) {
                     continue;
                 }
@@ -719,20 +706,10 @@ pub fn appendNode(
     self: *Graph,
     comptime FuncObj: type,
     args: anytype,
-    out: anytype,
-) @TypeOf(out) {
-    const closure = Closure.init(FuncObj, args ++ .{out}) catch @panic("Out of Memory");
+) void {
+    const closure = Closure.init(FuncObj, args) catch @panic("Out of Memory");
 
     UT.append(&self.nodes.callbacks, closure);
-
-    comptime var i: SizeType = 0;
-    inline while (comptime UT.tupleSize(@TypeOf(args)) > i) : (i += 1) {
-        if (comptime isGraphTensor(@TypeOf(args[i]))) {
-            _ = args[i].adjustDependencies(1);
-        }
-    }
-
-    return out;
 }
 
 pub fn nodeTensor(
@@ -741,6 +718,21 @@ pub fn nodeTensor(
     comptime data_type: type,
 ) NodeTensor(data_type) {
     return self.constructTensor(TensorClass.hid, dimensions, data_type, self.node_arena.allocator());
+}
+
+pub fn adjustDependencies(x: anytype, direction: i8) i8 {
+    const T = @TypeOf(x);
+
+    const self = x.ptr;
+    
+    const items = if (T.Class == .hid) 
+        self.nodes.dependencies.items else self.leaves.dependencies.items;
+
+    std.debug.assert(@abs(direction) <= 1);
+
+    items[x.idx] += direction;
+
+    return items[x.idx];
 }
 
 /////////////////////////////////////////////
@@ -769,8 +761,10 @@ fn reverseEdge(comptime func: anytype, comptime edge: SizeType, edge_tuple: anyt
     // can only return the next node if we've gathered
     // all of it's dependencies.
 
+    const deps = adjustDependencies(arg, -1);
+
     // ensure all partial-gradients are calculated
-    if (arg.adjustDependencies(-1) == 0) {
+    if (deps == 0) {
         if (comptime Class == .hid) {
             return arg.idx; // signal to keep reversing
         }
@@ -798,6 +792,8 @@ fn reverseNext(comptime CallbackType: type, edge_tuple: anytype, last_edge: Size
             // we need to call the next reversal up, starting from,
             // zero until we've gone through every breadth-wise edge
             if (last_edge <= edge_index) {
+
+                
                 const next_node = reverseEdge(
                     @field(decls, field.name).callback,
                     edge_index,
@@ -810,12 +806,6 @@ fn reverseNext(comptime CallbackType: type, edge_tuple: anytype, last_edge: Size
                 };
             }
         }
-    }
-
-    // some functions can allocate state for use
-    // in the reversal process - cleanup resources
-    if (comptime @hasField(CallbackType, "cleanup")) {
-        @call(.auto, decls.cleanup, edge_tuple);
     }
 
     // this node's reversals are now exhausted
@@ -900,7 +890,7 @@ const Closure = struct {
         const result = self.func(&self.args, self.next_edge);
 
         if (result.last_edge) |edge| {
-            self.next_edge += edge + 1;
+            self.next_edge = edge + 1;
         }
 
         return .{

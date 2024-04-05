@@ -102,10 +102,10 @@ pub fn main() !void {
     std.debug.assert(w2.grads() != null);
 
     // we have not reversed these yet
-    std.debug.assert(x.len() != 0);
+    //std.debug.assert(x.len() != 0);
     std.debug.assert(z1.len() != 0);
     std.debug.assert(w1.len() != 0);
-    std.debug.assert(x.grads() == null);
+    //std.debug.assert(x.grads() == null);
     std.debug.assert(z1.grads() == null);
     std.debug.assert(w1.grads() == null);
 
@@ -118,7 +118,7 @@ pub fn main() !void {
     std.debug.assert(w1.len() != 0);
     std.debug.assert(z1.grads() != null);
     std.debug.assert(w1.grads() != null);
-    std.debug.assert(x.grads() != null);
+    //std.debug.assert(x.grads() != null);
 
     // This now gives us interesting opportunities for optimizations.
     // Notably, we can partially free the subgraph beneath z4. This

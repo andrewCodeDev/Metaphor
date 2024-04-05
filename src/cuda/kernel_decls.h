@@ -74,6 +74,24 @@ EXTERN_C void launch_logistic_reverse_r64(
   const r64 *b_grads,
   len_t N
 );
+EXTERN_C void launch_zscore_i_i_r16(
+  StreamCtx stream, 
+  const r16* src, 
+        r16* dst, 
+  len_t n
+);
+EXTERN_C void launch_zscore_i_i_r32(
+  StreamCtx stream, 
+  const r32* src, 
+        r32* dst, 
+  len_t n
+);
+EXTERN_C void launch_zscore_i_i_r64(
+  StreamCtx stream, 
+  const r64* src, 
+        r64* dst, 
+  len_t n
+);
 EXTERN_C void launch_tanh_r16(
   StreamCtx stream,
   const r16* a,
@@ -110,31 +128,49 @@ EXTERN_C void launch_extract_sort_keys_i_r64(
   unsigned* keys, 
   len_t n
 );
+EXTERN_C void launch_sigmoid_r16(
+  StreamCtx stream,
+  const r16* a,
+        r16* b, 
+  len_t N
+);
+EXTERN_C void launch_sigmoid_r32(
+  StreamCtx stream,
+  const r32* a,
+        r32* b, 
+  len_t N
+);
+EXTERN_C void launch_sigmoid_r64(
+  StreamCtx stream,
+  const r64* a,
+        r64* b, 
+  len_t N
+);
 EXTERN_C void launch_cce_loss_i_i_r16(
   StreamCtx stream,
   const r16* src_value, 
         r16* src_grads, 
-        len_t    trg,
+        unsigned trg,
         r16* scratch,
-        double*  redux, // scalar
+        float* redux, // scalar
   len_t m
 );
 EXTERN_C void launch_cce_loss_i_i_r32(
   StreamCtx stream,
   const r32* src_value, 
         r32* src_grads, 
-        len_t    trg,
+        unsigned trg,
         r32* scratch,
-        double*  redux, // scalar
+        float* redux, // scalar
   len_t m
 );
 EXTERN_C void launch_cce_loss_i_i_r64(
   StreamCtx stream,
   const r64* src_value, 
         r64* src_grads, 
-        len_t    trg,
+        unsigned trg,
         r64* scratch,
-        double*  redux, // scalar
+        float* redux, // scalar
   len_t m
 );
 EXTERN_C void launch_setup_sort_pairs_i_r16(
@@ -286,6 +322,30 @@ EXTERN_C void launch_subtraction_c64(
   const c64* b, 
   c64* c, 
   len_t N
+);
+EXTERN_C void launch_reduce_ij_i_r16(
+    StreamCtx stream,
+    const r16* src,
+          r16* dst,
+          r16 alpha,
+    len_t m,
+    len_t n
+);
+EXTERN_C void launch_reduce_ij_i_r32(
+    StreamCtx stream,
+    const r32* src,
+          r32* dst,
+          r32 alpha,
+    len_t m,
+    len_t n
+);
+EXTERN_C void launch_reduce_ij_i_r64(
+    StreamCtx stream,
+    const r64* src,
+          r64* dst,
+          r64 alpha,
+    len_t m,
+    len_t n
 );
 EXTERN_C void launch_linear_ij_jk_r16(
   StreamCtx stream,
@@ -473,7 +533,7 @@ EXTERN_C void launch_mse_loss_i_i_r16(
         r16* src_grads, 
   const r16* trg_value, 
         r16* scratch,
-        double*  redux, // scalar
+        float*  redux, // scalar
   len_t m
 );
 EXTERN_C void launch_mse_loss_i_i_r32(
@@ -482,7 +542,7 @@ EXTERN_C void launch_mse_loss_i_i_r32(
         r32* src_grads, 
   const r32* trg_value, 
         r32* scratch,
-        double*  redux, // scalar
+        float*  redux, // scalar
   len_t m
 );
 EXTERN_C void launch_mse_loss_i_i_r64(
@@ -491,7 +551,7 @@ EXTERN_C void launch_mse_loss_i_i_r64(
         r64* src_grads, 
   const r64* trg_value, 
         r64* scratch,
-        double*  redux, // scalar
+        float*  redux, // scalar
   len_t m
 );
 EXTERN_C void launch_norm_l2_i_i_reverse_r16(
@@ -653,6 +713,66 @@ EXTERN_C void launch_permutate_r64(
 EXTERN_C void launch_permutate_naive_c64(
   CTensor64 X, CTensor64 Y, Permutation P
 );
+EXTERN_C void launch_broadcast_i_ij_r16(
+  StreamCtx stream, 
+  const r16* src, 
+        r16* dst, 
+        r16 alpha,
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_broadcast_i_ij_r32(
+  StreamCtx stream, 
+  const r32* src, 
+        r32* dst, 
+        r32 alpha,
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_broadcast_i_ij_r64(
+  StreamCtx stream, 
+  const r64* src, 
+        r64* dst, 
+        r64 alpha,
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_linear_ij_kj_r16(
+  StreamCtx stream,
+  const r16 *A, 
+  const r16 *B,
+        r16 alpha, // scales product
+  const r16 *C,
+        r16 beta, // blends C back in
+        r16 *Y,
+  len_t m, 
+  len_t n, 
+  len_t k 
+);
+EXTERN_C void launch_linear_ij_kj_r32(
+  StreamCtx stream,
+  const r32 *A, 
+  const r32 *B,
+        r32 alpha, // scales product
+  const r32 *C,
+        r32 beta, // blends C back in
+        r32 *Y,
+  len_t m, 
+  len_t n, 
+  len_t k 
+);
+EXTERN_C void launch_linear_ij_kj_r64(
+  StreamCtx stream,
+  const r64 *A, 
+  const r64 *B,
+        r64 alpha, // scales product
+  const r64 *C,
+        r64 beta, // blends C back in
+        r64 *Y,
+  len_t m, 
+  len_t n, 
+  len_t k 
+);
 EXTERN_C void launch_relu_leaky_reverse_r16(
   StreamCtx stream,
   const r16 *a_value,
@@ -782,6 +902,33 @@ EXTERN_C void launch_softmax_ij_j_r64(
   len_t m,
   len_t n
 );
+EXTERN_C void launch_bce_loss_i_i_r16(
+  StreamCtx stream,
+  const r16* src_value, 
+        r16* src_grads, 
+  const r16* trg_value,
+        r16* scratch,
+        float* redux, // scalar
+  len_t m
+);
+EXTERN_C void launch_bce_loss_i_i_r32(
+  StreamCtx stream,
+  const r32* src_value, 
+        r32* src_grads, 
+  const r32* trg_value,
+        r32* scratch,
+        float* redux, // scalar
+  len_t m
+);
+EXTERN_C void launch_bce_loss_i_i_r64(
+  StreamCtx stream,
+  const r64* src_value, 
+        r64* src_grads, 
+  const r64* trg_value,
+        r64* scratch,
+        float* redux, // scalar
+  len_t m
+);
 EXTERN_C void launch_softmax_i_i_reverse_r16(
   StreamCtx stream,
         r16* a_grads, 
@@ -812,7 +959,7 @@ EXTERN_C void launch_mse_loss_ij_j_r16(
         r16* src_grads, 
   const len_t* trgs,
         r16* scratch,
-        double* redux, // scalar
+        float* redux, // scalar
   len_t m,
   len_t n
 );
@@ -822,7 +969,7 @@ EXTERN_C void launch_mse_loss_ij_j_r32(
         r32* src_grads, 
   const len_t* trgs,
         r32* scratch,
-        double* redux, // scalar
+        float* redux, // scalar
   len_t m,
   len_t n
 );
@@ -832,7 +979,7 @@ EXTERN_C void launch_mse_loss_ij_j_r64(
         r64* src_grads, 
   const len_t* trgs,
         r64* scratch,
-        double* redux, // scalar
+        float* redux, // scalar
   len_t m,
   len_t n
 );
@@ -876,9 +1023,9 @@ EXTERN_C void launch_cce_loss_ij_j_r16(
   StreamCtx stream,
   const r16* src_value, 
         r16* src_grads, 
-  const len_t* trgs,
+  const unsigned* trgs,
         r16* scratch,
-        double* redux, // scalar
+        float* redux, // scalar
   len_t m,
   len_t n
 );
@@ -886,9 +1033,9 @@ EXTERN_C void launch_cce_loss_ij_j_r32(
   StreamCtx stream,
   const r32* src_value, 
         r32* src_grads, 
-  const len_t* trgs,
+  const unsigned* trgs,
         r32* scratch,
-        double* redux, // scalar
+        float* redux, // scalar
   len_t m,
   len_t n
 );
@@ -896,9 +1043,9 @@ EXTERN_C void launch_cce_loss_ij_j_r64(
   StreamCtx stream,
   const r64* src_value, 
         r64* src_grads, 
-  const len_t* trgs,
+  const unsigned* trgs,
         r64* scratch,
-        double* redux, // scalar
+        float* redux, // scalar
   len_t m,
   len_t n
 );

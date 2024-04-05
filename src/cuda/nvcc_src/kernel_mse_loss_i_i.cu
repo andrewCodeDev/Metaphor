@@ -5,7 +5,7 @@ __global__ void __kernel_mse_loss_i_i_RScalar(
           RScalar* src_grads, 
     const RScalar* trg_value, 
           RScalar* scratch,
-          double*  redux, // scalar
+          float*  redux, // scalar
     len_t m
 ) {
   auto grid = cg::this_grid();
@@ -102,7 +102,7 @@ extern "C" void launch_mse_loss_i_i_RScalar(
         RScalar* src_grads, 
   const RScalar* trg_value, 
         RScalar* scratch,
-        double*  redux, // scalar
+        float*  redux, // scalar
   len_t m
 ) {
 

@@ -43,6 +43,8 @@ const WeightIterator = struct {
         grd: SliceUnion,
         stream: Stream,
     }{
+        // TODO: Consider if leaves.dependencies should be considered? Would allow partial update.
+        
         while (self.idx < self.ptr.leaves.values.items.len) : (self.idx += 1){
 
             const grads = self.ptr.leaves.grads.items[self.idx];

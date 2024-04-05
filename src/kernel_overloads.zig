@@ -21,6 +21,12 @@ pub const kernel_logistic_reverse = OverloadSet(.{
 	decls.launch_logistic_reverse_r64,
 });
 
+pub const kernel_zscore_i_i = OverloadSet(.{
+	decls.launch_zscore_i_i_r16,
+	decls.launch_zscore_i_i_r32,
+	decls.launch_zscore_i_i_r64,
+});
+
 pub const kernel_tanh = OverloadSet(.{
 	decls.launch_tanh_r16,
 	decls.launch_tanh_r32,
@@ -31,6 +37,12 @@ pub const kernel_extract_sort_keys_i = OverloadSet(.{
 	decls.launch_extract_sort_keys_i_r16,
 	decls.launch_extract_sort_keys_i_r32,
 	decls.launch_extract_sort_keys_i_r64,
+});
+
+pub const kernel_sigmoid = OverloadSet(.{
+	decls.launch_sigmoid_r16,
+	decls.launch_sigmoid_r32,
+	decls.launch_sigmoid_r64,
 });
 
 pub const kernel_cce_loss_i_i = OverloadSet(.{
@@ -73,6 +85,12 @@ pub const kernel_subtraction = OverloadSet(.{
 	decls.launch_subtraction_c32,
 	decls.launch_subtraction_r64,
 	decls.launch_subtraction_c64,
+});
+
+pub const kernel_reduce_ij_i = OverloadSet(.{
+	decls.launch_reduce_ij_i_r16,
+	decls.launch_reduce_ij_i_r32,
+	decls.launch_reduce_ij_i_r64,
 });
 
 pub const kernel_linear_ij_jk = OverloadSet(.{
@@ -162,6 +180,18 @@ pub const kernel_permutate = OverloadSet(.{
 	decls.launch_permutate_naive_c64,
 });
 
+pub const kernel_broadcast_i_ij = OverloadSet(.{
+	decls.launch_broadcast_i_ij_r16,
+	decls.launch_broadcast_i_ij_r32,
+	decls.launch_broadcast_i_ij_r64,
+});
+
+pub const kernel_linear_ij_kj = OverloadSet(.{
+	decls.launch_linear_ij_kj_r16,
+	decls.launch_linear_ij_kj_r32,
+	decls.launch_linear_ij_kj_r64,
+});
+
 pub const kernel_leaky_relu_reverse = OverloadSet(.{
 	decls.launch_relu_leaky_reverse_r16,
 	decls.launch_relu_leaky_reverse_r32,
@@ -193,6 +223,12 @@ pub const kernel_softmax_ij_j = OverloadSet(.{
 	decls.launch_softmax_ij_j_r16,
 	decls.launch_softmax_ij_j_r32,
 	decls.launch_softmax_ij_j_r64,
+});
+
+pub const kernel_bce_loss_i_i = OverloadSet(.{
+	decls.launch_bce_loss_i_i_r16,
+	decls.launch_bce_loss_i_i_r32,
+	decls.launch_bce_loss_i_i_r64,
 });
 
 pub const kernel_softmax_i_i_reverse = OverloadSet(.{
@@ -261,6 +297,9 @@ pub const kernel_tanh_reverse = OverloadSet(.{
 	decls.launch_tanh_reverse_r64,
 });
 
+pub const kernel_zscore_i_i_reverse = OverloadSet(.{
+});
+
 pub const kernel_hadamard = OverloadSet(.{
 	decls.launch_hadamard_r16,
 	decls.launch_hadamard_c16,
@@ -280,6 +319,9 @@ pub const kernel_linear_ij_j = OverloadSet(.{
 	decls.launch_linear_ij_j_r16,
 	decls.launch_linear_ij_j_r32,
 	decls.launch_linear_ij_j_r64,
+});
+
+pub const kernel_sigmoid_reverse = OverloadSet(.{
 });
 
 pub const kernel_copy = OverloadSet(.{

@@ -36,10 +36,14 @@ const std = @import("std");
 
 
 pub fn main() !void {
+
     mp.device.init(0);
 
     const stream = mp.stream.init();
     defer mp.stream.deinit(stream);
+
+    const G = mp.Graph.init(.{ .stream = stream, .mode = .train });
+    defer G.deinit();
 
     var sgd = mp.optm.SGD.init(.{ 
         .rate = 0.1, 
@@ -51,80 +55,77 @@ pub fn main() !void {
 
     _ = &sgd;
 
-    const G = mp.Graph.init(.{ .stream = stream, .mode = .train });
-    defer G.deinit();
-
-    const m: usize = 16;
+    const m: usize = 32;
     const n: usize = 32;
+    //const k: usize = 64;
 
-    const X1 = G.tensor(.wgt, .r32, mp.Rank(2){ m, n });
-    //const X2 = G.tensor(.inp, .r32, mp.Rank(2){ m, n });
+    const X1 = G.tensor(.inp, .r32, mp.Rank(2){ m, n });
+    const X2 = G.tensor(.inp, .r32, mp.Rank(2){ m, n });
 
-    //const Q = G.tensor(.wgt, .r32, mp.Rank(2){ m, n });
-    //const K = G.tensor(.wgt, .r32, mp.Rank(2){ m, n });
-    //const V = G.tensor(.wgt, .r32, mp.Rank(2){ m, n });
-    //const alpha: f32 = 1.0 / @as(f32, @floatFromInt(n));
+    const t = G.tensor(.inp, .r32, mp.Rank(2){ m, 1 });
+    
+    const Q = G.tensor(.wgt, .r32, mp.Rank(2){ n, m });
+    const K = G.tensor(.wgt, .r32, mp.Rank(2){ n, m });
+    const V = G.tensor(.wgt, .r32, mp.Rank(2){ n, m });
+    const alpha: f32 = 1.0 / @as(f32, @floatFromInt(n));
+
+    //const W1 = G.tensor(.wgt, .r32, mp.Rank(2){ k, n });
+    //const b1 = G.tensor(.wgt, .r32, mp.Rank(2){ k, n });
+
+    //const W2 = G.tensor(.wgt, .r32, mp.Rank(2){ m, k });
+    //const b2 = G.tensor(.wgt, .r32, mp.Rank(2){ m, k });
+
+    var score: f32 = 0.0;
+
+    var trg: mp.types.Key = 0;
+
+    _ = &trg;
+
+    _ = &score;
 
     ///////////////////////////////////////////////////
     // feed forward network...
 
     // project to squared dimensions...
-
-    mp.mem.sequence(X1, 0.0, 0.1);
-
-    Y.reverse(.keep);
-
-    try EU.copyAndPrintMatrix("Y Values", Y.values(),   m, n, stream);
-    try EU.copyAndPrintMatrix("X1 grads", X1.grads().?, m, n, stream);
     
-    //mp.mem.fill(X2, 1.0);
-    //mp.mem.fill(Q, 1.0);
-    //mp.mem.fill(K, 1.0);
+    mp.mem.randomize(X1, .gauss);
+    mp.mem.randomize(X2, .gauss);
 
-    //const QX = mp.ops.innerProduct(Q,  X1, "ij,jk->ik");
-    //const KX = mp.ops.innerProduct(K,  X2, "ij,jk->ik");
-    //const VX = mp.ops.innerProduct(V,  X1, "ij,jk->ik");
-    //const QK = mp.ops.innerProduct(QX, KX, "ij,kj->ik");
-    //const SM = mp.ops.softmax(QK, "ij|j");
-    //const SV = mp.ops.innerProductScaled(SM, VX, alpha, "ij,jk->ik");
+    mp.mem.fill(t, 1.0);
 
-    //std.log.info("QX sizes: {any}", .{ QX.sizes() });
-    //std.log.info("KX sizes: {any}", .{ KX.sizes() });
-    //std.log.info("QK sizes: {any}", .{ QK.sizes() });
+    mp.mem.randomize(Q, .gauss);
+    mp.mem.randomize(K, .gauss);
+    mp.mem.randomize(V, .gauss);
 
-    //QK.reverse(.keep);
+    for (0..10) |_| {
 
-    //try EU.copyAndPrintMatrix("QX Values", QX.values(), m, m, stream);
-    //try EU.copyAndPrintMatrix("KX Values", KX.values(), m, m, stream);
+        // query, key, value
+        // mn,nm->mm
+        const QX = mp.ops.innerProductScaled(Q, X1, alpha, "ij,jk->ik");
+        const KX = mp.ops.innerProductScaled(K, X2, alpha, "ij,jk->ik");
+        const VX = mp.ops.innerProductScaled(V, X1, alpha, "ij,jk->ik");
 
-    //try EU.copyAndPrintMatrix("QX Grads", QX.grads().?, m, m, stream);
-    //try EU.copyAndPrintMatrix("KX Grads", KX.grads().?, m, m, stream);
-    
+        // calculate overlap
+        const QK = mp.ops.innerProduct(QX, KX, "ij,kj->ik");
+        const SM = mp.ops.softmax(QK, "ij|j");
+        const SV = mp.ops.innerProduct(SM, VX, "ij,jk->ik");
+        const L2 = mp.ops.norm.l2(SV, "ij|j");
+        const r = mp.ops.reduce(L2, "ij->i");
 
-    //var net = NeuralNet(.r32, 3).init(G, m, n, true);
-    //const x = G.tensor(.inp, .r32, mp.Rank(1){n});
-    //const t = 16;
+        mp.loss.bce(r, t, .{
+            .grads = true,
+            .score = &score
+        });
 
-    //mp.mem.randomize(x, .gauss);
-    //net.randomize();
+        r.reverse(.keep);
 
-    //var score: f64 = 0.0;
+        sgd.update(G);
 
-    //for (0..100) |_| {
-    //    const y = net.forward(x);
+        G.reset(.node, .all);
+        G.reset(.leaf, .grd);
 
-    //    mp.loss.cce(y, t, .{
-    //        .grads = true,
-    //        .score = &score,
-    //    });
-
-    //    net.reverse();
-
-    //    G.reset(.node, .all);
-    //    G.reset(.leaf, .grd);
-
-    //    std.log.info("score: {d:.4}", .{score});
-    //}
+        std.log.info("score - {}", .{ score });
+    }
 
     ////////////////////////////////////////////
     mp.device.check();

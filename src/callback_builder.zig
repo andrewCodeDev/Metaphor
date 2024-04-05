@@ -33,24 +33,12 @@ pub const NoArg = opaque {};
 pub fn CallbackBuilder(
     comptime forward: anytype,
     comptime reverse_tuple: anytype,
-    comptime cleanup: anytype,
 ) type {
     if (comptime !UT.isFunction(@TypeOf(forward))) {
         @compileError("Reversible field 'func' argument must be a function.");
     }
 
-    // we need an extra field if there is a cleanup provided
-    const M: usize = if (comptime @TypeOf(cleanup) == @TypeOf(NoCleanup)) 1 else 2;
-
-    if (comptime M == 2 and !UT.isFunction(@TypeOf(cleanup))) {
-        @compileError("Cleanup must be a function, otherwise use NoCleanup.");
-    }
-
-    const N: usize = comptime UT.fieldsLen(@TypeOf(reverse_tuple)) + M;
-
-    if (comptime N == M) {
-        @compileError("FunctionDeclarations: Empty Reverse Tuple.");
-    }
+    const N: usize = comptime UT.fieldsLen(@TypeOf(reverse_tuple)) + 1;
 
     comptime var fields: [N]std.builtin.Type.StructField = undefined;
 
@@ -62,20 +50,10 @@ pub fn CallbackBuilder(
         .alignment = 0,
     };
 
-    if (comptime M == 2) {
-        fields[1] = .{
-            .name = "cleanup",
-            .type = @TypeOf(cleanup),
-            .default_value = cleanup,
-            .is_comptime = true,
-            .alignment = 0,
-        };
-    }
-
     comptime var suffix: u8 = 'a';
 
-    inline for (M..N) |i| {
-        const elem = reverse_tuple[i - M];
+    inline for (1..N) |i| {
+        const elem = reverse_tuple[i - 1];
 
         const FieldType = ReversibleField(elem[0], elem[1]);
 

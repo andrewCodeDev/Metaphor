@@ -13,12 +13,11 @@ __global__ void __kernel_softmax_ij_j_reverse_RScalar(
   len_t t_row = threadIdx.y;
   len_t t_col = threadIdx.x;
 
-  const len_t offset = n * ((blockIdx.y * WARP_SIZE) + t_row);
-  A_grads += offset;
-  B_value += offset;
-  B_grads += offset;
+  const len_t m_bound = blockIdx.y * blockDim.y + t_row;
 
-  const len_t m_bound = (blockIdx.y * WARP_SIZE) + t_row;
+  A_grads += m_bound * n;
+  B_value += m_bound * n;
+  B_grads += m_bound * n;
 
   //////////////////////////////////
   /// Grid Sum /////////////////////
@@ -28,14 +27,14 @@ __global__ void __kernel_softmax_ij_j_reverse_RScalar(
 
   RScalar grid_sum = RScalar(0.0f);
 
-  for (len_t step = 0; step < m; step += WARP_SIZE) {
+  for (len_t step = 0; step < m; step += blockDim.x) {
 
     if ((m_bound < m) && (step + t_col) < n) {    
       grid_sum += B_val[t_col] * B_grd[t_col];
     }
     // move A along the columns
-    B_val += WARP_SIZE;
-    B_grd += WARP_SIZE;
+    B_val += blockDim.x;
+    B_grd += blockDim.x;
   }
 
   grid_sum = warpReduce<AddOP>(grid_sum);
@@ -50,15 +49,15 @@ __global__ void __kernel_softmax_ij_j_reverse_RScalar(
     grid_sum = redux[t_row];
   }
   
-  for (len_t step = 0; step < n; step += WARP_SIZE) {
+  for (len_t step = 0; step < n; step += blockDim.x) {
 
     if ((m_bound < m) && (step + t_col) < n) {    
-      A_grads[t_col] += B_value[t_col] * (B_grads[t_col] - grid_sum);
+      A_grads[t_col] = B_value[t_col] * (B_grads[t_col] - grid_sum);
     }
     // move A along the columns
-    B_value += WARP_SIZE;
-    A_grads += WARP_SIZE;
-    B_grads += WARP_SIZE;
+    A_grads += blockDim.x;
+    B_value += blockDim.x;
+    B_grads += blockDim.x;
   }
 } 
 

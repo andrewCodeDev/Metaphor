@@ -90,7 +90,7 @@ pub const optm = struct {
 pub const loss = struct {
     pub fn cce(x: anytype, y: anytype, config: struct {
         grads: bool,
-        score: ?*f64,
+        score: ?*f32,
     }) void {
         const T = @TypeOf(x);
 
@@ -99,14 +99,14 @@ pub const loss = struct {
         if (config.grads) {
             _ = enableGradient(graph, T.DataType, T.Class, x.idx);
         }
-        const redux: ?[*]f64 = if (config.score != null)
-            graph.tensor_allocator.create(f64, graph.stream)
+        const redux: ?[*]f32 = if (config.score != null)
+            graph.tensor_allocator.create(f32, graph.stream)
         else
             null;
         defer {
             if (redux) |ptr| graph.tensor_allocator.destroy(ptr);
         }
-        const score: ?[*]f64 = if (config.score) |ptr|
+        const score: ?[*]f32 = if (config.score) |ptr|
             @ptrCast(@alignCast(ptr))
         else
             null;
@@ -116,7 +116,7 @@ pub const loss = struct {
 
     pub fn mse(x: anytype, y: anytype, config: struct {
         grads: bool,
-        score: ?*f64,
+        score: ?*f32,
     }) void {
         const T = @TypeOf(x);
 
@@ -126,14 +126,36 @@ pub const loss = struct {
             _ = enableGradient(graph, T.DataType, T.Class, x.idx);
         }
 
-        const redux: ?[*]f64 = if (config.score != null) graph.tensor_allocator.create(f64, graph.stream) else null;
+        const redux: ?[*]f32 = if (config.score != null) graph.tensor_allocator.create(f32, graph.stream) else null;
         defer {
             if (redux) |ptr| graph.tensor_allocator.destroy(ptr);
         }
 
-        const score: ?[*]f64 = if (config.score) |ptr| @ptrCast(@alignCast(ptr)) else null;
+        const score: ?[*]f32 = if (config.score) |ptr| @ptrCast(@alignCast(ptr)) else null;
 
         Loss.mse(graph.stream, x, y, redux, score);
+    }
+
+    pub fn bce(x: anytype, y: anytype, config: struct {
+        grads: bool,
+        score: ?*f32,
+    }) void {
+        const T = @TypeOf(x);
+
+        const graph = x.ptr;
+
+        if (config.grads) {
+            _ = enableGradient(graph, T.DataType, T.Class, x.idx);
+        }
+
+        const redux: ?[*]f32 = if (config.score != null) graph.tensor_allocator.create(f32, graph.stream) else null;
+        defer {
+            if (redux) |ptr| graph.tensor_allocator.destroy(ptr);
+        }
+
+        const score: ?[*]f32 = if (config.score) |ptr| @ptrCast(@alignCast(ptr)) else null;
+
+        Loss.bce(graph.stream, x, y, redux, score);
     }
 };
 
@@ -154,10 +176,12 @@ pub const ops = struct {
         const Z = nodeTensor(graph, X.sizes(), DataType);
         const callback = Callback{}; // instance for comptime fields
         callback.forward(graph.stream, X, Y, Z);
-        return if (graph.mode == .eval)
-            Z
-        else
-            appendNode(graph, Callback, .{ X, Y }, Z);
+        if (graph.mode == .train){
+            _ = CG.adjustDependencies(X, 1);
+            _ = CG.adjustDependencies(Y, 1);
+            CG.appendNode(graph, TenOps.LeakyReluCallback, .{ X, Y, Z });
+        }
+        return Y;
     }
 
     inline fn activationDispatch(comptime Callback: type, X: anytype) NodeTensor(Child(@TypeOf(X))) {
@@ -165,10 +189,11 @@ pub const ops = struct {
         const Y = nodeTensor(graph, X.sizes(), @TypeOf(X).DataType);
         const callback = Callback{}; // instance for comptime fields
         callback.forward(graph.stream, X, Y);
-        return if (graph.mode == .eval)
-            Y
-        else
-            appendNode(graph, Callback, .{X}, Y);
+        if (graph.mode == .train){
+            _ = CG.adjustDependencies(X, 1);
+            CG.appendNode(graph, TenOps.LeakyReluCallback, .{ X, Y });
+        }
+        return Y;
     }
 
     // <>--------------------------------------------------------<>
@@ -212,7 +237,11 @@ pub const ops = struct {
 
         TenOps.leakyReluForward(graph.stream, X, coef, Y);
 
-        return if (graph.mode == .eval) Y else appendNode(graph, TenOps.LeakyReluCallback, .{X}, Y);
+        if (graph.mode == .train){
+            _ = CG.adjustDependencies(X, 1);
+            CG.appendNode(graph, TenOps.LeakyReluCallback, .{ X, Y });
+        }
+        return Y;
     }
 
     // <>--------------------------------------------------------<>
@@ -261,13 +290,17 @@ pub const ops = struct {
             y_sizes[map.perm[i]] = elem;
         }
 
-        const Y = nodeTensor(graph, y_sizes[0..], UT.Child(@TypeOf(X)));
+        const Y = CG.nodeTensor(graph, y_sizes[0..], UT.Child(@TypeOf(X)));
 
         const perm = TenOps.findPermutation(expression){};
 
         perm.forward(graph.stream, X, Y);
 
-        return if (graph.mode == .eval) Y else appendNode(graph, @TypeOf(perm), .{X}, Y);
+        if (graph.mode == .train){
+            _ = CG.adjustDependencies(X, 1);
+            CG.appendNode(graph, @TypeOf(perm), .{ X, Y });
+        }
+        return Y;
     }
 
     pub fn softmax(X: anytype, comptime expression: []const u8) NodeTensor(Child(@TypeOf(X))) {
@@ -277,13 +310,17 @@ pub const ops = struct {
         const graph = X.ptr;
 
         // tells us which size index to map from x to y
-        const Y = nodeTensor(graph, X.sizes(), UT.Child(@TypeOf(X)));
+        const Y = CG.nodeTensor(graph, X.sizes(), UT.Child(@TypeOf(X)));
 
         const sm = TenOps.findSoftmax(expression){};
 
         sm.forward(graph.stream, X, Y);
 
-        return if (graph.mode == .eval) Y else appendNode(graph, @TypeOf(sm), .{X}, Y);
+        if (graph.mode == .train){
+            _ = CG.adjustDependencies(X, 1);
+            CG.appendNode(graph, @TypeOf(sm), .{ X, Y });
+        }
+        return Y;
     }
 
     // <>--------------------------------------------------------<>
@@ -325,9 +362,15 @@ pub const ops = struct {
         const ip = TenOps.findLinear(expression, false){};
 
         // cancel out addition using 0.0 for beta
-        ip.forward(graph.stream, X, Y, 1.0, Z, 0.0, Z);
+        ip.forward(graph.stream, X, Y, alpha, Z, 0.0, Z);
 
-        return if (graph.mode == .eval) Z else appendNode(graph, @TypeOf(ip), .{ X, Y, alpha, Z, 0.0 }, Z);
+        if (graph.mode == .train) {
+            _ = CG.adjustDependencies(X, 1);
+            _ = CG.adjustDependencies(Y, 1);
+            CG.appendNode(graph, @TypeOf(ip), .{ X, Y, alpha, Z, 0.0, Z });   
+        }
+
+        return Z;
     }
 
     pub fn linear(X: anytype, Y: anytype, B: anytype, comptime expression: []const u8) NodeTensor(Child(@TypeOf(X))) {
@@ -370,7 +413,13 @@ pub const ops = struct {
         // cancel out addition using 0.0 for beta
         lin.forward(graph.stream, X, Y, alpha, B, 1.0, Z);
 
-        return if (graph.mode == .eval) Z else appendNode(graph, @TypeOf(lin), .{ X, Y, alpha, B, 1.0 }, Z);
+        if (graph.mode == .train) {
+            _ = CG.adjustDependencies(X, 1);
+            _ = CG.adjustDependencies(Y, 1);
+            _ = CG.adjustDependencies(B, 1);
+            CG.appendNode(graph, @TypeOf(lin), .{ X, Y, alpha, B, 0.0, Z });   
+        }
+        return Z;
     }
 
 
@@ -394,7 +443,11 @@ pub const ops = struct {
 
         rdx.forward(graph.stream, X, Y);
 
-        return if (graph.mode == .eval) Y else appendNode(graph, @TypeOf(rdx), .{ X }, Y);
+        if (graph.mode == .train) {
+            _ = CG.adjustDependencies(X, 1);
+            CG.appendNode(graph, @TypeOf(rdx), .{ X, Y }); 
+        }
+        return Y;
     }
 
     pub fn broadcast(X: anytype, ranks: []const types.SizeType, comptime expression: []const u8) NodeTensor(Child(@TypeOf(X))) {
@@ -409,7 +462,11 @@ pub const ops = struct {
 
         bcast.forward(graph.stream, X, Y);
 
-        return if (graph.mode == .eval) Y else appendNode(graph, @TypeOf(bcast), .{ X }, Y);
+        if (graph.mode == .train) {
+            _ = CG.adjustDependencies(X, 1);
+            CG.appendNode(graph, @TypeOf(bcast), .{ X, Y }); 
+        }
+        return Y;
     }
 
     pub const norm = struct {
@@ -428,7 +485,11 @@ pub const ops = struct {
             // cancel out addition using 0.0 for beta
             l2_norm.forward(X.stream(), X, Y);
 
-            return if (graph.mode == .eval) Y else appendNode(graph, @TypeOf(l2_norm), .{ X }, Y);
+            if (graph.mode == .train) {
+                _ = CG.adjustDependencies(X, 1);
+                CG.appendNode(graph, @TypeOf(l2_norm), .{ X, Y }); 
+            }
+            return Y;
         }
     };
 };
@@ -476,11 +537,7 @@ pub const algo = struct {
 
 // Use at your own risk.
 
-//pub const raw = struct {
-//    const ops = TenOps;
-//    // TODO: think of a better name?
-//    const ovl = @import("kernel_overloads.zig");
-//};
+pub const raw_ops = TenOps;
 
 /////////////////////////////////////////////
 /////////////////////////////////////////////

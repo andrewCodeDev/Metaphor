@@ -18,7 +18,7 @@ __global__ void __kernel_reduce_ij_j_RScalar(
 
     RScalar col_sum = 0.0;
 
-    for (unsigned m_step = 0; m_step < n; m_step += blockDim.y) {
+    for (unsigned m_step = 0; m_step < m; m_step += blockDim.y) {
 
       // TODO: create transpose boundary conditions to reduce smem reads
       smem[threadIdx.y][threadIdx.x] = 0.0f;

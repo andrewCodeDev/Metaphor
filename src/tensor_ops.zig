@@ -9,11 +9,11 @@ const Child = UT.Child;
 
 const CallbackBuilder = CB.CallbackBuilder;
 const CallbackDropReverse = CB.CallbackDropReverse;
-const NoCleanup = CB.NoCleanup;
 const overloads = @import("kernel_overloads.zig");
 const Parser = @import("expression_parsing.zig");
 const Stream = DU.Stream;
 const NoArg = CB.NoArg;
+
 
 // <>--------------------------------------------------------<>
 
@@ -40,9 +40,7 @@ pub fn additionReverseArg1(stream: Stream, _: anytype, Y: anytype, Z: anytype) v
 }
 
 pub const AddCallback = CallbackBuilder(
-    additionForward,
-    .{ .{ additionReverseArg0, 0 }, .{ additionReverseArg1, 1 } },
-    NoCleanup,
+    additionForward, .{ .{ additionReverseArg0, 0 }, .{ additionReverseArg1, 1 } },
 );
 
 // <>--------------------------------------------------------<>
@@ -76,9 +74,7 @@ pub fn subtractionReverseArg1(stream: Stream, _: anytype, Y: anytype, Z: anytype
 }
 
 pub const SubCallback = CallbackBuilder(
-    subtractionForward,
-    .{ .{ subtractionReverseArg0, 0 }, .{ subtractionReverseArg1, 1 } },
-    NoCleanup,
+    subtractionForward, .{ .{ subtractionReverseArg0, 0 }, .{ subtractionReverseArg1, 1 } },
 );
 
 // <>--------------------------------------------------------<>
@@ -108,9 +104,7 @@ pub fn hadamardReverseArg1(stream: Stream, X: anytype, Y: anytype, Z: anytype) v
 }
 
 pub const HadamardCallback = CallbackBuilder(
-    hadamardForward,
-    .{ .{ hadamardReverseArg0, 0 }, .{ hadamardReverseArg1, 1 } },
-    NoCleanup,
+    hadamardForward, .{ .{ hadamardReverseArg0, 0 }, .{ hadamardReverseArg1, 1 } },    
 );
 
 // <>--------------------------------------------------------<>
@@ -132,9 +126,7 @@ pub fn leakyReluReverse(stream: Stream, x: anytype, coef: anytype, y: anytype) v
 }
 
 pub const LeakyReluCallback = CallbackBuilder(
-    leakyReluForward,
-    .{.{ leakyReluReverse, 0 }},
-    NoCleanup,
+    leakyReluForward, .{.{ leakyReluReverse, 0 }},
 );
 
 // <>--------------------------------------------------------<>
@@ -155,7 +147,7 @@ pub fn tanhReverse(stream: Stream, x: anytype, y: anytype) void {
 }
 
 pub const TanhCallback = CallbackBuilder(
-    tanhForward, .{.{ tanhReverse, 0 }}, NoCleanup,
+    tanhForward, .{.{ tanhReverse, 0 }}, 
 );
 
 // <>--------------------------------------------------------<>
@@ -169,7 +161,7 @@ pub fn seluReverse(stream: Stream, x: anytype, y: anytype) void {
 }
 
 pub const SeluCallback = CallbackBuilder(
-    seluForward, .{.{ seluReverse, 0 }}, NoCleanup,
+    seluForward, .{.{ seluReverse, 0 }}, 
 );
 
 // <>--------------------------------------------------------<>
@@ -187,7 +179,7 @@ pub fn norm_l2_i_i_reverse(stream: Stream, x: anytype, y: anytype) void {
     overloads.kernel_norm_l2_i_i_reverse.call(.{ stream.context, x.values().ptr, x.grads().?.ptr, y.grads().?.ptr, y.len() });
 }
 pub const NormL2_i_i_Callback = CallbackBuilder(
-    norm_l2_i_i, .{.{ norm_l2_i_i_reverse, 0 }}, NoCleanup
+    norm_l2_i_i, .{.{ norm_l2_i_i_reverse, 0 }}, 
 );
 
 pub fn norm_l2_ij_j(stream: Stream, x: anytype, y: anytype) void {
@@ -205,7 +197,7 @@ pub fn norm_l2_ij_j_reverse(stream: Stream, x: anytype, y: anytype) void {
     overloads.kernel_norm_l2_ij_j_reverse.call(.{ stream.context, x.values().ptr, x.grads().?.ptr, y.grads().?.ptr, x_sizes[0], x_sizes[1] });
 }
 pub const NormL2_ij_j_Callback = CallbackBuilder(
-    norm_l2_ij_j, .{.{ norm_l2_ij_j_reverse, 0 }}, NoCleanup
+    norm_l2_ij_j, .{.{ norm_l2_ij_j_reverse, 0 }}, 
 );
 
 const norm_l2_expressions = std.ComptimeStringMap(type, .{
@@ -256,7 +248,7 @@ pub fn softmax_i_i_reverse(stream: Stream, x: anytype, y: anytype) void {
 pub const SM_i_i_Callback = CallbackBuilder(
     softmax_i_i,
     .{.{ softmax_i_i_reverse, 0 }},
-    NoCleanup,
+    
 );
 
 pub fn softmax_ij_j(stream: Stream, x: anytype, y: anytype) void {
@@ -269,7 +261,7 @@ pub fn softmax_ij_j(stream: Stream, x: anytype, y: anytype) void {
     std.debug.assert(y.sizes().len == 2);
     std.debug.assert(x.len() == y.len());
 
-    overloads.kernel_softmax_ij_j.call(.{ stream.context, x_value.ptr, y_value.ptr, x_sizes[0], x_sizes[1] });
+    overloads.kernel_softmax_ij_j.call(.{ stream.context, x_value.ptr, y_value.ptr, x_sizes[0], x_sizes[1], });
 }
 
 pub fn softmax_ij_j_reverse(stream: Stream, x: anytype, y: anytype) void {
@@ -285,13 +277,19 @@ pub fn softmax_ij_j_reverse(stream: Stream, x: anytype, y: anytype) void {
     std.debug.assert(y.sizes().len == 2);
     std.debug.assert(x.len() == y.len());
 
-    overloads.kernel_softmax_ij_j_reverse.call(.{ stream.context, x_grads.ptr, y_value.ptr, y_grads.ptr, x_sizes[0], x_sizes[1] });
+    overloads.kernel_softmax_ij_j_reverse.call(.{ 
+        stream.context, 
+        x_grads.ptr, 
+        y_value.ptr,
+        y_grads.ptr, 
+        x_sizes[0], 
+        x_sizes[1], 
+    });
 }
 
 pub const SM_ij_j_Callback = CallbackBuilder(
-    softmax_ij_j,
-    .{.{ softmax_ij_j_reverse, 0 }},
-    NoCleanup,
+    softmax_ij_j, .{.{ softmax_ij_j_reverse, 0 }},
+    
 );
 const softmax_expressions = std.ComptimeStringMap(type, .{
     .{ "i|i", SM_i_i_Callback },
@@ -333,7 +331,7 @@ pub inline fn permutate_ij_ji_reverse(
     overloads.kernel_permutate_ij_ji.call(.{ stream.context, y_grads.ptr, x_grads.ptr, SC.asScalar(T, 1.0), y_sizes[0], y_sizes[1] });
 }
 
-const Perm_ij_ji_Callback = CallbackBuilder(permutate_ij_ji, .{.{ permutate_ij_ji_reverse, 0 }}, NoCleanup);
+const Perm_ij_ji_Callback = CallbackBuilder(permutate_ij_ji, .{.{ permutate_ij_ji_reverse, 0 }}, );
 
 const permutation_expressions = std.ComptimeStringMap(type, .{
     .{ "ij->ji", Perm_ij_ji_Callback },
@@ -481,13 +479,11 @@ pub inline fn linear_bias_reverseArg3(
 }
 
 const Linear_ij_j_Callback = CallbackBuilder(
-    linear_ij_j,
-    .{
+    linear_ij_j, .{
         .{ linear_ij_j_reverseArg0, 0 },
         .{ linear_ij_j_reverseArg1, 1 },
         .{ linear_bias_reverseArg3, 3 },
     },
-    NoCleanup,
 );
 
 pub fn linear_i_ij(
@@ -562,13 +558,11 @@ pub fn linear_i_ij_reverseArg1(
 }
 
 const Linear_i_ij_Callback = CallbackBuilder(
-    linear_i_ij,
-    .{
+    linear_i_ij, .{
         .{ linear_i_ij_reverseArg0, 0 },
         .{ linear_i_ij_reverseArg1, 1 },
         .{ linear_bias_reverseArg3, 3 },
     },
-    NoCleanup,
 );
 
 pub fn linear_i_ji(stream: Stream, x: anytype, A: anytype, alpha: f32, b: anytype, beta: f32, y: anytype) void {
@@ -589,8 +583,7 @@ const Linear_i_ji_Callback = CallbackBuilder(
         .{ linear_i_ji_reverseArg0, 0 },
         .{ linear_i_ji_reverseArg1, 1 },
         .{ linear_bias_reverseArg3, 3 },
-    },
-    NoCleanup,
+    },    
 );
 
 pub fn linear_ij_i(stream: Stream, x: anytype, A: anytype, alpha: f32, b: anytype, beta: f32, y: anytype) void {
@@ -606,13 +599,11 @@ pub fn linear_ij_i_reverseArg1(stream: Stream, x: anytype, A: anytype, alpha: f3
 }
 
 const Linear_ij_i_Callback = CallbackBuilder(
-    linear_ij_i,
-    .{
+    linear_ij_i, .{
         .{ linear_ij_i_reverseArg0, 0 },
         .{ linear_ij_i_reverseArg1, 1 },
         .{ linear_bias_reverseArg3, 3 },
     },
-    NoCleanup,
 );
 
 //////////////////////////////
@@ -710,7 +701,7 @@ const Linear_ij_jk_Callback = CallbackBuilder(
         .{ linear_ij_jk_reverseArg1, 1 },
         .{ linear_bias_reverseArg3, 3 },
     },
-    NoCleanup,
+    
 );
 
 pub inline fn linear_ij_kj(
@@ -735,11 +726,16 @@ pub inline fn linear_ij_kj(
     std.debug.assert(Y.len() == m * k);
     std.debug.assert(C.len() == Y.len());
 
-    const B_tran = stream.getScratch(T, B.len());
-
-    overloads.kernel_permutate_ij_ji.call(.{ stream.context, B.values().ptr, B_tran.ptr, SC.asScalar(T, 0.0), B_sizes[0], B_sizes[1] });
-
-    __linear_ij_jk(stream, A.values(), B_tran, alpha, C.values(), beta, Y.values(), m, n, k);
+    overloads.kernel_linear_ij_kj.call(.{
+        stream.context, 
+        A.values().ptr,
+        B.values().ptr,
+        SC.asScalar(T, alpha),
+        C.values().ptr,
+        SC.asScalar(T, beta),
+        Y.values().ptr,
+        m,n,k
+    });    
 }
 
 inline fn linear_ij_kj_reverseArg0(
@@ -761,10 +757,6 @@ inline fn linear_ij_kj_reverseArg0(
     const m = Y_sizes[0];
     const n = Y_sizes[1];
     const k = B_sizes[1];
-
-    std.log.info("Y sizes: {any}", .{ Y_sizes });
-    std.log.info("B sizes: {any}", .{ B_sizes });
-    std.log.info("A sizes: {any}", .{ A.sizes() });
 
     std.debug.assert(n == B_sizes[0]);
     std.debug.assert(A.len() == m * k);
@@ -804,13 +796,11 @@ inline fn linear_ij_kj_reverseArg1(
 }
 
 const Linear_ij_kj_Callback = CallbackBuilder(
-    linear_ij_kj,
-    .{
+    linear_ij_kj, .{
         .{ linear_ij_kj_reverseArg0, 0 },
         .{ linear_ij_kj_reverseArg1, 1 },
         .{ linear_bias_reverseArg3, 3 },
-    },
-    NoCleanup,
+    },   
 );
 
 pub inline fn linear_ji_jk(
@@ -906,7 +896,7 @@ const Linear_ji_jk_Callback = CallbackBuilder(
         .{ linear_ji_jk_reverseArg1, 1 },
         .{ linear_bias_reverseArg3, 3 },
     },
-    NoCleanup,
+    
 );
 
 const inner_product_expressions = std.ComptimeStringMap(type, .{
@@ -1019,13 +1009,60 @@ pub fn reduce_ij_j_reverse(
 }
 
 const Reduce_ij_j_Callback = CallbackBuilder(
-    reduce_ij_j, .{.{ reduce_ij_j_reverse, 0 }}, NoCleanup  
+    reduce_ij_j, .{.{ reduce_ij_j_reverse, 0 }},   
+);
+
+pub fn reduce_ij_i(
+    stream: Stream,
+    x: anytype,
+    y: anytype,
+) void {
+    const x_sizes = x.sizes();
+    std.debug.assert(x.sizes().len == 2);
+    std.debug.assert(y.sizes().len == 1);
+    std.debug.assert(x_sizes[0] == y.len());
+
+    overloads.kernel_reduce_ij_i.call(.{
+        stream.context,
+        x.values().ptr,
+        y.values().ptr,
+        SC.asScalar(Child(@TypeOf(x)), 0.0),
+        x_sizes[0],
+        x_sizes[1],
+    });
+}
+
+pub fn reduce_ij_i_reverse(
+    stream: Stream,
+    x: anytype,
+    y: anytype,
+) void {
+    const x_sizes = x.sizes();
+    std.debug.assert(x.sizes().len == 2);
+    std.debug.assert(y.sizes().len == 1);
+    std.debug.assert(x_sizes[0] == y.len());
+
+    overloads.kernel_broadcast_i_ij.call(.{
+        stream.context,
+        y.grads().?.ptr,
+        x.grads().?.ptr,
+        SC.asScalar(Child(@TypeOf(x)), 1.0),
+        x_sizes[0],
+        x_sizes[1],
+    });
+}
+
+const Reduce_ij_i_Callback = CallbackBuilder(
+    reduce_ij_i, .{.{ reduce_ij_i_reverse, 0 }},   
 );
 
 const reduce_expressions = std.ComptimeStringMap(type, .{
     // Rank-1-to-Rank-2
     .{ "ij->j", Reduce_ij_j_Callback },
     .{ "ji->i", Reduce_ij_j_Callback },
+
+    .{ "ij->i", Reduce_ij_i_Callback },
+    .{ "ji->j", Reduce_ij_i_Callback },
 });
 
 pub fn findReduce(comptime expression: []const u8) type {
@@ -1079,18 +1116,65 @@ pub fn broadcast_j_ij_reverse(
         x.grads().?.ptr,
         SC.asScalar(Child(@TypeOf(x)), 1.0),
         y_sizes[0],
-        y_sizes[1]
+        y_sizes[1],
     });
 }
 
+
 const Broadcast_j_ij_Callback = CallbackBuilder(
-    broadcast_j_ij, .{.{broadcast_j_ij_reverse, 0}}, NoCleanup  
+    broadcast_j_ij, .{.{broadcast_j_ij_reverse, 0}},   
+);
+
+pub fn broadcast_i_ij(
+    stream: Stream,
+    x: anytype,
+    y: anytype,
+) void {
+    const y_sizes = y.sizes();
+    std.debug.assert(x.sizes().len == 1);
+    std.debug.assert(y.sizes().len == 2);
+    std.debug.assert(y_sizes[0] == x.len());
+
+    overloads.kernel_broadcast_i_ij.call(.{
+        stream.context,
+        x.values().ptr, 
+        y.values().ptr, 
+        SC.asScalar(Child(@TypeOf(x)), 0.0), 
+        y_sizes[0], 
+        y_sizes[1],
+    });
+}
+
+pub fn broadcast_i_ij_reverse(
+    stream: Stream,
+    x: anytype,
+    y: anytype,
+) void {
+    const y_sizes = y.sizes();
+    std.debug.assert(x.sizes().len == 1);
+    std.debug.assert(y.sizes().len == 2);
+    std.debug.assert(y_sizes[0] == x.len());
+
+    overloads.kernel_reduce_ij_i.call(.{
+        stream.context,
+        y.grads().?.ptr,
+        x.grads().?.ptr,
+        SC.asScalar(Child(@TypeOf(x)), 1.0),
+        y_sizes[0],
+        y_sizes[1],
+    });
+}
+
+const Broadcast_i_ij_Callback = CallbackBuilder(
+    broadcast_i_ij, .{.{broadcast_i_ij_reverse, 0}},   
 );
 
 const broadcast_expressions = std.ComptimeStringMap(type, .{
     // Rank-1-to-Rank-2
     .{ "j->ij", Broadcast_j_ij_Callback },
     .{ "i->ji", Broadcast_j_ij_Callback },
+    .{ "i->ij", Broadcast_i_ij_Callback },
+    .{ "j->ji", Broadcast_i_ij_Callback },
 });
 
 pub fn findBroadcast(comptime expression: []const u8) type {

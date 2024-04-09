@@ -55,9 +55,6 @@ __global__ void __kernel_convolution_2D_1_channel_source_reverse_RScalar(
 
   for (len_t m_step = offset; (m_step + k_dim) <= m && (k_m < k_stop); m_step += stride, ++k_m) {
 
-    if (blockIdx.x == 0 && threadIdx.x == 0 && threadIdx.y == 0)
-      printf("k_m %d, passes %d, offset %d", (int)k_m, (int)passes, (int)offset);
-
     // This loop tracks how many times we have slid across n
     for (len_t n_step = 0, k_n = 0; (n_step + k_dim) <= n; n_step += stride, ++k_n) {
 

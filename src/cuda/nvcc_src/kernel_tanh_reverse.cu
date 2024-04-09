@@ -9,9 +9,7 @@ __global__ void __kernel_tanh_reverse_RScalar(
   const len_t tid = (blockIdx.x * blockDim.x) + threadIdx.x;
 
   if (tid < N) {
-    const RScalar one = 1.0;
-    const RScalar b = b_value[tid];
-    a_grads[tid] += (one - (b * b)) * b_grads[tid];
+    a_grads[tid] += (RScalar(1.0) - rsqr(b_value[0])) * b_grads[tid];
   }
 }
 
@@ -22,7 +20,7 @@ extern "C" void launch_tanh_reverse_RScalar(
   const RScalar *b_grads,
   len_t N
 ) {
-  __kernel_tanh_reverse_RScalar<<<GRID_1D(N), dim3(32), 0, getCtx(stream)>>>(
+  __kernel_tanh_reverse_RScalar<<<DIMPAD(N, 1024), 1024, 0, getCtx(stream)>>>(
     a_grads, b_value, b_grads, N
   );
 }

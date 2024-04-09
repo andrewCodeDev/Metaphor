@@ -148,6 +148,7 @@ pub fn objectFilesArgv(
         "-O3",
         "-std=c++20",
         "--allow-unsupported-compiler",
+        "--expt-relaxed-constexpr",
         "-ccbin",
         config.gcc_bin_path,
         config.gpu_architecture,

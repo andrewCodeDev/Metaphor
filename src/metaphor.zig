@@ -9,7 +9,7 @@ const DU = @import("device_utils.zig");
 const Parser = @import("expression_parsing.zig");
 
 const appendNode = CG.appendNode;
-const enableGradient = CG.enableGradient;
+pub const enableGradient = CG.enableGradient;
 const nodeTensor = CG.nodeTensor;
 
 const Contract = UT.Contract;
@@ -85,6 +85,7 @@ pub const scalar = struct {
 
 pub const optm = struct {
     pub const SGD = Optimizer.SGD;
+    pub const Momentum = Optimizer.Momentum;
 };
 
 pub const loss = struct {
@@ -417,7 +418,7 @@ pub const ops = struct {
             _ = CG.adjustDependencies(X, 1);
             _ = CG.adjustDependencies(Y, 1);
             _ = CG.adjustDependencies(B, 1);
-            CG.appendNode(graph, @TypeOf(lin), .{ X, Y, alpha, B, 0.0, Z });   
+            CG.appendNode(graph, @TypeOf(lin), .{ X, Y, alpha, B, 1.0, Z });   
         }
         return Z;
     }
@@ -437,7 +438,7 @@ pub const ops = struct {
             if (map.x_map[i]) |idx| y_sizes[idx] = elem;
         }
 
-        const Y = nodeTensor(graph, y_sizes[0..], UT.Child(@TypeOf(X)));
+        const Y = CG.nodeTensor(graph, y_sizes[0..], UT.Child(@TypeOf(X)));
 
         const rdx = comptime TenOps.findReduce(expression){};
 
@@ -456,7 +457,7 @@ pub const ops = struct {
 
         const graph = X.ptr;
 
-        const Y = nodeTensor(graph, ranks, UT.Child(@TypeOf(X)));
+        const Y = CG.nodeTensor(graph, ranks, UT.Child(@TypeOf(X)));
 
         const bcast = comptime TenOps.findBroadcast(expression){};
 
@@ -469,6 +470,56 @@ pub const ops = struct {
         return Y;
     }
 
+    pub fn convolution(
+        src: anytype,
+        krn: anytype,
+        comptime config: struct {
+            dims: usize,
+            channels: usize,
+            stride: usize,
+        },
+    ) NodeTensor(Child(@TypeOf(src))) {
+        
+        // These restrictions are temporary
+        if (config.dims != 2) {
+            @compileError("TODO: implement other dimensions besides 2");
+        }
+        if (config.channels != 1) {
+            @compileError("TODO: implement other channels besides 1");
+        }
+
+        const graph = src.ptr;
+
+        // this function will be a multi-level dispatcher
+        // right now it's just doing 2-D 1-channel
+        const src_sizes = src.sizes();
+        const krn_sizes = krn.sizes();
+
+        std.debug.assert(src_sizes.len == 2);
+        std.debug.assert(krn_sizes.len == 2);
+        std.debug.assert(krn_sizes[0] <= 32);
+
+        // kernel must be square and smaller than source
+        std.debug.assert(krn_sizes[0] == krn_sizes[1]);
+        std.debug.assert(krn_sizes[0] <= src_sizes[0]);
+        std.debug.assert(krn_sizes[0] <= src_sizes[1]);
+
+        const m = UT.windowCount(src_sizes[0], krn_sizes[0], config.stride);
+        const n = UT.windowCount(src_sizes[1], krn_sizes[0], config.stride);
+        const out = CG.nodeTensor(graph, &.{ m, n }, Child(@TypeOf(src)));
+        
+        const conv: TenOps.Convolution_2D_Callback = .{ };
+
+        conv.forward(out.stream(), src, krn, out, config.stride);
+        
+        if (graph.mode == .train) {
+            _ = CG.adjustDependencies(src, 1);
+            _ = CG.adjustDependencies(krn, 1);
+            CG.appendNode(graph, @TypeOf(conv), .{ src, krn, out, config.stride });   
+        }
+        return out;
+    }
+
     pub const norm = struct {
 
         pub fn l2(X: anytype, comptime expression: []const u8) NodeTensor(Child(@TypeOf(X))) {
@@ -477,7 +528,7 @@ pub const ops = struct {
             }
             const graph = X.ptr;
     
-            const Y = nodeTensor(graph, X.sizes(), UT.Child(@TypeOf(X)));
+            const Y = CG.nodeTensor(graph, X.sizes(), UT.Child(@TypeOf(X)));
 
             // locate inner product by expression
             const l2_norm = TenOps.findNormL2(expression){};
@@ -488,6 +539,27 @@ pub const ops = struct {
             if (graph.mode == .train) {
                 _ = CG.adjustDependencies(X, 1);
                 CG.appendNode(graph, @TypeOf(l2_norm), .{ X, Y }); 
+            }
+            return Y;
+        }
+
+        pub fn minmax(X: anytype, comptime expression: []const u8) NodeTensor(Child(@TypeOf(X))) {
+            if (comptime !isGraphTensor(@TypeOf(X))){
+                @compileError("Linear requires graph tensors.");
+            }
+            const graph = X.ptr;
+    
+            const Y = CG.nodeTensor(graph, X.sizes(), UT.Child(@TypeOf(X)));
+
+            // locate inner product by expression
+            const mm = TenOps.findMinmax(expression){};
+
+            // cancel out addition using 0.0 for beta
+            mm.forward(X.stream(), X, Y);
+
+            if (graph.mode == .train) {
+                _ = CG.adjustDependencies(X, 1);
+                CG.appendNode(graph, @TypeOf(mm), .{ X, Y }); 
             }
             return Y;
         }

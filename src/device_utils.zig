@@ -1,5 +1,6 @@
 const std = @import("std");
 const cuda = @import("cimport.zig").C;
+const NonConstPtr = @import("utility.zig").NonConstPtr;
 
 const StreamCtx = cuda.StreamCtx;
 
@@ -123,7 +124,7 @@ pub fn create(comptime T: type, stream: Stream) [*]T {
     return @ptrCast(@alignCast(ptr));
 }
 
-pub fn copyToDevice(src: anytype, dst: @TypeOf(src), stream: Stream) void {
+pub fn copyToDevice(src: anytype, dst: NonConstPtr(@TypeOf(src)), stream: Stream) void {
     // std.debug.assert(stream != null);
     switch (@typeInfo(@TypeOf(src))) {
         .Pointer => |p| {
@@ -139,7 +140,7 @@ pub fn copyToDevice(src: anytype, dst: @TypeOf(src), stream: Stream) void {
     }
 }
 
-pub fn copyFromDevice(src: anytype, dst: @TypeOf(src), stream: Stream) void {
+pub fn copyFromDevice(src: anytype, dst: NonConstPtr(@TypeOf(src)), stream: Stream) void {
     // std.debug.assert(stream != null);
     switch (@typeInfo(@TypeOf(src))) {
         .Pointer => |p| {

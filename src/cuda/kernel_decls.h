@@ -96,19 +96,19 @@ EXTERN_C void launch_tanh_r16(
   StreamCtx stream,
   const r16* a,
         r16* b, 
-  len_t N
+  len_t n
 );
 EXTERN_C void launch_tanh_r32(
   StreamCtx stream,
   const r32* a,
         r32* b, 
-  len_t N
+  len_t n
 );
 EXTERN_C void launch_tanh_r64(
   StreamCtx stream,
   const r64* a,
         r64* b, 
-  len_t N
+  len_t n
 );
 EXTERN_C void launch_extract_sort_keys_i_r16(
   StreamCtx stream, 
@@ -172,6 +172,27 @@ EXTERN_C void launch_cce_loss_i_i_r64(
         r64* scratch,
         float* redux, // scalar
   len_t m
+);
+EXTERN_C void launch_minmax_ij_j_r16(
+  StreamCtx stream,
+  const r16* A, 
+        r16* B, 
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_minmax_ij_j_r32(
+  StreamCtx stream,
+  const r32* A, 
+        r32* B, 
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_minmax_ij_j_r64(
+  StreamCtx stream,
+  const r64* A, 
+        r64* B, 
+  len_t m,
+  len_t n
 );
 EXTERN_C void launch_setup_sort_pairs_i_r16(
   StreamCtx stream,
@@ -460,6 +481,42 @@ EXTERN_C void launch_softmax_i_i_r64(
         r64* B, 
         r64* scratch,
   len_t m
+);
+EXTERN_C void launch_convolution_2D_reverse_kernel_r16(
+  StreamCtx stream,
+    const r16 *src_value,
+          r16 *kern_grads,
+    const r16 *dst_grads,
+          r16 *scratch,
+    len_t m, // src matrix m dim
+    len_t n, // src matrix n dim
+    len_t k_dim, // kernel width/height 
+    len_t windows,
+    len_t stride // kernel stride
+);
+EXTERN_C void launch_convolution_2D_reverse_kernel_r32(
+  StreamCtx stream,
+    const r32 *src_value,
+          r32 *kern_grads,
+    const r32 *dst_grads,
+          r32 *scratch,
+    len_t m, // src matrix m dim
+    len_t n, // src matrix n dim
+    len_t k_dim, // kernel width/height 
+    len_t windows,
+    len_t stride // kernel stride
+);
+EXTERN_C void launch_convolution_2D_reverse_kernel_r64(
+  StreamCtx stream,
+    const r64 *src_value,
+          r64 *kern_grads,
+    const r64 *dst_grads,
+          r64 *scratch,
+    len_t m, // src matrix m dim
+    len_t n, // src matrix n dim
+    len_t k_dim, // kernel width/height 
+    len_t windows,
+    len_t stride // kernel stride
 );
 EXTERN_C void launch_norm_l2_ij_j_reverse_r16(
   StreamCtx stream,
@@ -881,6 +938,39 @@ EXTERN_C void launch_kernel_sort_key_i_r64(
   unsigned* per_thread_remaining,
   len_t n
 );
+EXTERN_C void launch_momentum_r16(
+  StreamCtx stream,
+        r16* a_value,
+  const r16* a_grads, 
+        r16* mtm,
+  r16 rate,
+  r16 alpha,
+  r16 lower,
+  r16 upper,
+  len_t n
+);
+EXTERN_C void launch_momentum_r32(
+  StreamCtx stream,
+        r32* a_value,
+  const r32* a_grads, 
+        r32* mtm,
+  r32 rate,
+  r32 alpha,
+  r32 lower,
+  r32 upper,
+  len_t n
+);
+EXTERN_C void launch_momentum_r64(
+  StreamCtx stream,
+        r64* a_value,
+  const r64* a_grads, 
+        r64* mtm,
+  r64 rate,
+  r64 alpha,
+  r64 lower,
+  r64 upper,
+  len_t n
+);
 EXTERN_C void launch_softmax_ij_j_r16(
   StreamCtx stream,
   const r16* A, 
@@ -1019,6 +1109,39 @@ EXTERN_C void launch_addition_reverse_c64(
   const c64* b, 
   len_t N
 );
+EXTERN_C void launch_convolution_2D_r16(
+  StreamCtx stream,
+    const r16 *src,
+    const r16 *kern,
+          r16 *dst,
+    len_t m, // src matrix m dim
+    len_t n, // src matrix n dim
+    len_t k_dim, // kernel width/height 
+    len_t windows,
+    len_t stride // kernel stride
+);
+EXTERN_C void launch_convolution_2D_r32(
+  StreamCtx stream,
+    const r32 *src,
+    const r32 *kern,
+          r32 *dst,
+    len_t m, // src matrix m dim
+    len_t n, // src matrix n dim
+    len_t k_dim, // kernel width/height 
+    len_t windows,
+    len_t stride // kernel stride
+);
+EXTERN_C void launch_convolution_2D_r64(
+  StreamCtx stream,
+    const r64 *src,
+    const r64 *kern,
+          r64 *dst,
+    len_t m, // src matrix m dim
+    len_t n, // src matrix n dim
+    len_t k_dim, // kernel width/height 
+    len_t windows,
+    len_t stride // kernel stride
+);
 EXTERN_C void launch_cce_loss_ij_j_r16(
   StreamCtx stream,
   const r16* src_value, 
@@ -1119,7 +1242,7 @@ EXTERN_C void launch_gradient_descent_r16(
   r16 rate,
   r16 lower,
   r16 upper,
-  len_t N
+  len_t n
 );
 EXTERN_C void launch_gradient_descent_r32(
   StreamCtx stream,
@@ -1128,7 +1251,7 @@ EXTERN_C void launch_gradient_descent_r32(
   r32 rate,
   r32 lower,
   r32 upper,
-  len_t N
+  len_t n
 );
 EXTERN_C void launch_gradient_descent_r64(
   StreamCtx stream,
@@ -1137,7 +1260,64 @@ EXTERN_C void launch_gradient_descent_r64(
   r64 rate,
   r64 lower,
   r64 upper,
-  len_t N
+  len_t n
+);
+EXTERN_C void launch_minmax_ij_j_reverse_r16(
+  StreamCtx stream,
+  const r16* a_value, 
+        r16* a_grads, 
+  const r16* b_grads, 
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_minmax_ij_j_reverse_r32(
+  StreamCtx stream,
+  const r32* a_value, 
+        r32* a_grads, 
+  const r32* b_grads, 
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_minmax_ij_j_reverse_r64(
+  StreamCtx stream,
+  const r64* a_value, 
+        r64* a_grads, 
+  const r64* b_grads, 
+  len_t m,
+  len_t n
+);
+EXTERN_C void launch_convolution_2D_source_reverse_r16(
+  StreamCtx stream,
+          r16 *src_grads,
+    const r16 *kern_value,
+    const r16 *dst_grads,
+    len_t m, // src matrix m dim
+    len_t n, // src matrix n dim
+    len_t k_dim, // kernel width/height 
+    len_t windows, // number of windows over n
+    len_t stride // kernel stride
+);
+EXTERN_C void launch_convolution_2D_source_reverse_r32(
+  StreamCtx stream,
+          r32 *src_grads,
+    const r32 *kern_value,
+    const r32 *dst_grads,
+    len_t m, // src matrix m dim
+    len_t n, // src matrix n dim
+    len_t k_dim, // kernel width/height 
+    len_t windows, // number of windows over n
+    len_t stride // kernel stride
+);
+EXTERN_C void launch_convolution_2D_source_reverse_r64(
+  StreamCtx stream,
+          r64 *src_grads,
+    const r64 *kern_value,
+    const r64 *dst_grads,
+    len_t m, // src matrix m dim
+    len_t n, // src matrix n dim
+    len_t k_dim, // kernel width/height 
+    len_t windows, // number of windows over n
+    len_t stride // kernel stride
 );
 EXTERN_C void launch_softmax_ij_j_reverse_r16(
   StreamCtx stream,
@@ -1251,19 +1431,19 @@ EXTERN_C void launch_selu_r16(
   StreamCtx stream,
   const r16* a,
         r16* b, 
-  len_t N
+  len_t n
 );
 EXTERN_C void launch_selu_r32(
   StreamCtx stream,
   const r32* a,
         r32* b, 
-  len_t N
+  len_t n
 );
 EXTERN_C void launch_selu_r64(
   StreamCtx stream,
   const r64* a,
         r64* b, 
-  len_t N
+  len_t n
 );
 EXTERN_C void launch_linear_ij_j_r16(
   StreamCtx stream,

@@ -6,13 +6,13 @@
 // I'd be surprised that it wouldn't with the original raw types.
 
 __device__ __inline__ RScalar __grad_calc_RScalar(
-  precision<RScalar>::type src_val, // current value
-  precision<RScalar>::type dst_grd, // incoming gradient
+  precision<RScalar>::type x_val, // current value
+  precision<RScalar>::type y_grd, // incoming gradient
   precision<RScalar>::type s_sum, // sum of squares
-  precision<RScalar>::type g_sum, // sum of src * grd
-  precision<RScalar>::type denom // sum of squares to 1.5 power
+  precision<RScalar>::type g_sum, // sum of grads
+  precision<RScalar>::type denom // sum of src * grd
 ){
-  return static_cast<RScalar>((dst_grd * (s_sum - rsqr(src_val)) - src_val * (g_sum - src_val * g_sum)) * denom);
+  return static_cast<RScalar>((y_grd * s_sum - x_val * g_sum) / denom);
 }
 
 // CUDA Kernel for Vector fill
@@ -22,6 +22,8 @@ __global__ void __kernel_norm_l2_i_i_reverse_RScalar(
   const RScalar* dst_grads, // output
   len_t n
 ) {
+  using prc = precision<RScalar>;
+  
   const len_t block_step = blockDim.x * 4;
 
   // recover raw norm and sum of squares  
@@ -36,19 +38,19 @@ __global__ void __kernel_norm_l2_i_i_reverse_RScalar(
       // sum the gradient times each raw value...
       const auto u = *reinterpret_cast<coalesce<RScalar>::c_ptr>(&src_value[ofs]);
       const auto g = *reinterpret_cast<coalesce<RScalar>::c_ptr>(&dst_grads[ofs]);      
-      s_sum += precision<RScalar>::cast(rsqr(g.w));
-      s_sum += precision<RScalar>::cast(rsqr(g.x));
-      s_sum += precision<RScalar>::cast(rsqr(g.y));
-      s_sum += precision<RScalar>::cast(rsqr(g.z));
-      g_sum += precision<RScalar>::cast(g.w * u.w);
-      g_sum += precision<RScalar>::cast(g.x * u.x);
-      g_sum += precision<RScalar>::cast(g.y * u.y);
-      g_sum += precision<RScalar>::cast(g.z * u.z);
+      s_sum += prc::cast(rsqr(g.w));
+      s_sum += prc::cast(rsqr(g.x));
+      s_sum += prc::cast(rsqr(g.y));
+      s_sum += prc::cast(rsqr(g.z));
+      g_sum += prc::cast(g.w * u.w);
+      g_sum += prc::cast(g.x * u.x);
+      g_sum += prc::cast(g.y * u.y);
+      g_sum += prc::cast(g.z * u.z);
     }
     else if (ofs < n) {
       for (len_t i = ofs; i < n; ++i) {
-        s_sum += precision<RScalar>::cast(rsqr(src_value[i]));  
-        g_sum += precision<RScalar>::cast(src_value[i] * dst_grads[i]);  
+        s_sum += prc::cast(rsqr(src_value[i]));  
+        g_sum += prc::cast(src_value[i] * dst_grads[i]);  
       }
     }
   }
@@ -66,15 +68,17 @@ __global__ void __kernel_norm_l2_i_i_reverse_RScalar(
     if ((ofs + 4) < n) {
       auto u = *reinterpret_cast<coalesce<RScalar>::c_ptr>(&src_value[ofs]);
       auto g = *reinterpret_cast<coalesce<RScalar>::c_ptr>(&dst_grads[ofs]);
-      u.w = __grad_calc_RScalar(u.w, g.w, s_sum, g_sum, denom) + g.w;
-      u.x = __grad_calc_RScalar(u.x, g.x, s_sum, g_sum, denom) + g.x;
-      u.y = __grad_calc_RScalar(u.y, g.y, s_sum, g_sum, denom) + g.y;
-      u.z = __grad_calc_RScalar(u.z, g.z, s_sum, g_sum, denom) + g.z;
+      u.w = __grad_calc_RScalar(u.w, g.w, s_sum - prc::cast(rsqr(u.w)), g_sum - prc::cast(u.w * g.w), denom);
+      u.x = __grad_calc_RScalar(u.x, g.x, s_sum - prc::cast(rsqr(u.x)), g_sum - prc::cast(u.x * g.x), denom);
+      u.y = __grad_calc_RScalar(u.y, g.y, s_sum - prc::cast(rsqr(u.y)), g_sum - prc::cast(u.y * g.y), denom);
+      u.z = __grad_calc_RScalar(u.z, g.z, s_sum - prc::cast(rsqr(u.z)), g_sum - prc::cast(u.z * g.z), denom);
       *reinterpret_cast<coalesce<RScalar>::ptr>(&src_grads[ofs]) = u;
     }
     else if (ofs < n) {
       for (len_t i = ofs; i < n; ++i) {
-        src_grads[i] = __grad_calc_RScalar(src_value[i], dst_grads[i], s_sum, g_sum, denom);
+        const RScalar u = src_value[i];
+        const RScalar g = dst_grads[i];
+        src_grads[i] = __grad_calc_RScalar(u, g, s_sum - prc::cast(rsqr(u)), g_sum - prc::cast(u * g), denom);
       }
     }
   }

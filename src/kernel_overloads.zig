@@ -51,6 +51,12 @@ pub const kernel_cce_loss_i_i = OverloadSet(.{
 	decls.launch_cce_loss_i_i_r64,
 });
 
+pub const kernel_minmax_ij_j = OverloadSet(.{
+	decls.launch_minmax_ij_j_r16,
+	decls.launch_minmax_ij_j_r32,
+	decls.launch_minmax_ij_j_r64,
+});
+
 pub const kernel_setup_sort_pairs_i = OverloadSet(.{
 	decls.launch_setup_sort_pairs_i_r16,
 	decls.launch_setup_sort_pairs_i_r32,
@@ -115,6 +121,12 @@ pub const kernel_softmax_i_i = OverloadSet(.{
 	decls.launch_softmax_i_i_r16,
 	decls.launch_softmax_i_i_r32,
 	decls.launch_softmax_i_i_r64,
+});
+
+pub const kernel_convolution_2D_kernel_reverse = OverloadSet(.{
+	decls.launch_convolution_2D_reverse_kernel_r16,
+	decls.launch_convolution_2D_reverse_kernel_r32,
+	decls.launch_convolution_2D_reverse_kernel_r64,
 });
 
 pub const kernel_norm_l2_ij_j_reverse = OverloadSet(.{
@@ -219,6 +231,12 @@ pub const kernel_sort_key_i = OverloadSet(.{
 	decls.launch_kernel_sort_key_i_r64,
 });
 
+pub const kernel_momentum = OverloadSet(.{
+	decls.launch_momentum_r16,
+	decls.launch_momentum_r32,
+	decls.launch_momentum_r64,
+});
+
 pub const kernel_softmax_ij_j = OverloadSet(.{
 	decls.launch_softmax_ij_j_r16,
 	decls.launch_softmax_ij_j_r32,
@@ -252,6 +270,12 @@ pub const kernel_addition_reverse = OverloadSet(.{
 	decls.launch_addition_reverse_c64,
 });
 
+pub const kernel_convolution_2D = OverloadSet(.{
+	decls.launch_convolution_2D_r16,
+	decls.launch_convolution_2D_r32,
+	decls.launch_convolution_2D_r64,
+});
+
 pub const kernel_cce_loss_ij_j = OverloadSet(.{
 	decls.launch_cce_loss_ij_j_r16,
 	decls.launch_cce_loss_ij_j_r32,
@@ -277,6 +301,18 @@ pub const kernel_gradient_descent = OverloadSet(.{
 	decls.launch_gradient_descent_r16,
 	decls.launch_gradient_descent_r32,
 	decls.launch_gradient_descent_r64,
+});
+
+pub const kernel_minmax_ij_j_reverse = OverloadSet(.{
+	decls.launch_minmax_ij_j_reverse_r16,
+	decls.launch_minmax_ij_j_reverse_r32,
+	decls.launch_minmax_ij_j_reverse_r64,
+});
+
+pub const kernel_convolution_2D_source_reverse = OverloadSet(.{
+	decls.launch_convolution_2D_source_reverse_r16,
+	decls.launch_convolution_2D_source_reverse_r32,
+	decls.launch_convolution_2D_source_reverse_r64,
 });
 
 pub const kernel_softmax_ij_j_reverse = OverloadSet(.{

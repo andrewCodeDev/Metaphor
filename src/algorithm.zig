@@ -189,29 +189,37 @@ pub fn sequence(tensor: anytype, init: anytype, step: anytype) void {
 
 // <>--------------------------------------------------------<>
 
-pub fn randomize(x: anytype, mode: enum{ gauss, uniform }) void {
+const RandomizeMode = enum { gauss, uniform };
+
+pub fn randomizeSlice(
+    comptime T: type,
+     dst: []T,
+     mode: RandomizeMode,
+     stream: Stream,
+) void {
+
     //TODO: replace this with a kernel call...?
     //      really though, how often is this called?
     var backing = std.rand.DefaultPrng.init(22);
-    var random = backing.random();
+    const random = backing.random();
 
-    // for floating point conversion
-    const T = Child(@TypeOf(x));
-
-    const mem = std.heap.c_allocator.alloc(T, x.len()) catch @panic("randomize out of memory");
+    const mem = std.heap.c_allocator.alloc(T, dst.len) catch @panic("randomize out of memory");
     defer std.heap.c_allocator.free(mem);
-
 
     switch (mode) {
         .uniform, => {
-            for (0..x.len()) |i| mem[i] = 2.0 * SC.asScalar(T, random.float(f32)) - 1.0; 
+            for (0..dst.len) |i| mem[i] = 2.0 * SC.asScalar(T, random.float(f32)) - 1.0; 
         },
         .gauss => { 
-            for (0..x.len()) |i| mem[i] = SC.asScalar(T, random.floatNorm(f32)); 
+            for (0..dst.len) |i| mem[i] = SC.asScalar(T, random.floatNorm(f32)); 
         }
     }
 
-    DU.copyToDevice(mem, x.values(), x.stream());
+    DU.copyToDevice(mem, dst, stream);
+}
+
+pub fn randomize(dst: anytype, mode: RandomizeMode) void {
+    randomizeSlice(Child(@TypeOf(dst)), dst.values(), mode, dst.stream());
 }
 
 // <>--------------------------------------------------------<>

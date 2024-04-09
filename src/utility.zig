@@ -121,6 +121,28 @@ pub fn Child(comptime T: type) type {
     };
 }
 
+pub fn NonConstPtr(comptime Parent: type) type {
+
+    if (comptime !isPointer(Parent)) {
+        @compileError("Non-pointer type passed to pointer deduction.");
+    }
+
+    const info = @typeInfo(Parent).Pointer;
+
+    return @Type(.{
+        .Pointer = .{
+            .size = info.size,
+            .is_const = false,
+            .is_volatile = info.is_volatile,
+            .alignment = info.alignment,
+            .address_space = info.address_space,
+            .child = info.child,
+            .is_allowzero = info.is_allowzero,
+            .sentinel = info.sentinel,
+        }
+    });
+}
+
 // same as ceiling division - named after kernel macro
 pub inline fn dimpad(n: anytype, m: @TypeOf(n)) @TypeOf(n) {
     return (n + (m - 1)) / m;
@@ -150,3 +172,9 @@ pub fn product(comptime T: type, slice: []const T) T {
     }
     return tmp;
 }
+
+// calculates the number of windows with a given stride that fit in n
+pub fn windowCount(n: usize, window_size: usize, stride: usize) usize {
+    return ((n - window_size) / stride) + 1;
+}
+

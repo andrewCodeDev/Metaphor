@@ -135,7 +135,9 @@ __device__ __inline__ r16 rlog(r16 x) { return hlog(x); }
 __device__ __inline__ r32 rlog(r32 x) { return std::log(x); }
 __device__ __inline__ r64 rlog(r64 x) { return std::log(x); }
 
-#endif
+__device__ __inline__ r16 rabs(r16 x) { return __habs(x); }
+__device__ __inline__ r32 rabs(r32 x) { return std::abs(x); }
+__device__ __inline__ r64 rabs(r64 x) { return std::abs(x); }
 
 template<class T>
 __device__ __inline__ T cdiv(T x, T y) { 
@@ -206,13 +208,17 @@ __inline__ __device__ bool epsEql(T x, T y) {
   return std::abs(static_cast<double>(x) - static_cast<double>(y)) < 0.001;
 }
 
-
+// TODO:
+//  This function has undefined behaviour for threadIdx.x < WARP_SIZE.
+//  More research into this __shfl_xor_sync intrinsic needs to be done.
+//  In the mean time, if you use this, launch all 32 threads and then
+//  for out of bounds reads, parameterize with idempotent value
 template <class OP, typename T>
 __inline__ __device__ T warpReduce(T value) {
-    __syncthreads();
+  __syncthreads();
 
-    for (int mask = WARP_SIZE >> 1; mask > 0; mask >>= 1) {
-      value = OP::apply(value, __shfl_xor_sync(0xffffffff, value, mask, WARP_SIZE));
+  for (int mask = WARP_SIZE >> 1; mask > 0; mask >>= 1) {
+    value = OP::apply(value, __shfl_xor_sync(0xffffffff, value, mask, WARP_SIZE));
   }
   return value;
 }
@@ -221,7 +227,8 @@ template <class OP, len_t N, typename T>
 __inline__ __device__ T blockReduce(
   T value,
   len_t idx,
-  len_t ctrl
+  len_t ctrl,
+  len_t lim = N
 ) {
   __shared__ T cache[N];
   
@@ -234,7 +241,7 @@ __inline__ __device__ T blockReduce(
 
   if (ctrl == 0 && idx == 0) {
     T tmp = cache[0];
-    for (len_t i = 1; i < N; ++i) { 
+    for (len_t i = 1; i < lim; ++i) { 
       tmp = OP::apply(tmp, cache[i]);
     }
     cache[0] = tmp;
@@ -243,5 +250,6 @@ __inline__ __device__ T blockReduce(
   return cache[0];
 }
 
-#endif // nvcc stuff
+#endif // nvcc guard
+#endif // c++ guard
 #endif // header guard

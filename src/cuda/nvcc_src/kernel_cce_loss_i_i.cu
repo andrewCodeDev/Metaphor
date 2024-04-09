@@ -15,13 +15,13 @@ __global__ void __kernel_cce_loss_i_i_RScalar(
   // since we're coalescing by 4's for every thread in the
   // kernel across the grid, we need to adjust up by 4 times
   // the grid every time we make a shift over to the right.
-  const len_t g_step = (WARP_SIZE * WARP_SIZE * gridDim.x) * 4;
+  const len_t g_step = (blockDim.x * gridDim.x) * 4;
 
   RScalar grid_sum = RScalar(0.0f);
     
   for (len_t step = 0; step < m; step += g_step) {
 
-    const len_t ofs = (step + idx) * 4;
+    const len_t ofs = step + idx * 4;
 
     if ((ofs + 4) < m) {
       auto u = *reinterpret_cast<coalesce<RScalar>::c_ptr>(&src_value[ofs]);
@@ -34,10 +34,10 @@ __global__ void __kernel_cce_loss_i_i_RScalar(
       // calculate the dydx
       if (src_value != src_grads) {
         auto s = reinterpret_cast<coalesce<RScalar>::ptr>(&src_grads[ofs]);
-        u.w = u.w - RScalar((ofs + 0 == trg) ? 1.0f : 0.0f);
-        u.x = u.x - RScalar((ofs + 1 == trg) ? 1.0f : 0.0f);
-        u.y = u.y - RScalar((ofs + 2 == trg) ? 1.0f : 0.0f);
-        u.z = u.z - RScalar((ofs + 3 == trg) ? 1.0f : 0.0f);
+        u.w -= RScalar((ofs + 0 == trg) ? 1.0f : 0.0f);
+        u.x -= RScalar((ofs + 1 == trg) ? 1.0f : 0.0f);
+        u.y -= RScalar((ofs + 2 == trg) ? 1.0f : 0.0f);
+        u.z -= RScalar((ofs + 3 == trg) ? 1.0f : 0.0f);
         *s = u;
       }
     }

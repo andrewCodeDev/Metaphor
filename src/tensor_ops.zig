@@ -221,6 +221,39 @@ pub fn findNormL2(comptime expression: []const u8) type {
 
 // <>--------------------------------------------------------<>
 
+pub fn minmax_ij_j(stream: Stream, x: anytype, y: anytype) void {
+    std.debug.assert(x.sizes().len == 2);
+    std.debug.assert(y.sizes().len == 2);
+    std.debug.assert(std.mem.eql(TC.SizeType, x.sizes(), y.sizes()));
+    const x_sizes = x.sizes();
+    overloads.kernel_minmax_ij_j.call(.{ stream.context, x.values().ptr, y.values().ptr, x_sizes[0], x_sizes[1] });
+}
+pub fn minmax_ij_j_reverse(stream: Stream, x: anytype, y: anytype) void {
+    std.debug.assert(x.sizes().len == 2);
+    std.debug.assert(y.sizes().len == 2);
+    std.debug.assert(std.mem.eql(TC.SizeType, x.sizes(), y.sizes()));
+    const x_sizes = x.sizes();
+    overloads.kernel_minmax_ij_j_reverse.call(.{ stream.context, x.values().ptr, x.grads().?.ptr, y.grads().?.ptr, x_sizes[0], x_sizes[1] });
+}
+
+pub const Minmax_ij_j_Callback = CallbackBuilder(
+    minmax_ij_j, .{.{ minmax_ij_j_reverse, 0 }}, 
+);
+
+const minmax_expressions = std.ComptimeStringMap(type, .{
+    .{ "ij|j", Minmax_ij_j_Callback },
+});
+
+pub fn findMinmax(comptime expression: []const u8) type {
+    const parsed = comptime Parser.transformExpression(expression);
+    if (comptime minmax_expressions.get(parsed)) |norm| {
+        return norm;
+    } else {
+        @compileError("TODO: invalid softmax expression:" ++ expression);
+    }
+}
+// <>--------------------------------------------------------<>
+
 pub fn softmax_i_i(stream: Stream, x: anytype, y: anytype) void {
     const x_values = x.values();
     const y_values = y.values();
@@ -1190,3 +1223,100 @@ pub fn findBroadcast(comptime expression: []const u8) type {
         @compileError("TODO: general broadcast kernel: " ++ expression);
     }
 }
+
+// <>--------------------------------------------------------<>
+
+pub fn convolution_2D(
+    stream: Stream, 
+    x: anytype,
+    k: anytype, 
+    y: anytype,
+    stride: TC.SizeType,
+) void {
+    const x_sizes = x.sizes();
+    const k_sizes = k.sizes();
+    const windows = UT.windowCount(x_sizes[1], k_sizes[0], stride);
+
+    std.debug.assert(x_sizes.len == 2);
+    std.debug.assert(k_sizes.len == 2);
+    std.debug.assert(k_sizes[0] == k_sizes[1]);
+
+    overloads.kernel_convolution_2D.call(.{
+        stream.context,
+        x.values().ptr,
+        k.values().ptr,
+        y.values().ptr,
+        x_sizes[0],
+        x_sizes[1],
+        k_sizes[0],
+        windows,
+        stride,
+    });
+}
+    
+pub fn convolution_2D_reverseArg0(
+    stream: Stream, 
+    x: anytype,
+    k: anytype, 
+    y: anytype,
+    stride: TC.SizeType,
+) void {
+    const x_sizes = x.sizes();
+    const k_sizes = k.sizes();
+    const windows = UT.windowCount(x_sizes[1], k_sizes[0], stride);
+
+    std.debug.assert(x_sizes.len == 2);
+    std.debug.assert(k_sizes.len == 2);
+    std.debug.assert(k_sizes[0] == k_sizes[1]);
+
+    overloads.kernel_convolution_2D_source_reverse.call(.{
+        stream.context,
+        x.grads().?.ptr,
+        k.values().ptr,
+        y.grads().?.ptr,
+        x_sizes[0],
+        x_sizes[1],
+        k_sizes[0],
+        windows,
+        stride,
+    });
+}
+    
+pub fn convolution_2D_reverseArg1(
+    stream: Stream, 
+    x: anytype,
+    k: anytype, 
+    y: anytype,
+    stride: TC.SizeType,
+) void {
+    const x_sizes = x.sizes();
+    const k_sizes = k.sizes();
+    const windows = UT.windowCount(x_sizes[1], k_sizes[0], stride);
+
+    std.debug.assert(x_sizes.len == 2);
+    std.debug.assert(k_sizes.len == 2);
+    std.debug.assert(k_sizes[0] == k_sizes[1]);
+
+    // m: (k_sizes[0]), n: (k_sizes[0] * windows)
+    const scratch = stream.getScratch(Child(@TypeOf(k)), @min(1024, k_sizes[0] * k_sizes[0] * windows));
+
+    overloads.kernel_convolution_2D_kernel_reverse.call(.{
+        stream.context,
+        x.values().ptr,
+        k.grads().?.ptr,
+        y.grads().?.ptr,
+        scratch.ptr,
+        x_sizes[0],
+        x_sizes[1],
+        k_sizes[0],
+        windows,
+        stride,
+    });
+}
+
+pub const Convolution_2D_Callback = CallbackBuilder(
+    convolution_2D, .{ 
+        .{ convolution_2D_reverseArg0, 0 },
+        .{ convolution_2D_reverseArg1, 1 },
+    },
+);

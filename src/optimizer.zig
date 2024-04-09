@@ -1,4 +1,5 @@
-const SliceUnion = @import("tensor_components.zig").SliceUnion;
+const TC = @import("tensor_components.zig");
+const SliceUnion = TC.SliceUnion;
 const SC = @import("scalar.zig");
 const Stream = @import("device_utils.zig").Stream;
 const overloads = @import("kernel_overloads.zig");
@@ -8,16 +9,23 @@ const GraphID = usize; // convert graph ptr to number
 const Child = @import("utility.zig").Child;
 const Graph = @import("graph.zig").Graph;
 const DU = @import("device_utils.zig");
+const Algo = @import("algorithm.zig");
+
+// key for stateful optimizer maps
+const KeyPair = struct {
+    gid: usize, // graph id
+    wid: usize, // weight id
+};
 
 const ClipRange = struct {
-    lower: f16,
-    upper: f16,
+    lower: f32,
+    upper: f32,
 
     // clip at +/-inf bypasses clipping
     pub fn init() ClipRange {
         return .{
-            .lower = -std.math.inf(f16),
-            .upper = std.math.inf(f16),
+            .lower = -std.math.inf(f32),
+            .upper = std.math.inf(f32),
         };
     }
 };
@@ -116,11 +124,11 @@ inline fn updateDispatch(
 //};
 
 pub const SGD = struct {
-    rate: f16,
+    rate: f32,
     clip: ClipRange,
 
     pub fn init(config: struct {
-        rate: f16,
+        rate: f32,
         clip: ?ClipRange = null,
     }) SGD {
         return .{
@@ -164,6 +172,101 @@ pub const SGD = struct {
             wgt.ptr,
             grd.ptr,
             SC.asScalar(T, self.rate),
+            SC.asScalar(T, self.clip.lower),
+            SC.asScalar(T, self.clip.upper),
+            wgt.len,
+        });
+    }
+};
+
+pub const Momentum = struct {
+
+    const StateMap = std.AutoHashMap(KeyPair, SliceUnion);
+    
+    rate: f32,
+    alpha: f32,
+    clip: ClipRange,
+    map: StateMap,
+
+    // TODO: consider letting the user pass an allocator
+    pub fn init(config: struct {
+        rate: f32,
+        alpha: ?f32,
+        clip: ?ClipRange = null,
+        allocator: ?std.mem.Allocator = null,
+    }) Momentum {
+        const alpha = if (config.alpha) |a| a else @as(f32, 0.90);
+
+        std.debug.assert((0.0 < alpha) and (alpha < 1.0));
+                
+        return .{
+            .rate = config.rate,
+            .alpha = alpha,
+            .clip = config.clip orelse ClipRange.init(),
+            .map = StateMap.init(if (config.allocator) |a| a else std.heap.c_allocator),
+        };
+    }
+
+    pub fn deinit(self: *Momentum, stream: Stream) void {
+        var itr = self.map.keyIterator();
+        while (itr.next()) |key| {
+            const u = self.map.get(key.*) orelse unreachable;
+            DU.free(u.bytes(), stream);
+        }
+        self.map.deinit();
+    }
+
+    pub fn update(self: *Momentum, graph: *Graph) void {
+
+        // only synchronize active streams once
+        var unique = std.StaticBitSet(DU.MAX_STREAMS).initEmpty();
+
+        var itr = WeightIterator.init(graph);
+
+        while (itr.next()) |pkg| {
+            updateDispatch(self, graph.id(), pkg.idx, pkg.wgt, pkg.grd, pkg.stream);
+            unique.setValue(pkg.stream.ID, true);
+        }
+
+        // synchronize all unique streams
+        for (0..DU.MAX_STREAMS) |i| {
+            if (unique.isSet(i)) DU.synchronizeStream(&DU.stream_array[i].?);
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////
+
+    inline fn optimize(
+        self: *Momentum,
+        gid: GraphID,
+        wid: IndexType,
+        wgt: anytype,
+        grd: anytype,
+        stream: Stream,
+    ) void {
+        const T = Child(@TypeOf(grd));
+
+        const res = self.map.getOrPut(KeyPair{ .gid = gid, .wid = wid })
+            catch @panic("Failed to put value into map");
+
+        if (!res.found_existing) {
+            const mtm = DU.alloc(T, grd.len, stream);
+            Algo.fillSlice(T, mtm, 0.0, stream);
+            res.value_ptr.* = SliceUnion.init(mtm);
+        }
+
+        const mtm = TC.getSlice(T, res.value_ptr.*);
+        
+        std.debug.assert(wgt.len == grd.len);
+        std.debug.assert(mtm.len == grd.len);
+
+        overloads.kernel_momentum.call(.{
+            stream.context,
+            wgt.ptr,
+            grd.ptr,
+            mtm.ptr,
+            SC.asScalar(T, self.rate),
+            SC.asScalar(T, self.alpha),
             SC.asScalar(T, self.clip.lower),
             SC.asScalar(T, self.clip.upper),
             wgt.len,

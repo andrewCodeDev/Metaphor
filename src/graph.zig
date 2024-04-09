@@ -180,7 +180,7 @@ pub fn NodeTensor(comptime T: type) type {
                 // if a loss hasn't been applied, this will be null
                 const grd = enableGradient(self.ptr, DataType, .hid, self.idx);
                 // derivative with respect to self is 1
-                fillSlice(DataType, grd, 1.0, self.ptr.stream);
+                fillSlice(DataType, grd, 1.0, self.stream());
             }
 
             // call graph reverse
@@ -339,6 +339,7 @@ pub const Graph = struct {
             if (component == .grd) {
                 for (self.leaves.grads.items, 0..) |opt, i| {
                     if (opt) |raw| self.freeGradientRaw(raw, .inp, i);
+                    self.leaves.dependencies.items[i] = 0;
                 }
             }
             if (component == .all) {
@@ -357,9 +358,9 @@ pub const Graph = struct {
             }
         } else {
             if (component == .grd) {
-                // frees both values and grads
                 for (self.nodes.grads.items, 0..) |opt, i| {
                     if (opt) |raw| self.freeGradientRaw(raw, .hid, i);
+                    self.leaves.dependencies.items[i] = 0;
                 }
             }
             if (component == .all) {

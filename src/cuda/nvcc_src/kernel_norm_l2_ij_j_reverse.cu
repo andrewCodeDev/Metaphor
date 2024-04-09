@@ -6,13 +6,13 @@
 // I'd be surprised that it wouldn't with the original raw types.
 
 __device__ __inline__ RScalar __grad_calc_RScalar(
-  precision<RScalar>::type src_val, // current value
-  precision<RScalar>::type dst_grd, // incoming gradient
+  precision<RScalar>::type x_val, // current value
+  precision<RScalar>::type y_grd, // incoming gradient
   precision<RScalar>::type s_sum, // sum of squares
-  precision<RScalar>::type g_sum, // sum of src * grd
-  precision<RScalar>::type denom // sum of squares to 1.5 power
+  precision<RScalar>::type g_sum, // sum of grads
+  precision<RScalar>::type denom // sum of src * grd
 ){
-  return static_cast<RScalar>((dst_grd * (s_sum - rsqr(src_val)) - src_val * (g_sum - src_val * g_sum)) * denom);
+  return static_cast<RScalar>((y_grd * s_sum - x_val * g_sum) / denom);
 }
 
 // CUDA Kernel for Vector fill
@@ -49,7 +49,7 @@ __global__ void __kernel_norm_l2_ij_j_reverse_RScalar(
     // I regret putting thread sync in warp reduce now
     s_sum = warpReduce<AddOP>(s_sum);
     g_sum = warpReduce<AddOP>(g_sum);
-    const prc::type denom = 1.0f / std::pow(s_sum, 1.5f);
+    const prc::type denom = std::pow(s_sum, 1.5);
 
     // this loop moves our blocks across the columns
     for (len_t n_step = 0; n_step < n; n_step += blockDim.x) {
@@ -59,7 +59,7 @@ __global__ void __kernel_norm_l2_ij_j_reverse_RScalar(
       if ((m_pos < m) && (n_pos < n)) {
         const RScalar src_val = src_value[m_pos * n + n_pos];
         const RScalar dst_grd = dst_grads[m_pos * n + n_pos];
-        src_grads[m_pos * n + n_pos] = __grad_calc_RScalar(src_val, dst_grd, s_sum, g_sum, denom);
+        src_grads[m_pos * n + n_pos] = __grad_calc_RScalar(src_val, dst_grd, s_sum - prc::cast(rsqr(src_val)), g_sum - prc::cast(src_val * dst_grd), denom);
       }
     }
   }

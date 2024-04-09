@@ -22,7 +22,7 @@ extern "C" void launch_hadamard_RScalar(
   RScalar* c, 
   len_t N
 ) {
-  __kernel_hadamard_RScalar<<<GRID_1D(N), dim3(32), 0, getCtx(stream)>>>(a, b, c, N);
+  __kernel_hadamard_RScalar<<<DIMPAD(N, 1024), 1024, 0, getCtx(stream)>>>(a, b, c, N);
 }
 
 __global__ void __kernel_hadamard_CScalar(
@@ -46,6 +46,6 @@ extern "C" void launch_hadamard_CScalar(
   CScalar* c, 
   len_t N
 ) {
-  __kernel_hadamard_CScalar<<<GRID_1D(N), dim3(32), 0, getCtx(stream)>>>(a, b, c, N);
+  __kernel_hadamard_CScalar<<<DIMPAD(N, 1024), 1024, 0, getCtx(stream)>>>(a, b, c, N);
 }
 

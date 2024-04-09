@@ -9,7 +9,7 @@ __global__ void __kernel_sigmoid_RScalar(
   const len_t tid = (blockIdx.x * blockDim.x) + threadIdx.x;
 
   if (tid < N) {
-    b_value[tid] = rtanh(a_value[tid]);
+    b_value[tid] = RScalar(1.0f) / (RScalar(1.0f) + rexp(-a_value[tid]));
   }
 }
 

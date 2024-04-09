@@ -5,8 +5,8 @@ __device__ __inline__ RScalar __cross_entropy_RScalar(
   RScalar t
 ){
   // TODO: break apart this expression - we don't need to run both logs
-  const RScalar adj = (y > Init<RScalar>::epsilon()) ? y : Init<RScalar>::epsilon();
-  return -((RScalar(1.0f) - t) * rlog(RScalar(1.0f) - adj) + y * rlog(adj));
+  const RScalar adj = (rabs(y) < Init<RScalar>::epsilon()) ? y : Init<RScalar>::epsilon();
+  return -((RScalar(1.0f) - t) * rlog(RScalar(1.0f) - y) + t * rlog(y));
 }
 
 __global__ void __kernel_bce_loss_i_i_RScalar(
@@ -17,6 +17,8 @@ __global__ void __kernel_bce_loss_i_i_RScalar(
           float* redux, // scalar
     len_t m
 ) {
+  using prc = precision<RScalar>;
+  
   auto grid = cg::this_grid();
 
   const len_t idx = grid.thread_rank();
@@ -26,7 +28,7 @@ __global__ void __kernel_bce_loss_i_i_RScalar(
   // the grid every time we make a shift over to the right.
   const len_t g_step = (WARP_SIZE * WARP_SIZE * gridDim.x) * 4;
 
-  RScalar grid_sum = RScalar(0.0f);
+  prc::type grid_sum = 0.0;
     
   for (len_t step = 0; step < m; step += g_step) {
 
@@ -41,7 +43,7 @@ __global__ void __kernel_bce_loss_i_i_RScalar(
         const RScalar x = __cross_entropy_RScalar(u.x, v.x);
         const RScalar y = __cross_entropy_RScalar(u.y, v.y);
         const RScalar z = __cross_entropy_RScalar(u.z, v.z);
-        grid_sum += static_cast<double>(w + x + y + z);
+        grid_sum += prc::cast(w + x + y + z);
       }
       // calculate the dydx
       if (src_value != src_grads) {
@@ -58,7 +60,7 @@ __global__ void __kernel_bce_loss_i_i_RScalar(
         const RScalar x = src_value[i];
         const RScalar t = trg_value[i];
         if (redux != nullptr) {
-            grid_sum += __cross_entropy_RScalar(x, t);
+            grid_sum += prc::cast(__cross_entropy_RScalar(x, t));
         }
         
         // calculate the dydx
@@ -82,7 +84,7 @@ __global__ void __kernel_bce_loss_i_i_RScalar(
 
     grid.sync();
 
-    grid_sum = RScalar(0.0f);
+    grid_sum = 0.0;
 
     if (idx < WARP_SIZE) { // get only first warp
 
@@ -92,11 +94,11 @@ __global__ void __kernel_bce_loss_i_i_RScalar(
 
         if ((ofs + 4) < gridDim.x) {
           auto u = *reinterpret_cast<coalesce<RScalar>::c_ptr>(&scratch[ofs]);
-          grid_sum += u.w + u.x + u.y + u.z;
+          grid_sum += prc::cast(u.w + u.x + u.y + u.z);
         }
         else if (ofs < gridDim.x) {
           for (len_t i = ofs; i < gridDim.x; ++i) {
-            grid_sum += scratch[i];  
+            grid_sum += prc::cast(scratch[i]);  
           }
         }
       }
@@ -105,7 +107,7 @@ __global__ void __kernel_bce_loss_i_i_RScalar(
     grid_sum = warpReduce<AddOP>(grid_sum);
     
     if (idx == 0) {
-      *redux = grid_sum;
+      *redux = grid_sum / prc::cast(m);
     }
   }
 } 

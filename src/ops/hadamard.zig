@@ -71,14 +71,14 @@ pub fn reverse(
     );
 }
 
-const dialate = @import("dialate.zig");
+const dilate = @import("dilate.zig");
 const addition = @import("addition.zig");
 
 pub fn derive(args: []const OpDatum, wrt: Tensor) ?OpDatum {
 
     // common optimization for power rule
     if (args[0].tensor.same(wrt) and args[1].tensor.same(wrt)) {
-        return OpDatum{ .tensor = dialate.forward_impl(wrt.ptr, args[0].tensor, 2.0) };
+        return OpDatum{ .tensor = dilate.forward_impl(wrt.ptr, args[0].tensor, 2.0) };
     }
 
     const dx: OpDatum = core.derive(args[0].tensor, wrt) orelse {
@@ -93,7 +93,7 @@ pub fn derive(args: []const OpDatum, wrt: Tensor) ?OpDatum {
             if (is_one(dy.scalar)) // f'(x): 1 -> 1*c = c
                 return args[0];
             
-            return OpDatum{ .tensor = dialate.forward_impl(wrt.ptr, args[0].tensor, dy.scalar) };
+            return OpDatum{ .tensor = dilate.forward_impl(wrt.ptr, args[0].tensor, dy.scalar) };
         }
         return OpDatum{ .tensor = forward_impl(wrt.ptr, args[0].tensor, dy.tensor) };  
     };
@@ -108,7 +108,7 @@ pub fn derive(args: []const OpDatum, wrt: Tensor) ?OpDatum {
             if (is_one(dx.scalar)) // f'(x): 1 -> 1*c = c
                 return args[1];
 
-            return OpDatum{ .tensor = dialate.forward_impl(wrt.ptr, args[1].tensor, dx.scalar) };
+            return OpDatum{ .tensor = dilate.forward_impl(wrt.ptr, args[1].tensor, dx.scalar) };
         }
         return OpDatum{ .tensor = forward_impl(wrt.ptr, args[1].tensor, dx.tensor) };
     };
@@ -120,25 +120,25 @@ pub fn derive(args: []const OpDatum, wrt: Tensor) ?OpDatum {
             return null;
         
         if (is_zero(dx.scalar)) // only keep rhs
-            return OpDatum{ .tensor = dialate.forward_impl(wrt.ptr, args[0].tensor, dy.scalar) };
+            return OpDatum{ .tensor = dilate.forward_impl(wrt.ptr, args[0].tensor, dy.scalar) };
 
         if (is_zero(dy.scalar)) // only keep lhs
-            return OpDatum{ .tensor = dialate.forward_impl(wrt.ptr, args[1].tensor, dx.scalar) };
+            return OpDatum{ .tensor = dilate.forward_impl(wrt.ptr, args[1].tensor, dx.scalar) };
 
         if (is_one(dx.scalar) and is_one(dy.scalar)) // x': 1, y': 1 -> 1y + x1 = x + y
             return OpDatum{ .tensor = addition.forward_impl(wrt.ptr, args[0].tensor, args[1].tensor) };
 
         if (is_one(dx.scalar)) { // x': 1 -> xy' + 1y = xy' + y
-            const u = dialate.forward_impl(wrt.ptr, args[0].tensor, dy.scalar);
+            const u = dilate.forward_impl(wrt.ptr, args[0].tensor, dy.scalar);
             return OpDatum{ .tensor = addition.forward_impl(wrt.ptr, u, args[1].tensor) };
         }
         if (is_one(dy.scalar)) { // y': 1 -> x1 + x'y = x + x'y
-            const u = dialate.forward_impl(wrt.ptr, args[1].tensor, dx.scalar);
+            const u = dilate.forward_impl(wrt.ptr, args[1].tensor, dx.scalar);
             return OpDatum{ .tensor = addition.forward_impl(wrt.ptr, u, args[0].tensor) };
         }
         // neither dx or dy are equal to one or zero
-        const t = dialate.forward_impl(wrt.ptr, args[0].tensor, dy.scalar);
-        const u = dialate.forward_impl(wrt.ptr, args[1].tensor, dx.scalar);
+        const t = dilate.forward_impl(wrt.ptr, args[0].tensor, dy.scalar);
+        const u = dilate.forward_impl(wrt.ptr, args[1].tensor, dx.scalar);
         return OpDatum{ .tensor = addition.forward_impl(wrt.ptr, t, u) };
     }
 
@@ -151,7 +151,7 @@ pub fn derive(args: []const OpDatum, wrt: Tensor) ?OpDatum {
             return OpDatum{ .tensor = addition.forward_impl(wrt.ptr, t, args[1].tensor) };
         }
         const t = forward_impl(wrt.ptr, args[0].tensor, dy.tensor);
-        const u = dialate.forward_impl(wrt.ptr, args[1].tensor, dx.scalar);
+        const u = dilate.forward_impl(wrt.ptr, args[1].tensor, dx.scalar);
         return OpDatum{ .tensor = addition.forward_impl(wrt.ptr, t, u) };
     }
 
@@ -164,7 +164,7 @@ pub fn derive(args: []const OpDatum, wrt: Tensor) ?OpDatum {
             return OpDatum{ .tensor = addition.forward_impl(wrt.ptr, args[0].tensor, t) };
         }
         const t = forward_impl(wrt.ptr, args[1].tensor, dx.tensor);
-        const u = dialate.forward_impl(wrt.ptr, args[0].tensor, dy.scalar);
+        const u = dilate.forward_impl(wrt.ptr, args[0].tensor, dy.scalar);
         return OpDatum{ .tensor = addition.forward_impl(wrt.ptr, t, u) };
     }
 

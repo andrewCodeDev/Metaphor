@@ -6,6 +6,8 @@ const OpDatum = core.OpDatum;
 const OpInterface = core.OpInterface;
 const Tensor = core.Tensor;
 const Graph = core.Graph;
+const is_one = @import("common.zig").is_one;
+const is_zero = @import("common.zig").is_zero;
 
 // default to lhs-graph
 pub fn forward(x: Tensor, y: Tensor) Tensor {
@@ -97,14 +99,14 @@ pub fn derive(
     // c + g'(x)
     if (dx == .scalar) {
         // TODO: this could be more optimal
-        const _dy = negate.forward_impl(wrt.ptr, dy.tensor);
-        if (core.eps_equal(dx.scalar, 0.0)) return _dy;
-        return OpDatum{ .tensor = translate.forward_impl(wrt.ptr, _dy.tensor, dx.scalar) };
+        const u = negate.forward_impl(wrt.ptr, dy.tensor);
+        if (is_zero(dx.scalar)) return u;
+        return OpDatum{ .tensor = translate.forward_impl(wrt.ptr, u.tensor, dx.scalar) };
     }
 
     // f'(x) - c
     if (dy == .scalar) {
-        if (core.eps_equal(dy.scalar, 0.0)) return dx;
+        if (is_zero(dy.scalar)) return dx;
         return OpDatum{ .tensor = translate.forward_impl(wrt.ptr, dx.tensor, -dy.scalar) };
     }
 

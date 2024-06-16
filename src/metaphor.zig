@@ -43,5 +43,5 @@ pub const ops = struct {
     pub const sub = @import("ops/subtraction.zig").forward;
     pub const hadamard = @import("ops/hadamard.zig").forward;
     pub const translate = @import("ops/translate.zig").forward;
-    pub const dialate = @import("ops/dialate.zig").forward;
+    pub const dilate = @import("ops/dilate.zig").forward;
 };

@@ -29,27 +29,6 @@ EXTERN_C void launch_translate_r64(
   len_t N,
   StreamCtx stream
 );
-EXTERN_C void launch_dialate_reverse_r16(
-  const void* a,
-  double value, 
-        void* b, 
-  len_t N,
-  StreamCtx stream
-);
-EXTERN_C void launch_dialate_reverse_r32(
-  const void* a,
-  double value, 
-        void* b, 
-  len_t N,
-  StreamCtx stream
-);
-EXTERN_C void launch_dialate_reverse_r64(
-  const void* a,
-  double value, 
-        void* b, 
-  len_t N,
-  StreamCtx stream
-);
 EXTERN_C void launch_hadamard_reverse_r16(
   const void* a,
   const void* b, 
@@ -68,27 +47,6 @@ EXTERN_C void launch_hadamard_reverse_r64(
   const void* a,
   const void* b, 
   void* c, 
-  len_t N,
-  StreamCtx stream
-);
-EXTERN_C void launch_dialate_r16(
-  const void* a,
-  double value, 
-        void* c, 
-  len_t N,
-  StreamCtx stream
-);
-EXTERN_C void launch_dialate_r32(
-  const void* a,
-  double value, 
-        void* c, 
-  len_t N,
-  StreamCtx stream
-);
-EXTERN_C void launch_dialate_r64(
-  const void* a,
-  double value, 
-        void* c, 
   len_t N,
   StreamCtx stream
 );
@@ -113,6 +71,27 @@ EXTERN_C void launch_hadamard_r64(
   len_t N,
   StreamCtx stream
 );
+EXTERN_C void launch_dilate_r16(
+  const void* a,
+  double value, 
+        void* c, 
+  len_t N,
+  StreamCtx stream
+);
+EXTERN_C void launch_dilate_r32(
+  const void* a,
+  double value, 
+        void* c, 
+  len_t N,
+  StreamCtx stream
+);
+EXTERN_C void launch_dilate_r64(
+  const void* a,
+  double value, 
+        void* c, 
+  len_t N,
+  StreamCtx stream
+);
 EXTERN_C void launch_addition_r16(
   const void* a,
   const void* b, 
@@ -131,6 +110,27 @@ EXTERN_C void launch_addition_r64(
   const void* a,
   const void* b, 
   void* c, 
+  len_t N,
+  StreamCtx stream
+);
+EXTERN_C void launch_dilate_reverse_r16(
+  const void* a,
+  double value, 
+        void* b, 
+  len_t N,
+  StreamCtx stream
+);
+EXTERN_C void launch_dilate_reverse_r32(
+  const void* a,
+  double value, 
+        void* b, 
+  len_t N,
+  StreamCtx stream
+);
+EXTERN_C void launch_dilate_reverse_r64(
+  const void* a,
+  double value, 
+        void* b, 
   len_t N,
   StreamCtx stream
 );

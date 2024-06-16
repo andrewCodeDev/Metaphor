@@ -117,13 +117,6 @@ pub fn build(b: *std.Build) void {
 }
 
 const EXAMPLE_NAMES = &[_][]const u8{
-    "scalar",
-//    "linear_maps",
-//    "streams",
-    "subgraphs",
-//    "feedforward",
-//    "keys",
-
     // this is for development purposes
     "experimental",
 };

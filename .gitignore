@@ -1,4 +1,5 @@
 zig-out/
 zig-cache/
+.zig-cache/
 /config.json
 /cleanup.sh

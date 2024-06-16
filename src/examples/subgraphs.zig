@@ -15,13 +15,13 @@ pub fn main() !void {
 
     /////////////////////////////////////////////////////
 
-    const x = G.tensor(.inp, .r32, mp.Rank(1){M});
-    const w1 = G.tensor(.wgt, .r32, mp.Rank(1){M});
-    const w2 = G.tensor(.wgt, .r32, mp.Rank(1){M});
+    const x  = G.tensor(.inp, .r32, &.{ M });
+    const w1 = G.tensor(.wgt, .r32, &.{ M });
+    const w2 = G.tensor(.wgt, .r32, &.{ M });
 
-    mp.mem.randomize(x, .gauss);
-    mp.mem.randomize(w1, .gauss);
-    mp.mem.randomize(w2, .gauss);
+    mp.algo.randomize(x,  .gauss);
+    mp.algo.randomize(w1, .gauss);
+    mp.algo.randomize(w2, .gauss);
 
     /////////////////////////////////////////////////////
 

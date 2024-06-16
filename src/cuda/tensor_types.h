@@ -39,13 +39,32 @@ struct coalesce {
   using ptr = coalesce<T>*;
   static constexpr len_t warp_step = WARP_SIZE / 4;
   T w, x, y, z;
+
+  __device__ coalesce& operator+=(coalesce const& c) {
+    w += c.w; x += c.x; y += c.y; z += c.z; return *this;
+  }
 };
 
 // used to adjust precision up on r16
 template <class T> struct precision;
-template <> struct precision<r16>{ using type = r32; static __device__ type cast(type x){ return x; }};
-template <> struct precision<r32>{ using type = r32; static __device__ type cast(type x){ return x; }};
-template <> struct precision<r64>{ using type = r64; static __device__ type cast(type x){ return x; }};
+
+template <> struct precision<r16>{ 
+  using type = r32; 
+  __device__ __inline__ static constexpr type one() { return 1.0; };
+  __device__ __inline__ static constexpr type zero() { return 0.0; };
+  static __device__ __inline__ type cast(type x){ return x; }};
+
+template <> struct precision<r32>{ 
+  using type = r32; 
+  __device__ __inline__ static constexpr type one() { return 1.0; };
+  __device__ __inline__ static constexpr type zero() { return 0.0; };
+  static __device__ __inline__ type cast(type x){ return x; }};
+
+template <> struct precision<r64>{ 
+  using type = r64; 
+  __device__ __inline__ static constexpr type one() { return 1.0; };
+  __device__ __inline__ static constexpr type zero() { return 0.0; };
+  static __device__ __inline__ type cast(type x){ return x; }};
 
 #else
 #endif

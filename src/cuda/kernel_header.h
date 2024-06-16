@@ -11,11 +11,8 @@ typedef struct {
 } StreamCtx;
 
 // generator types
-#define RScalar float
-#define CScalar c32
-#define RTensor RTensor32
-#define CTensor CTensor32
-#define SortPair_RScalar SortPair_r32
+#define Scalar float
+#define SortPair_Scalar SortPair_r32
 
 #define DIMPAD(M, N) (((M) + ((N) - 1)) / (N))
 
@@ -249,6 +246,33 @@ __inline__ __device__ T blockReduce(
   __syncthreads();
   return cache[0];
 }
+
+//template <class OP, len_t N, typename T>
+//__inline__ __device__ T blockReduceSerial(
+//  T value,
+//  len_t idx,
+//  len_t ctrl,
+//  len_t lim = N
+//) {
+//  __shared__ T cache[N];
+//  
+//  const T rdx = warpReduce<OP>(value);
+//
+//  if (ctrl == 0) {
+//    cache[idx] = rdx;
+//  }
+//  __syncthreads();
+//
+//  if (ctrl == 0 && idx == 0) {
+//    T tmp = cache[0];
+//    for (len_t i = 1; i < lim; ++i) { 
+//      tmp = OP::apply(tmp, cache[i]);
+//    }
+//    cache[0] = tmp;
+//  }
+//  __syncthreads();
+//  return cache[0];
+//}
 
 #endif // nvcc guard
 #endif // c++ guard

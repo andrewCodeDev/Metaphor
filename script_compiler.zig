@@ -1,7 +1,7 @@
 const std = @import("std");
-const ChildProcess = std.ChildProcess;
+const ChildProcess = std.process.Child;
 
-fn joinString(allocator: std.mem.Allocator, a: []const u8, b: []const u8) []u8 {
+fn join_string(allocator: std.mem.Allocator, a: []const u8, b: []const u8) []u8 {
     return std.mem.join(allocator, "", &.{ a, b }) catch @panic("Failed to join string.");
 }
 
@@ -15,7 +15,7 @@ const MetaphorConfig = struct {
 
 var config: MetaphorConfig = .{};
 
-pub fn setupConfig(b: *std.Build, cwd_path: []const u8) void {
+pub fn setup_config(b: *std.Build, cwd_path: []const u8) void {
     const config_path = b.pathJoin(&.{ cwd_path, "config.json" });
 
     const f = std.fs.cwd().openFile(config_path, .{}) catch @panic("Cannot open config.");
@@ -49,7 +49,7 @@ pub fn setupConfig(b: *std.Build, cwd_path: []const u8) void {
                 if (!std.mem.startsWith(u8, str, "sm_")) {
                     @panic("\n\nInvalid in format in config for gpu-architecture. Valid format example: \"sm_89\"\n");
                 }
-                config.gpu_architecture = joinString(b.allocator, "--gpu-architecture=", str);
+                config.gpu_architecture = join_string(b.allocator, "--gpu-architecture=", str);
             },
             else => @panic("\n\nInvalid datatype in config for gpu-architecture.\n"),
         }
@@ -68,7 +68,7 @@ pub fn setupConfig(b: *std.Build, cwd_path: []const u8) void {
     config.setup = true;
 }
 
-pub fn buildSharedLibraryArgv(
+pub fn shared_library_argv(
     allocator: std.mem.Allocator,
     targets: []const []const u8,
     lib_name: []const u8,
@@ -104,7 +104,7 @@ pub fn buildSharedLibraryArgv(
     return argv.allocatedSlice();
 }
 
-pub fn compileSharedLibrary(input: struct {
+pub fn compile_shared_library(input: struct {
     allocator: std.mem.Allocator,
     targets: []const []const u8,
     lib_name: []const u8,
@@ -114,7 +114,12 @@ pub fn compileSharedLibrary(input: struct {
     }
 
     blk: {
-        const argv = buildSharedLibraryArgv(input.allocator, input.targets, input.lib_name) catch @panic("concatLibraryCompileVargs: Out Of Memory");
+        const argv = shared_library_argv(
+            input.allocator, 
+            input.targets,
+            input.lib_name
+        ) catch @panic("concatLibraryCompileVargs: Out Of Memory");
+
         defer input.allocator.free(argv);
 
         const result = ChildProcess.run(.{
@@ -139,7 +144,7 @@ pub fn compileSharedLibrary(input: struct {
     }
 }
 
-pub fn objectFilesArgv(
+pub fn object_files_argv(
     allocator: std.mem.Allocator,
     mod_targets: []const []const u8,
 ) ![]const []const u8 {
@@ -170,7 +175,7 @@ pub fn objectFilesArgv(
     return argv.allocatedSlice();
 }
 
-pub fn archiveFilesArgv(
+pub fn archive_files_argv(
     allocator: std.mem.Allocator,
     object_abspaths: []const []const u8,
     lib_name: []const u8,
@@ -184,7 +189,7 @@ pub fn archiveFilesArgv(
     return argv.allocatedSlice();
 }
 
-pub fn compileStaticLibrary(input: struct {
+pub fn compile_static_library(input: struct {
     allocator: std.mem.Allocator,
     modded_abspaths: []const []const u8,
     object_abspaths: []const []const u8,
@@ -203,7 +208,7 @@ pub fn compileStaticLibrary(input: struct {
     dir.setAsCwd() catch @panic("Failed to move to target directory");
 
     { // compile modified argument files
-        const argv = objectFilesArgv(input.allocator, input.modded_abspaths) catch @panic("Failed to create object files argv");
+        const argv = object_files_argv(input.allocator, input.modded_abspaths) catch @panic("Failed to create object files argv");
         // defer input.allocator.free(argv);
 
         const result = ChildProcess.run(.{
@@ -230,7 +235,7 @@ pub fn compileStaticLibrary(input: struct {
     }
 
     { // create indexed archive file for static library
-        const argv = archiveFilesArgv(input.allocator, input.object_abspaths, input.lib_name) catch @panic("Failed to create archive argv");
+        const argv = archive_files_argv(input.allocator, input.object_abspaths, input.lib_name) catch @panic("Failed to create archive argv");
         // defer input.allocator.free(argv);
 
         const result = ChildProcess.run(.{
@@ -262,8 +267,8 @@ pub fn compileStaticLibrary(input: struct {
     home.setAsCwd() catch @panic("Failed to move to target directory");
 }
 
-pub fn compileSingleFile(
-    b: *std.Build,
+pub fn compile_shared_file(
+    allocator: std.mem.Allocator,
     source_path: []const u8,
     target_path: []const u8,
 ) void {
@@ -285,7 +290,7 @@ pub fn compileSingleFile(
         "-lcuda",
     };
 
-    const result = std.ChildProcess.run(.{ .allocator = b.allocator, .argv = libgen_utils_argv }) catch |e| {
+    const result = ChildProcess.run(.{ .allocator = allocator, .argv = libgen_utils_argv }) catch |e| {
         std.log.err("Error: {}", .{e});
         @panic("Failed to create libdev_utils.so");
     };

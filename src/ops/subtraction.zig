@@ -82,9 +82,12 @@ pub fn derive(
 ) ?OpDatum {
 
     const dx: OpDatum = core.derive(args[0].tensor, wrt) orelse {
-        return switch (args[1].derive(wrt)) {
+
+        const dy = core.derive(args[1].tensor, wrt) orelse return null;
+        
+        return switch (dy) {
             .scalar => |s| OpDatum{ .scalar = -s },
-            .tensor => |t| negate.forward_impl(wrt.ptr, t),
+            .tensor => |t| OpDatum{ .tensor = negate.forward_impl(wrt.ptr, t) },
         };
     };
 
@@ -100,8 +103,8 @@ pub fn derive(
     if (dx == .scalar) {
         // TODO: this could be more optimal
         const u = negate.forward_impl(wrt.ptr, dy.tensor);
-        if (is_zero(dx.scalar)) return u;
-        return OpDatum{ .tensor = translate.forward_impl(wrt.ptr, u.tensor, dx.scalar) };
+        if (is_zero(dx.scalar)) return OpDatum{ .tensor = u };
+        return OpDatum{ .tensor = translate.forward_impl(wrt.ptr, u, dx.scalar) };
     }
 
     // f'(x) - c

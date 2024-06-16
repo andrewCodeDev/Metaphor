@@ -18,14 +18,16 @@ pub fn main() !void {
 
     var z_cpu: [100]f32 = .{ 0.0 } ** 100;
 
-    const z = mp.ops.hadamard(x, x);
+    const z = mp.ops.add(x, x);
 
     const dx = z.derive(x) orelse unreachable;
     mp.util.from_device(dx.data().r32, z_cpu[0..], stream);
     mp.stream.sync(stream);
     std.debug.print("\nIt worked.\n{any}\n", .{ z_cpu[0..] });
 
-    const ddx = dx.derive(x) orelse unreachable;
+    const ddx = dx.derive(x) orelse {
+        return std.debug.print("\no derivative\n", .{});
+    };
     mp.util.from_device(ddx.data().r32, z_cpu[0..], stream);
     mp.stream.sync(stream);
     std.debug.print("\nIt worked.\n{any}\n", .{ z_cpu[0..] });

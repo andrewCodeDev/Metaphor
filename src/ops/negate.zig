@@ -49,7 +49,7 @@ pub fn reverse(args: []const OpDatum, type_id: usize) void {
 pub fn derive(args: []const OpDatum, wrt: Tensor) ?OpDatum {
     const dx = core.derive(args[0].tensor, wrt) orelse return null;
     return switch (dx) {
-        .scalar => |s| -s,
-        .tensor => |t| forward_impl(wrt.ptr, t)
+        .scalar => |s| OpDatum{ .scalar = -s },
+        .tensor => |t| OpDatum{ .tensor = forward_impl(wrt.ptr, t) },
     };
 }

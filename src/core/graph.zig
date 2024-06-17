@@ -161,7 +161,6 @@ pub const Graph = struct {
         grad: ArrayList(?SliceUnion),
         sizes: ArrayList(Sizes),
         strides: ArrayList(Strides),
-        dependencies: ArrayList(i8),
         classes: ArrayList(TensorClass),
         pub fn init(allocator: std.mem.Allocator, block_size: usize) !LeafBlock {
             return .{
@@ -169,7 +168,6 @@ pub const Graph = struct {
                 .grad = try ArrayList(?SliceUnion).initCapacity(allocator, block_size),
                 .sizes = try ArrayList(Sizes).initCapacity(allocator, block_size),
                 .strides = try ArrayList(Strides).initCapacity(allocator, block_size),
-                .dependencies = try ArrayList(i8).initCapacity(allocator, block_size),
                 .classes = try ArrayList(TensorClass).initCapacity(allocator, block_size),
             };
         }
@@ -181,7 +179,7 @@ pub const Graph = struct {
         grad: ArrayList(?SliceUnion),
         sizes: ArrayList(Sizes),
         strides: ArrayList(Strides),
-        dependencies: ArrayList(i8),
+        dependencies: ArrayList(i32),
         attached: ArrayList(bool),
         pub fn init(allocator: std.mem.Allocator, block_size: usize) !NodeBlock {
             return .{
@@ -190,7 +188,7 @@ pub const Graph = struct {
                 .grad = try ArrayList(?SliceUnion).initCapacity(allocator, block_size),
                 .sizes = try ArrayList(Sizes).initCapacity(allocator, block_size),
                 .strides = try ArrayList(Strides).initCapacity(allocator, block_size),
-                .dependencies = try ArrayList(i8).initCapacity(allocator, block_size),
+                .dependencies = try ArrayList(i32).initCapacity(allocator, block_size),
                 .attached = try ArrayList(bool).initCapacity(allocator, block_size),
             };
         }
@@ -265,7 +263,6 @@ pub const Graph = struct {
             if (component == .grd) {
                 for (self.leaf_block.grad.items, 0..) |opt, i| {
                     if (opt) |raw| self.free_raw_gradient(raw, .inp, i);
-                    self.leaf_block.dependencies.items[i] = 0;
                 }
             }
             if (component == .all) {
@@ -286,7 +283,7 @@ pub const Graph = struct {
             if (component == .grd) {
                 for (self.node_block.grad.items, 0..) |opt, i| {
                     if (opt) |raw| self.free_raw_gradient(raw, .hid, i);
-                    self.leaf_block.dependencies.items[i] = 0;
+                    self.node_block.dependencies.items[i] = 0;
                 }
             }
             if (component == .all) {
@@ -341,7 +338,6 @@ pub const Graph = struct {
             try self.leaf_block.sizes.append(sizes);
             try self.leaf_block.strides.append(strides);
             try self.leaf_block.grad.append(null);
-            try self.leaf_block.dependencies.append(0);
             try self.leaf_block.classes.append(class);
         }
 
@@ -402,6 +398,11 @@ pub const Graph = struct {
         tag: SC.Tag,
         dimensions: Sizes, 
     ) Tensor {
+
+        if (tag == .q8) {
+            @panic("q8 support is currently under construction");
+        }
+            
         const allocator = if (class == .hid) 
             self.node_arena.allocator() else
             self.leaf_arena.allocator();
@@ -500,6 +501,9 @@ pub const Graph = struct {
 
             const op: *OpInterface = &(self.node_block.ops.items[last] orelse continue);
 
+            if (cleanup == .free)
+                free_stack.append(last) catch @panic("Failed to append to free stack.");
+
             op.reverse();
 
             var itr = op.iterator();
@@ -509,20 +513,17 @@ pub const Graph = struct {
                 if (arg.* == .scalar)
                     continue;
 
-                if (arg.tensor.class != .hid)
+                if (arg.tensor.class != .hid or arg.tensor.idx == last)
                     continue;
 
                 if (!self.attached(arg.tensor.idx))
                     continue;
 
-                if (adjust_dependencies(arg.tensor, -1) == 0) {
+                if (adjust_dependencies(arg.tensor, -1) == 0)
                     node_stack.append(arg.tensor.idx) catch @panic("Failed to append to node stack.");
-
-                    if (cleanup == .free) {
-                        free_stack.append(arg.tensor.idx) catch @panic("Failed to append to free stack.");
-                    }
-                }
             }
+
+            op.deinit();
 
             // To maintain graph invariants, we reduce dependencies
             // upon reversal. To keep an accurate picture of this
@@ -633,13 +634,10 @@ pub fn enable_gradient(t: Tensor) void {
     } 
 }
 
-pub fn adjust_dependencies(x: Tensor, direction: i8) i8 {
+pub fn adjust_dependencies(x: Tensor, direction: i32) i32 {
+    std.debug.assert(x.class == .hid);
     const self = x.ptr;
-    
-    const items = if (x.class == .hid) 
-        self.node_block.dependencies.items else 
-        self.leaf_block.dependencies.items;
-
+    const items = self.node_block.dependencies.items;
     std.debug.assert(@abs(direction) <= 1);
     items[x.idx] += direction;
     return items[x.idx];
@@ -653,7 +651,9 @@ pub fn attach_op(
 
     t.ptr.node_block.ops.items[t.idx] = op;
 
-    for (op.args.slice()) |*arg| {
+    const slice = op.args.slice();
+
+    for (slice, 0..) |*arg, i| {
 
         if (arg.* == .scalar)
             continue;
@@ -661,6 +661,10 @@ pub fn attach_op(
         if (arg.tensor.class != .hid)
             continue;
 
+        // don't adjust the out argument
+        if ((i + 1) == slice.len)
+            break;
+            
         _ = adjust_dependencies(arg.tensor, 1);
     }
 }
@@ -779,7 +783,7 @@ pub const OpArgs = struct {
     }
 
     pub fn deinit(self: *OpArgs) void {
-        if (std.meta.activeSC.Tag(self.items) == .overage) {
+        if (self.items == .overage) {
             std.heap.c_allocator.free(self.items.overage);
         }
     }

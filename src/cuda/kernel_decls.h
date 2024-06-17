@@ -29,6 +29,24 @@ EXTERN_C void launch_translate_r64(
   len_t N,
   StreamCtx stream
 );
+EXTERN_C void launch_relu_r16(
+  const void* a,
+        void* b, 
+  len_t n,
+  StreamCtx stream
+);
+EXTERN_C void launch_relu_r32(
+  const void* a,
+        void* b, 
+  len_t n,
+  StreamCtx stream
+);
+EXTERN_C void launch_relu_r64(
+  const void* a,
+        void* b, 
+  len_t n,
+  StreamCtx stream
+);
 EXTERN_C void launch_hadamard_reverse_r16(
   const void* a,
   const void* b, 
@@ -111,6 +129,45 @@ EXTERN_C void launch_addition_r64(
   const void* b, 
   void* c, 
   len_t N,
+  StreamCtx stream
+);
+EXTERN_C void launch_relu_reverse_r16(
+  const void *a_value,
+        void *a_grads,
+  const void *b_grads,
+  len_t N,
+  StreamCtx stream
+);
+EXTERN_C void launch_relu_reverse_r32(
+  const void *a_value,
+        void *a_grads,
+  const void *b_grads,
+  len_t N,
+  StreamCtx stream
+);
+EXTERN_C void launch_relu_reverse_r64(
+  const void *a_value,
+        void *a_grads,
+  const void *b_grads,
+  len_t N,
+  StreamCtx stream
+);
+EXTERN_C void launch_stepwise_r16(
+  const void* a,
+        void* b, 
+  len_t n,
+  StreamCtx stream
+);
+EXTERN_C void launch_stepwise_r32(
+  const void* a,
+        void* b, 
+  len_t n,
+  StreamCtx stream
+);
+EXTERN_C void launch_stepwise_r64(
+  const void* a,
+        void* b, 
+  len_t n,
   StreamCtx stream
 );
 EXTERN_C void launch_dilate_reverse_r16(

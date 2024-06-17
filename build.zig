@@ -118,6 +118,7 @@ pub fn build(b: *std.Build) void {
 
 const EXAMPLE_NAMES = &[_][]const u8{
     // this is for development purposes
+    "subgraphs",
     "experimental",
 };
 

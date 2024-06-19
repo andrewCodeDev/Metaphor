@@ -24,7 +24,7 @@ pub fn forward_impl(
 
     std.debug.assert(std.mem.eql(usize, x.sizes(), y.sizes()));
 
-    const z = graph.tensor(.hid, x.type_tag(), x.sizes());
+    const z = graph.tensor(.{ .class = .hid, .dtype = x.type_tag(), .sizes = x.sizes() });
 
     core.kernels.subtraction[z.type_id()](
         x.data_ptr(),
@@ -35,14 +35,11 @@ pub fn forward_impl(
     );
 
     if (graph.mode == .train) {
-
-        const op = OpInterface.init(@This(), &.{ 
+        core.attach_op(@This(), z, &.{ 
             OpDatum{ .tensor = x },
             OpDatum{ .tensor = y },
             OpDatum{ .tensor = z },
-        });
-        
-        core.attach_op(op, z);
+        });        
     }
 
     return z;

@@ -72,6 +72,18 @@ pub const Tensor = struct {
             else => self.ptr.leaf_block.strides.items[self.idx],
         };
     }
+    pub fn scale(self: Self) f64 {
+
+        // TODO: consider calculating quantization scale here
+        if (self.type_tag() != .q8)
+            return null;
+        
+        return switch (self.class) {
+            .hid => self.ptr.node_block.scale.items[self.idx],
+            else => self.ptr.leaf_block.scale.items[self.idx],
+        } orelse self.ptr.scale;
+    }
+
     pub fn stream(self: Tensor) StreamCtx {
         return self.ptr.stream.context;
     }
@@ -115,7 +127,7 @@ pub const Tensor = struct {
             return null;
 
         if (self.same(wrt)) {
-            const dx = wrt.ptr.tensor(.hid, self.type_tag(), self.sizes());
+            const dx = wrt.ptr.tensor(.{ .class = .hid, .dtype = self.type_tag(), .sizes = self.sizes() });
             kernels.fill[dx.type_id()](dx.data_ptr(), 1.0, dx.len(), dx.stream());
             return dx;
         }
@@ -127,7 +139,7 @@ pub const Tensor = struct {
             const datum = op.derive(wrt) orelse return null;
 
             if (datum == .scalar) { // constant valued tensor
-                const dx = wrt.ptr.tensor(.hid, self.type_tag(), self.sizes());
+                const dx = wrt.ptr.tensor(.{ .class = .hid, .dtype = self.type_tag(), .sizes = self.sizes() });
                 kernels.fill[dx.type_id()](dx.data_ptr(), datum.scalar, dx.len(), dx.stream());
                 return dx;
             }
@@ -162,6 +174,7 @@ pub const Graph = struct {
         sizes: ArrayList(Sizes),
         strides: ArrayList(Strides),
         classes: ArrayList(TensorClass),
+        scale: ArrayList(?f64),
         pub fn init(allocator: std.mem.Allocator, block_size: usize) !LeafBlock {
             return .{
                 .data = try ArrayList(SliceUnion).initCapacity(allocator, block_size),
@@ -169,6 +182,7 @@ pub const Graph = struct {
                 .sizes = try ArrayList(Sizes).initCapacity(allocator, block_size),
                 .strides = try ArrayList(Strides).initCapacity(allocator, block_size),
                 .classes = try ArrayList(TensorClass).initCapacity(allocator, block_size),
+                .scale = try ArrayList(?f64).initCapacity(allocator, block_size),
             };
         }
     };
@@ -181,6 +195,7 @@ pub const Graph = struct {
         strides: ArrayList(Strides),
         dependencies: ArrayList(i32),
         attached: ArrayList(bool),
+        scale: ArrayList(?f64),
         pub fn init(allocator: std.mem.Allocator, block_size: usize) !NodeBlock {
             return .{
                 .ops = try ArrayList(?OpInterface).initCapacity(allocator, block_size),
@@ -190,6 +205,7 @@ pub const Graph = struct {
                 .strides = try ArrayList(Strides).initCapacity(allocator, block_size),
                 .dependencies = try ArrayList(i32).initCapacity(allocator, block_size),
                 .attached = try ArrayList(bool).initCapacity(allocator, block_size),
+                .scale = try ArrayList(?f64).initCapacity(allocator, block_size),
             };
         }
     };
@@ -203,6 +219,7 @@ pub const Graph = struct {
     node_block: NodeBlock,
     mode: Mode,
     stream: Stream,
+    scale: f64,
 
     pub fn id(self: *const Graph) usize {
         return @intFromPtr(self);
@@ -321,9 +338,10 @@ pub const Graph = struct {
         data: SliceUnion,
         sizes: Sizes,
         strides: Sizes,
+        scale: ?f64,
     ) !Tensor {
-        assert(0 < sizes.len);
-        assert(0 < strides.len);
+        std.debug.assert(0 < sizes.len);
+        std.debug.assert(0 < strides.len);
 
         if (class == .hid) {
             try self.node_block.data.append(data);
@@ -333,12 +351,14 @@ pub const Graph = struct {
             try self.node_block.dependencies.append(0);
             try self.node_block.attached.append(true);
             try self.node_block.ops.append(null);
+            try self.node_block.scale.append(scale);
         } else {
             try self.leaf_block.data.append(data);
             try self.leaf_block.sizes.append(sizes);
             try self.leaf_block.strides.append(strides);
             try self.leaf_block.grad.append(null);
             try self.leaf_block.classes.append(class);
+            try self.leaf_block.scale.append(scale);
         }
 
         const idx = if (class == .hid) 
@@ -355,37 +375,37 @@ pub const Graph = struct {
     fn construct_tensor(
         self: *Graph,
         class: TensorClass,
-        tag: SC.Tag,
-        dimensions: Sizes, // fixed-length array
+        dtype: SC.Tag,
+        sizes: Sizes, // fixed-length array
+        scale: ?f64,
         allocator: std.mem.Allocator,
     ) Tensor {
-        assert(0 < dimensions.len);
+        std.debug.assert(0 < sizes.len);
 
         const N = blk: {
             var n: usize = 1;
-            for (dimensions) |s| {
-                n *= s;
-            }
+            for (sizes) |s| n *= s;
             break :blk n;
         };
-        assert(0 < N);
 
-        const data: SliceUnion = switch (tag) {
+        std.debug.assert(0 < N);
+
+        const data: SliceUnion = switch (dtype) {
              .q8 => SliceUnion.init(self.tensor_allocator.alloc(SC.q8,  N, self.stream)),
             .r16 => SliceUnion.init(self.tensor_allocator.alloc(SC.r16, N, self.stream)),
             .r32 => SliceUnion.init(self.tensor_allocator.alloc(SC.r32, N, self.stream)),
             .r64 => SliceUnion.init(self.tensor_allocator.alloc(SC.r64, N, self.stream)),
         };
 
-        const sizes = allocator.dupe(usize, dimensions) 
+        const _sizes = allocator.dupe(usize, sizes) 
             catch @panic("failed to duplicate sizes");
 
         const strides = allocator.alloc(usize, sizes.len) 
             catch @panic("failed to allocate strides");
 
-        TC.compute_strides(sizes, strides);
+        TC.compute_strides(_sizes, strides);
 
-        return self.tensor_from_components(class, data, sizes, strides) 
+        return self.tensor_from_components(class, data, _sizes, strides, scale) 
             catch @panic("Failed to add tensor from components.");
     }
 
@@ -394,20 +414,31 @@ pub const Graph = struct {
 
     pub fn tensor(
         self: *Graph,
-        class: TensorClass,
-        tag: SC.Tag,
-        dimensions: Sizes, 
+        config: struct {
+            class: TensorClass,
+            dtype: SC.Tag,
+            sizes: Sizes, 
+            scale: ?f64 = null,
+        },
     ) Tensor {
 
-        if (tag == .q8) {
-            @panic("q8 support is currently under construction");
-        }
+        // TODO: 
+        //  Should this be a debug assert?
+        //  This could also have defaults.     
+        if (config.dtype == .q8 and config.scale == null)
+            @panic("Argument 'scale' cannot be null when creating a quantized tensor (ex: .q8)");
             
-        const allocator = if (class == .hid) 
+        const allocator = if (config.class == .hid) 
             self.node_arena.allocator() else
             self.leaf_arena.allocator();
         
-        return self.construct_tensor(class, tag, dimensions, allocator);
+        return self.construct_tensor(
+            config.class,
+            config.dtype,
+            config.sizes,
+            config.scale,
+            allocator
+        );
     }
 
     fn free_gradient(
@@ -644,16 +675,16 @@ pub fn adjust_dependencies(x: Tensor, direction: i32) i32 {
 }
 
 pub fn attach_op(
-    op: OpInterface,
+    comptime decls: type,
     t: Tensor,
+    args: []const OpDatum,
 ) void {
     std.debug.assert(t.class == .hid);
 
-    t.ptr.node_block.ops.items[t.idx] = op;
+    t.ptr.node_block.ops.items[t.idx] = 
+        OpInterface.init(decls, args, t.ptr.node_arena.allocator());
 
-    const slice = op.args.slice();
-
-    for (slice, 0..) |*arg, i| {
+    for (args, 0..) |*arg, i| {
 
         if (arg.* == .scalar)
             continue;
@@ -662,7 +693,7 @@ pub fn attach_op(
             continue;
 
         // don't adjust the out argument
-        if ((i + 1) == slice.len)
+        if ((i + 1) == args.len)
             break;
             
         _ = adjust_dependencies(arg.tensor, 1);
@@ -696,10 +727,11 @@ pub const OpInterface = struct {
     
     pub fn init(
         comptime decls: type,
-        args: []const OpDatum
+        args: []const OpDatum,
+        allocator: std.mem.Allocator,
     ) OpInterface {
         return .{
-            .args = OpArgs.init(args),
+            .args = OpArgs.init(args, allocator),
             .vrt_ptr = &.{
                 .reverse = decls.reverse,   
                 .derive = decls.derive,   
@@ -770,14 +802,14 @@ pub const OpArgs = struct {
         overage: []OpDatum,
     },
 
-    pub fn init(args: []const OpDatum) OpArgs {
+    pub fn init(args: []const OpDatum, allocator: std.mem.Allocator) OpArgs {
         if (args.len <= inplace_size) {
             return .{ 
                 .items = .{ .inplace = InplaceType.fromSlice(args) catch unreachable } 
             };
         } else {
             return .{ 
-                .items = .{ .overage = std.heap.c_allocator.dupe(OpDatum, args) catch @panic("failed to allocate argument buffer") }
+                .items = .{ .overage = allocator.dupe(OpDatum, args) catch @panic("failed to allocate argument buffer") }
             };
         }
     }

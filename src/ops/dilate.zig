@@ -26,14 +26,11 @@ pub fn forward_impl(
     );
 
     if (graph.mode == .train) {
-
-        const op = OpInterface.init(@This(), &.{ 
+        core.attach_op(@This(), z, &.{ 
             OpDatum{ .tensor = x },
             OpDatum{ .scalar = value },
             OpDatum{ .tensor = z },
         });
-        
-        core.attach_op(op, z);
     }
 
     return z;

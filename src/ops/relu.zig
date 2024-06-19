@@ -12,7 +12,7 @@ pub fn forward(x: Tensor) Tensor {
 
 pub fn forward_impl(graph: *Graph, x: Tensor) Tensor {
 
-    const z = graph.tensor(.hid, x.type_tag(), x.sizes());
+    const z = graph.tensor(.{ .class = .hid, .dtype = x.type_tag(), .sizes = x.sizes() });
 
     core.kernels.relu[z.type_id()](
         x.data_ptr(),
@@ -22,13 +22,10 @@ pub fn forward_impl(graph: *Graph, x: Tensor) Tensor {
     );
 
     if (graph.mode == .train) {
-
-        const op = OpInterface.init(@This(), &.{ 
+        core.attach_op(@This(), z, &.{ 
             OpDatum{ .tensor = x },
             OpDatum{ .tensor = z },
-        });
-        
-        core.attach_op(op, z);
+        });        
     }
 
     return z;

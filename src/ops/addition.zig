@@ -20,10 +20,9 @@ pub fn forward_impl(
     y: Tensor, 
 ) Tensor {
     std.debug.assert(x.type_id() == y.type_id());
-
     std.debug.assert(std.mem.eql(usize, x.sizes(), y.sizes()));
 
-    const z = graph.tensor(.hid, x.type_tag(), x.sizes());
+    const z = graph.tensor(.{ .class = .hid, .dtype = x.type_tag(), .sizes = x.sizes() });
 
     core.kernels.addition[z.type_id()](
         x.data_ptr(),
@@ -34,18 +33,24 @@ pub fn forward_impl(
     );
 
     if (graph.mode == .train) {
-
-        const op = OpInterface.init(@This(), &.{ 
+        core.attach_op(@This(), z, &.{ 
             OpDatum{ .tensor = x },
             OpDatum{ .tensor = y },
             OpDatum{ .tensor = z },
-        });
-        
-        core.attach_op(op, z);
+        });        
     }
-
     return z;
 }
+
+//fn forward_quant(
+//    graph: *Graph,
+//    x: Tensor,
+//    y: Tensor,
+//) Tensor {
+//
+//    const q_config = x.get_config();
+//        
+//}
 
 pub fn reverse(
     args: []const OpDatum,

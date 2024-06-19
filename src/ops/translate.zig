@@ -15,7 +15,7 @@ pub fn forward_impl(
     x: Tensor, 
     value: f64, 
 ) Tensor {
-    const z = graph.tensor(.hid, x.type_tag(), x.sizes());
+    const z = graph.tensor(.{ .class = .hid, .dtype = x.type_tag(), .sizes = x.sizes()});
 
     core.kernels.translate[z.type_id()](
         x.data_ptr(),
@@ -26,16 +26,12 @@ pub fn forward_impl(
     );
 
     if (graph.mode == .train) {
-
-        const op = OpInterface.init(@This(), &.{ 
+        core.attach_op(@This(), z, &.{ 
             OpDatum{ .tensor = x },
             OpDatum{ .scalar = value },
             OpDatum{ .tensor = z },
         });
-        
-        core.attach_op(op, z);
     }
-
     return z;
 }
 

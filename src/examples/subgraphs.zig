@@ -15,9 +15,21 @@ pub fn main() !void {
 
     /////////////////////////////////////////////////////
 
-    const x  = G.tensor(.inp, .r32, &.{ M });
-    const w1 = G.tensor(.wgt, .r32, &.{ M });
-    const w2 = G.tensor(.wgt, .r32, &.{ M });
+    const x  = G.tensor(.{ 
+        .class = .inp, 
+        .dtype = .r32, 
+        .sizes = &.{ M } 
+    });
+    const w1 = G.tensor(.{ 
+        .class = .wgt, 
+        .dtype = .r32, 
+        .sizes = &.{ M } 
+    });
+    const w2 = G.tensor(.{ 
+        .class = .wgt, 
+        .dtype = .r32, 
+        .sizes = &.{ M } 
+    });
 
     mp.algo.fill(x, 1.0);
     mp.algo.fill(w1, 1.0);

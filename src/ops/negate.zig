@@ -12,7 +12,7 @@ pub fn forward(x: Tensor) Tensor {
 
 pub fn forward_impl(graph: *Graph, x: Tensor) Tensor {
 
-    const z = graph.tensor(.hid, x.type_tag(), x.sizes());
+    const z = graph.tensor(.{ .class = .hid, .dtype = x.type_tag(), .sizes = x.sizes() });
 
     core.kernels.negate[z.type_id()](
         x.data_ptr(),

@@ -72,16 +72,15 @@ pub const Tensor = struct {
             else => self.ptr.leaf_block.strides.items[self.idx],
         };
     }
-    pub fn scale(self: Self) f64 {
+    pub fn scale(self: Self) ?f64 {
 
-        // TODO: consider calculating quantization scale here
-        if (self.type_tag() != .q8)
-            return null;
-        
+        // TODO: 
+        //   make this function lazily calculated
+        //   and return a non-optional f64 value
         return switch (self.class) {
             .hid => self.ptr.node_block.scale.items[self.idx],
             else => self.ptr.leaf_block.scale.items[self.idx],
-        } orelse self.ptr.scale;
+        };
     }
 
     pub fn stream(self: Tensor) StreamCtx {
@@ -219,7 +218,6 @@ pub const Graph = struct {
     node_block: NodeBlock,
     mode: Mode,
     stream: Stream,
-    scale: f64,
 
     pub fn id(self: *const Graph) usize {
         return @intFromPtr(self);

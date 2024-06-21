@@ -10,11 +10,15 @@ pub fn main() !void {
     const G = mp.Graph.init(.{ .stream = stream, .mode = .train });
         defer G.deinit();
 
-    const x = G.tensor(.{
-        .class = .inp, .dtype = .r32, .sizes = &.{ 10, 10 }
+    const x = G.tensor(.{ 
+        .class = .inp,
+        .dtype = .r32,
+        .sizes = &.{ 10, 10 }
     });
-    const y = G.tensor(.{
-        .class = .inp, .dtype = .r32, .sizes = &.{ 10, 10 }
+    const y = G.tensor(.{ 
+        .class = .inp,
+        .dtype = .r32,
+        .sizes = &.{ 10, 10 }
     });
 
     mp.algo.fill(x, 4.0);

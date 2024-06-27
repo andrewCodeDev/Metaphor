@@ -72,17 +72,6 @@ pub const Tensor = struct {
             else => self.ptr.leaf_block.strides.items[self.idx],
         };
     }
-    pub fn scale(self: Self) ?f64 {
-
-        // TODO: 
-        //   make this function lazily calculated
-        //   and return a non-optional f64 value
-        return switch (self.class) {
-            .hid => self.ptr.node_block.scale.items[self.idx],
-            else => self.ptr.leaf_block.scale.items[self.idx],
-        };
-    }
-
     pub fn stream(self: Tensor) StreamCtx {
         return self.ptr.stream.context;
     }
@@ -148,22 +137,44 @@ pub const Tensor = struct {
 
         return null;
     }
+
+    pub fn quantized_components(self: Tensor) ?*QuantizedComponents {
+        return self.ptr.quantized_components(self);
+    }
 };
 
-const Mode = enum {
-    train,
-    eval,
-};
+const Mode = enum { train, eval };
+
+pub const ReverseCleanup = enum { keep, free };
 
 pub const GraphConfig = struct {
     stream: Stream,
     mode: Mode,
 };
 
-pub const ReverseCleanup = enum {
-    keep,
-    free,
+///////////////////////////////
+//     Quantization Maps     //
+///////////////////////////////
+
+const QuantizeMode = enum(u1) {
+    sym = 0, asym = 1,
 };
+
+const QuantizedComponents = struct {
+    /// Denotes symmetric vs asymmetric quantization.
+    mode: QuantizeMode,
+    /// Floating point tensor to project quantized q8
+    /// values back to higher precision floating point.
+    /// Can be rank zero or higher. Higher rank values
+    /// are often referred to as "values". 
+    scale: Tensor,
+    /// Adjusts result tensor value by a scaled minimum
+    /// to guarentee that zero is within the range.
+    /// Always null if mode is symmetric.
+    zero_point: ?Tensor,
+};
+
+const QuantizeMap = std.AutoHashMap(usize, QuantizedComponents); 
 
 pub const Graph = struct {
 
@@ -173,7 +184,7 @@ pub const Graph = struct {
         sizes: ArrayList(Sizes),
         strides: ArrayList(Strides),
         classes: ArrayList(TensorClass),
-        scale: ArrayList(?f64),
+        q_map: QuantizeMap,
         pub fn init(allocator: std.mem.Allocator, block_size: usize) !LeafBlock {
             return .{
                 .data = try ArrayList(SliceUnion).initCapacity(allocator, block_size),
@@ -181,7 +192,7 @@ pub const Graph = struct {
                 .sizes = try ArrayList(Sizes).initCapacity(allocator, block_size),
                 .strides = try ArrayList(Strides).initCapacity(allocator, block_size),
                 .classes = try ArrayList(TensorClass).initCapacity(allocator, block_size),
-                .scale = try ArrayList(?f64).initCapacity(allocator, block_size),
+                .q_map = QuantizeMap.init(allocator),  
             };
         }
     };
@@ -192,9 +203,9 @@ pub const Graph = struct {
         grad: ArrayList(?SliceUnion),
         sizes: ArrayList(Sizes),
         strides: ArrayList(Strides),
-        dependencies: ArrayList(i32),
+        deps: ArrayList(i32),
         attached: ArrayList(bool),
-        scale: ArrayList(?f64),
+        q_map: QuantizeMap,
         pub fn init(allocator: std.mem.Allocator, block_size: usize) !NodeBlock {
             return .{
                 .ops = try ArrayList(?OpInterface).initCapacity(allocator, block_size),
@@ -202,9 +213,9 @@ pub const Graph = struct {
                 .grad = try ArrayList(?SliceUnion).initCapacity(allocator, block_size),
                 .sizes = try ArrayList(Sizes).initCapacity(allocator, block_size),
                 .strides = try ArrayList(Strides).initCapacity(allocator, block_size),
-                .dependencies = try ArrayList(i32).initCapacity(allocator, block_size),
+                .deps = try ArrayList(i32).initCapacity(allocator, block_size),
                 .attached = try ArrayList(bool).initCapacity(allocator, block_size),
-                .scale = try ArrayList(?f64).initCapacity(allocator, block_size),
+                .q_map = QuantizeMap.init(allocator),  
             };
         }
     };
@@ -298,7 +309,7 @@ pub const Graph = struct {
             if (component == .grd) {
                 for (self.node_block.grad.items, 0..) |opt, i| {
                     if (opt) |raw| self.free_raw_gradient(raw, .hid, i);
-                    self.node_block.dependencies.items[i] = 0;
+                    self.node_block.deps.items[i] = 0;
                 }
             }
             if (component == .all) {
@@ -336,7 +347,6 @@ pub const Graph = struct {
         data: SliceUnion,
         sizes: Sizes,
         strides: Sizes,
-        scale: ?f64,
     ) !Tensor {
         std.debug.assert(0 < sizes.len);
         std.debug.assert(0 < strides.len);
@@ -346,17 +356,15 @@ pub const Graph = struct {
             try self.node_block.sizes.append(sizes);
             try self.node_block.strides.append(strides);
             try self.node_block.grad.append(null);
-            try self.node_block.dependencies.append(0);
+            try self.node_block.deps.append(0);
             try self.node_block.attached.append(true);
             try self.node_block.ops.append(null);
-            try self.node_block.scale.append(scale);
         } else {
             try self.leaf_block.data.append(data);
             try self.leaf_block.sizes.append(sizes);
             try self.leaf_block.strides.append(strides);
             try self.leaf_block.grad.append(null);
             try self.leaf_block.classes.append(class);
-            try self.leaf_block.scale.append(scale);
         }
 
         const idx = if (class == .hid) 
@@ -375,7 +383,6 @@ pub const Graph = struct {
         class: TensorClass,
         dtype: SC.Tag,
         sizes: Sizes, // fixed-length array
-        scale: ?f64,
         allocator: std.mem.Allocator,
     ) Tensor {
         std.debug.assert(0 < sizes.len);
@@ -403,7 +410,7 @@ pub const Graph = struct {
 
         TC.compute_strides(_sizes, strides);
 
-        return self.tensor_from_components(class, data, _sizes, strides, scale) 
+        return self.tensor_from_components(class, data, _sizes, strides) 
             catch @panic("Failed to add tensor from components.");
     }
 
@@ -416,15 +423,11 @@ pub const Graph = struct {
             class: TensorClass,
             dtype: SC.Tag,
             sizes: Sizes, 
-            scale: ?f64 = null,
         },
     ) Tensor {
 
-        // TODO: 
-        //  Should this be a debug assert?
-        //  This could also have defaults.     
-        if (config.dtype == .q8 and config.scale == null)
-            @panic("Argument 'scale' cannot be null when creating a quantized tensor (ex: .q8)");
+        if (config.dtype == .q8)
+            @panic("TODO: q8 support is under construction.");
             
         const allocator = if (config.class == .hid) 
             self.node_arena.allocator() else
@@ -434,7 +437,6 @@ pub const Graph = struct {
             config.class,
             config.dtype,
             config.sizes,
-            config.scale,
             allocator
         );
     }
@@ -491,7 +493,6 @@ pub const Graph = struct {
         }
     }
 
-    // trampoline loop for reversing graph
     fn reverse(self: *Graph, idx: usize, cleanup: ReverseCleanup) void {
 
         std.debug.assert(self.mode != .eval);
@@ -502,7 +503,7 @@ pub const Graph = struct {
 
         // Reversal works like a simple breadth-first traversal. For each
         // node, we call reverse (which populates the gradients of its
-        // reverse children). If all the dependencies have been collected
+        // reverse children). If all the deps have been collected
         // for that child, the child is a .hid type (it was computed),
         // and it's attached, then we add it the node stack to be reverse.
 
@@ -548,13 +549,13 @@ pub const Graph = struct {
                 if (!self.attached(arg.tensor.idx))
                     continue;
 
-                if (adjust_dependencies(arg.tensor, -1) == 0)
+                if (adjust_deps(arg.tensor, -1) == 0)
                     node_stack.append(arg.tensor.idx) catch @panic("Failed to append to node stack.");
             }
 
             op.deinit();
 
-            // To maintain graph invariants, we reduce dependencies
+            // To maintain graph invariants, we reduce deps
             // upon reversal. To keep an accurate picture of this
             // within the graph, now remove the actual dependency.
             self.node_block.ops.items[last] = null;
@@ -597,7 +598,7 @@ pub const Graph = struct {
                 // we have uninitialized weights
                 std.debug.assert(bytes.len != 0);
                 
-                loadTensorToGraph(dir, prefix, wgt_idx, bytes, buf[0..bytes.len], self.leaf_block.streams.items[i])
+                loadTensorToGraph(dir, prefix, wgt_idx, bytes, buf[0..bytes.len], self.stream)
                     catch @panic("Failed to load tensor data.");
 
                 wgt_idx += 1;
@@ -633,12 +634,24 @@ pub const Graph = struct {
                 // we have uninitialized weights
                 std.debug.assert(bytes.len != 0);
                 
-                saveTensorFromGraph(dir, prefix, wgt_idx, bytes, buf[0..bytes.len], self.leaf_block.streams.items[i])
+                saveTensorFromGraph(dir, prefix, wgt_idx, bytes, buf[0..bytes.len], self.stream)
                     catch @panic("Failed to save tensor data.");
 
                 wgt_idx += 1;
             }
         }
+    }
+
+    fn quantized_components(self: *Graph, x: Tensor) ?*QuantizedComponents {
+
+        if (x.dtype() != .q8) return null;
+        
+        const q_map: *QuantizeMap = switch (x.class) {
+            .hid => &self.node_block.q_map,
+            else => &self.leaf_block.q_map,  
+        };
+
+        return q_map.getOrPut(x.idx) catch @panic("Failed to make quantized map value.");        
     }
 };
 
@@ -663,10 +676,10 @@ pub fn enable_gradient(t: Tensor) void {
     } 
 }
 
-pub fn adjust_dependencies(x: Tensor, direction: i32) i32 {
+pub fn adjust_deps(x: Tensor, direction: i32) i32 {
     std.debug.assert(x.class == .hid);
     const self = x.ptr;
-    const items = self.node_block.dependencies.items;
+    const items = self.node_block.deps.items;
     std.debug.assert(@abs(direction) <= 1);
     items[x.idx] += direction;
     return items[x.idx];
@@ -694,7 +707,7 @@ pub fn attach_op(
         if ((i + 1) == args.len)
             break;
             
-        _ = adjust_dependencies(arg.tensor, 1);
+        _ = adjust_deps(arg.tensor, 1);
     }
 }
 

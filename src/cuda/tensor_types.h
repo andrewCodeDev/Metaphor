@@ -13,7 +13,7 @@ const len_t UINT_BUFFER_SIZE = 32;
 // use the cuda definitions with device
 // defined member functions.
 #if defined(__cplusplus)
-  #include "cuda/cuda_fp16.h"
+  #include "cuda_fp16.h"
 
   typedef __half r16;
 #else
@@ -110,74 +110,5 @@ typedef struct {
   r64 val;
   unsigned key;
 } SortPair_r64;
-
-////////////////////////
-// C tensors variants
-
-typedef struct {
-  r16* values;
-  len_t sizes[MAX_DIMS];
-  len_t strides[MAX_DIMS];
-  len_t dims;
-  len_t len;
-} RTensor16;
-
-typedef struct {
-  r32* values;
-  len_t sizes[MAX_DIMS];
-  len_t strides[MAX_DIMS];
-  len_t dims;
-  len_t len;
-} RTensor32;
-
-typedef struct {
-  r64* values;
-  len_t sizes[MAX_DIMS];
-  len_t strides[MAX_DIMS];
-  len_t dims;
-  len_t len;
-} RTensor64;
-
-typedef struct {
-  c16* values;
-  len_t sizes[MAX_DIMS];
-  len_t strides[MAX_DIMS];
-  len_t dims;
-  len_t len;
-} CTensor16;
-
-typedef struct {
-  c32* values;
-  len_t sizes[MAX_DIMS];
-  len_t strides[MAX_DIMS];
-  len_t dims;
-  len_t len;
-} CTensor32;
-
-typedef struct {
-  c64* values;
-  len_t sizes[MAX_DIMS];
-  len_t strides[MAX_DIMS];
-  len_t dims;
-  len_t len;
-} CTensor64;
-
-typedef struct {
-  char* values;
-  len_t sizes[MAX_DIMS];
-  len_t strides[MAX_DIMS];
-  len_t dims;
-  len_t len;
-} QTensor8;
-
-typedef struct {
-  len_t order[MAX_DIMS];
-} Permutation;
-
-// for small buffer optimizations
-typedef struct {
-  unsigned items[UINT_BUFFER_SIZE];
-  unsigned used;
-} UintBuffer;
 
 #endif

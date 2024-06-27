@@ -8,6 +8,7 @@ fn join_string(allocator: std.mem.Allocator, a: []const u8, b: []const u8) []u8 
 const MetaphorConfig = struct {
     setup: bool = false,
     gcc_bin_path: []const u8 = "",
+    cuda_nvcc_path: []const u8 = "",
     cuda_include_path: []const u8 = "",
     cuda_library_path: []const u8 = "",
     gpu_architecture: []const u8 = "",
@@ -55,11 +56,13 @@ pub fn setup_config(b: *std.Build, cwd_path: []const u8) void {
         }
     }
 
+    config.cuda_nvcc_path = b.pathJoin(&.{ cwd_path, "deps", "cuda", "bin", "nvcc" });
     config.cuda_include_path = b.pathJoin(&.{ "-I", cwd_path, "deps", "cuda", "include" });
     config.cuda_library_path = b.pathJoin(&.{ "-L", cwd_path, "deps", "cuda", "lib64" });
 
-    std.log.info("Config:\n  {s}\n  {s}\n  {s}\n  {s}\n", .{
+    std.log.info("Config:\n  {s}\n  {s}\n  {s}\n  {s}\n  {s}\n", .{
         config.gcc_bin_path,
+        config.cuda_nvcc_path,
         config.cuda_include_path,
         config.cuda_library_path,
         config.gpu_architecture,
@@ -74,7 +77,7 @@ pub fn shared_library_argv(
     lib_name: []const u8,
 ) ![]const []const u8 {
     const comp_head: []const []const u8 = &.{
-        "nvcc", "--shared", "-o",
+        config.cuda_nvcc_path, "--shared", "-o",
     };
     const comp_tail: []const []const u8 = &.{
         "-O3",
@@ -148,7 +151,10 @@ pub fn object_files_argv(
     allocator: std.mem.Allocator,
     mod_targets: []const []const u8,
 ) ![]const []const u8 {
-    const comp_head: []const []const u8 = &.{ "nvcc", "-c" };
+    const comp_head: []const []const u8 = &.{ 
+        config.cuda_nvcc_path, 
+        "-c" 
+    };
     const comp_tail: []const []const u8 = &.{
         "-O3",
         "-std=c++20",
@@ -275,7 +281,7 @@ pub fn compile_shared_file(
     std.log.info("Creating device utilities...\n", .{});
 
     const libgen_utils_argv: []const []const u8 = &.{
-        "nvcc",
+        config.cuda_nvcc_path,
         "--shared",
         "-o",
         target_path,

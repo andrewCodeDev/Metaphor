@@ -2,6 +2,7 @@ const mp = @import("metaphor");
 const std = @import("std");
 
 pub fn main() !void {
+
     mp.device.init(0);
 
     const stream = mp.stream.init();
@@ -15,6 +16,12 @@ pub fn main() !void {
         .dtype = .r32,
         .sizes = &.{ 10, 10 }
     });
+
+    //const y = mp.ops.quantize(x, .{
+    //    .symmetry = .sym,
+    //    .channels = true,
+    //});
+
     const y = G.tensor(.{ 
         .class = .inp,
         .dtype = .r32,

@@ -11,15 +11,11 @@ pub const r16 = UT.dev.r16;
 pub const r32 = UT.dev.r32;
 pub const r64 = UT.dev.r64;
 
-// quantized types
-pub const q8 = i8;
-
 // we use this as a field accessor for union types
 // @typeName will call through to the name of the
 // underlying type but we need the alias
 pub fn name(comptime T: type) []const u8 {
     return switch (T) {
-         q8 => "q8",
         r16 => "r16",
         r32 => "r32",
         r64 => "r64",
@@ -29,7 +25,6 @@ pub fn name(comptime T: type) []const u8 {
 
 pub fn native(comptime T: type) []const u8 {
     return switch (T) {
-         q8 => u8,
         r16 => f16,
         r32 => f32,
         r64 => f64,
@@ -39,9 +34,6 @@ pub fn native(comptime T: type) []const u8 {
 
 pub const Tag = enum(u2) {
 
-    // do not change ordering - q8 is not a generated type
-     q8 = 3,
-
     // these replace scalars in declarations in the given order
     r16 = 0,
     r32 = 1,
@@ -49,7 +41,6 @@ pub const Tag = enum(u2) {
 
     pub fn as_type(comptime tag: Tag) type {
         return switch (tag) {
-             .q8 => SC.q8,
             .r16 => SC.r16,
             .r32 => SC.r32,
             .r64 => SC.r64,
@@ -57,7 +48,6 @@ pub const Tag = enum(u2) {
     }
     pub fn as_tag(comptime T: type) Tag {
         return switch (T) {
-             SC.q8 => .q8,
             SC.r16 => .r16,
             SC.r32 => .r32,
             SC.r64 => .r64,

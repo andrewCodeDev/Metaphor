@@ -261,38 +261,6 @@ pub fn make_device_kernels(self: *Self) void {
     }
 }
 
-fn make_kernel_overloads(self: *Self) !void {
-    var overloadset_decls: []const u8 = "";
-    var overloadset_args: []const u8 = "";
-
-    for (self.target_abspaths.items, self.source_filenames.items) |path, name| {
-        const content = self.file_to_string(path);
-        overloadset_args = "";
-
-        var itr = Fluent.match("void launch_\\w+", content);
-
-        while (itr.next()) |decl| {
-
-            overloadset_args = try std.mem.join(self.string_allocator, "", &.{
-                overloadset_args, "\tdecls.",  decl.trim(.left, .regex, "void ").items, ",\n" 
-            });
-        }
-
-        const name_stop = Fluent.init(name).find(.scalar, '.') orelse @panic("Target file does not have extension.");
-
-        overloadset_decls = try std.mem.join(self.string_allocator, "", &.{
-            overloadset_decls, "pub const ", name[0..name_stop], " = dispatch_array(.{\n", overloadset_args, "});\n\n"
-        });
-    }
-
-    overloadset_decls = try std.mem.join(self.string_allocator, "", &.{ OVERLOAD_IMPORT, overloadset_decls });
-
-    // create main kernel dispatching file exported through core.root
-    string_to_file(self.append_core_directory("kernels.zig"), overloadset_decls);
-
-    _ = self.string_arena.reset(.retain_capacity);
-}
-
 fn make_kernel_declarations(self: *Self) !void {
     var declarations: []const u8 = EXTERN_HEADER_MACRO;
 
@@ -325,6 +293,38 @@ pub fn make_device_utils(
     trg_path: []const u8,
 ) void {
     ScriptCompiler.compile_shared_file(self.system_allocator, src_path, trg_path);
+}
+
+fn make_kernel_overloads(self: *Self) !void {
+    var overloadset_decls: []const u8 = "";
+    var overloadset_args: []const u8 = "";
+
+    for (self.target_abspaths.items, self.source_filenames.items) |path, name| {
+        const content = self.file_to_string(path);
+        overloadset_args = "";
+
+        var itr = Fluent.match("void launch_\\w+", content);
+
+        while (itr.next()) |decl| {
+
+            overloadset_args = try std.mem.join(self.string_allocator, "", &.{
+                overloadset_args, "\tdecls.",  decl.trim(.left, .regex, "void ").items, ",\n" 
+            });
+        }
+
+        const name_stop = Fluent.init(name).find(.scalar, '.') orelse @panic("Target file does not have extension.");
+
+        overloadset_decls = try std.mem.join(self.string_allocator, "", &.{
+            overloadset_decls, "pub const ", name[0..name_stop], " = dispatch_array(.{\n", overloadset_args, "});\n\n"
+        });
+    }
+
+    overloadset_decls = try std.mem.join(self.string_allocator, "", &.{ OVERLOAD_IMPORT, overloadset_decls });
+
+    // create main kernel dispatching file exported through core.root
+    string_to_file(self.append_core_directory("kernels.zig"), overloadset_decls);
+
+    _ = self.string_arena.reset(.retain_capacity);
 }
 
 pub fn make_core_cimport(self: *Self) void {
@@ -408,3 +408,4 @@ fn replace_extension(
 
     return buffer[0..end];
 }
+

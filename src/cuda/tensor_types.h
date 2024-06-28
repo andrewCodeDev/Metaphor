@@ -6,6 +6,8 @@ typedef unsigned long len_t;
 const len_t WARP_SIZE = 32;
 const len_t UINT_BUFFER_SIZE = 32;
 
+#include <stdint.h>
+
 // coalesced types for load optimization
 
 // fundamental types

@@ -8,28 +8,41 @@ const Graph = core.Graph;
 const is_one = @import("common.zig").is_one;
 const is_zero = @import("common.zig").is_zero;
 
+// default to lhs-graph
 pub fn forward(x: Tensor, y: Tensor) Tensor {
     return forward_impl(x.ptr, x, y);
 }
 
-pub fn forward_impl(
+fn deduce_output(graph: *Graph, x: Tensor) Tensor {
+    return graph.tensor(.{ 
+        .class = .hid, 
+        .dtype = x.dtype(), 
+        .sizes = x.sizes(),
+    });
+}
+
+// enable choice of graph
+pub fn forward_impl(   
     graph: *Graph,
     x: Tensor, 
     y: Tensor, 
 ) Tensor {
-    std.debug.assert(x.type_id() == y.type_id());
+
+    std.debug.assert(x.dtype() == y.dtype());
 
     std.debug.assert(std.mem.eql(usize, x.sizes(), y.sizes()));
 
-    const z = graph.tensor(.{ .class = .hid, .dtype = x.type_tag(), .sizes = x.sizes() });
+    const z = deduce_output(graph, x);
 
-    core.kernels.hadamard[z.type_id()](
-        x.data_ptr(),
-        y.data_ptr(),
-        z.data_ptr(),
-        z.len(),
+    const key = core.dkey(z);
+
+    core.kernels.hadamard[key](
+        x.data_ptr(), 
+        y.data_ptr(), 
+        z.data_ptr(), 
+        z.len(), 
         z.stream(),
-    );
+    );        
 
     if (graph.mode == .train) {
         core.attach_op(@This(), z, &.{ 
@@ -42,24 +55,22 @@ pub fn forward_impl(
     return z;
 }
 
-pub fn reverse(
-    args: []const OpDatum,
-    type_id: usize,
-) void {
+pub fn reverse(args: []const OpDatum) void {
 
     core.enable_gradient(args[0].tensor);
     core.enable_gradient(args[1].tensor);
 
-    const dispatch = core.kernels.hadamard_reverse[type_id];
+    const key = core.dkey(args[2].tensor);
 
-    dispatch(
+    core.kernels.hadamard_reverse[key](
         args[2].tensor.grad_ptr(),
         args[1].tensor.data_ptr(),
         args[0].tensor.grad_ptr(),
         args[0].tensor.len(),
         args[0].tensor.stream(),
     );
-    dispatch(
+
+    core.kernels.hadamard_reverse[key](
         args[2].tensor.grad_ptr(),
         args[0].tensor.data_ptr(),
         args[1].tensor.grad_ptr(),

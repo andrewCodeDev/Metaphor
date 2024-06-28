@@ -89,24 +89,15 @@ pub const Tensor = struct {
             // if a loss hasn't been applied, this will be null
             enable_gradient(self);
             // derivative with respect to self is 1
-            kernels.fill[self.type_id()](self.grad_ptr(), 1.0, self.len(), self.stream());
+            kernels.fill[dkey(self)](self.grad_ptr(), 1.0, self.len(), self.stream());
         }
         if (self.class != .hid) return;
         
         self.ptr.reverse(self.idx, cleanup);
     }
-    /// Use to get a numeric type ID based on the current
-    /// active member of the SliceUnion. Can be used as
-    /// an index to retrieve functions from arrays.
-    pub fn type_id(self: Tensor) usize {
-        return @intFromEnum(self.type_tag());
-    }
 
-    /// Use to get a numeric type ID based on the current
-    /// active member of the SliceUnion. Can be used as
-    /// an index to retrieve functions from arrays.
-    pub fn type_tag(self: Tensor) SC.Tag {
-        return self.data().active();
+    pub fn dtype(self: Tensor) SC.Tag {
+        return self.data().dtype();
     }
 
     pub fn derive(self: Tensor, wrt: Tensor) ?Tensor {
@@ -115,8 +106,8 @@ pub const Tensor = struct {
             return null;
 
         if (self.same(wrt)) {
-            const dx = wrt.ptr.tensor(.{ .class = .hid, .dtype = self.type_tag(), .sizes = self.sizes() });
-            kernels.fill[dx.type_id()](dx.data_ptr(), 1.0, dx.len(), dx.stream());
+            const dx = wrt.ptr.tensor(.{ .class = .hid, .dtype = self.dtype(), .sizes = self.sizes() });
+            kernels.fill[dkey(self)](dx.data_ptr(), 1.0, dx.len(), dx.stream());
             return dx;
         }
 
@@ -127,8 +118,8 @@ pub const Tensor = struct {
             const datum = op.derive(wrt) orelse return null;
 
             if (datum == .scalar) { // constant valued tensor
-                const dx = wrt.ptr.tensor(.{ .class = .hid, .dtype = self.type_tag(), .sizes = self.sizes() });
-                kernels.fill[dx.type_id()](dx.data_ptr(), datum.scalar, dx.len(), dx.stream());
+                const dx = wrt.ptr.tensor(.{ .class = .hid, .dtype = self.dtype(), .sizes = self.sizes() });
+                kernels.fill[dkey(self)](dx.data_ptr(), datum.scalar, dx.len(), dx.stream());
                 return dx;
             }
 
@@ -137,11 +128,56 @@ pub const Tensor = struct {
 
         return null;
     }
+};
 
-    pub fn quantized_components(self: Tensor) ?*QuantizedComponents {
-        return self.ptr.quantized_components(self);
+// non-public api for tensors
+// to get their dispatch keys
+pub fn dkey(self: Tensor) usize {
+    const key: usize = @intFromEnum(self.dtype());
+    std.debug.assert(key < 4);
+    return key;
+}
+
+///////////////////////////////
+//     Quantization Maps     //
+///////////////////////////////
+
+// TODO: Currently not used
+
+const QuantizeMode = enum(u1) { sym = 0, asym = 1 };
+
+const QuantizeParent = enum(u2) {
+    r32 = @intFromEnum(SC.r32), 
+    r64 = @intFromEnum(SC.r64),  
+};
+
+const QuantizeComponent = struct {
+    /// Denotes symmetric vs asymmetric quantization.
+    mode: QuantizeMode,
+    /// Stores what the parent type of the quantization
+    /// was to determine the dtype of a resulting tensor.
+    /// This currently cannot be another q8 type.
+    dtype: QuantizeParent,
+    /// Floating point tensor to project quantized q8
+    /// values back to higher precision floating point.
+    /// Can be rank zero or higher. Higher rank values
+    /// are often referred to as "values". 
+    scale: Tensor,
+    /// Adjusts result tensor value by a scaled minimum
+    /// to guarentee that zero is within the range.
+    /// Always null if mode is symmetric.
+    zpoint: ?Tensor,
+
+    pub fn target(self: *const QuantizeComponent) SC.Tag {
+        return @enumFromInt(self.index());
     }
 };
+
+const QuantizeMap = std.AutoHashMap(usize, QuantizeComponent); 
+
+///////////////////////////
+//   Computation Graph   // 
+///////////////////////////
 
 const Mode = enum { train, eval };
 
@@ -152,30 +188,6 @@ pub const GraphConfig = struct {
     mode: Mode,
 };
 
-///////////////////////////////
-//     Quantization Maps     //
-///////////////////////////////
-
-const QuantizeMode = enum(u1) {
-    sym = 0, asym = 1,
-};
-
-const QuantizedComponents = struct {
-    /// Denotes symmetric vs asymmetric quantization.
-    mode: QuantizeMode,
-    /// Floating point tensor to project quantized q8
-    /// values back to higher precision floating point.
-    /// Can be rank zero or higher. Higher rank values
-    /// are often referred to as "values". 
-    scale: Tensor,
-    /// Adjusts result tensor value by a scaled minimum
-    /// to guarentee that zero is within the range.
-    /// Always null if mode is symmetric.
-    zero_point: ?Tensor,
-};
-
-const QuantizeMap = std.AutoHashMap(usize, QuantizedComponents); 
-
 pub const Graph = struct {
 
     const LeafBlock = struct {
@@ -184,7 +196,6 @@ pub const Graph = struct {
         sizes: ArrayList(Sizes),
         strides: ArrayList(Strides),
         classes: ArrayList(TensorClass),
-        q_map: QuantizeMap,
         pub fn init(allocator: std.mem.Allocator, block_size: usize) !LeafBlock {
             return .{
                 .data = try ArrayList(SliceUnion).initCapacity(allocator, block_size),
@@ -192,7 +203,6 @@ pub const Graph = struct {
                 .sizes = try ArrayList(Sizes).initCapacity(allocator, block_size),
                 .strides = try ArrayList(Strides).initCapacity(allocator, block_size),
                 .classes = try ArrayList(TensorClass).initCapacity(allocator, block_size),
-                .q_map = QuantizeMap.init(allocator),  
             };
         }
     };
@@ -205,7 +215,6 @@ pub const Graph = struct {
         strides: ArrayList(Strides),
         deps: ArrayList(i32),
         attached: ArrayList(bool),
-        q_map: QuantizeMap,
         pub fn init(allocator: std.mem.Allocator, block_size: usize) !NodeBlock {
             return .{
                 .ops = try ArrayList(?OpInterface).initCapacity(allocator, block_size),
@@ -215,7 +224,6 @@ pub const Graph = struct {
                 .strides = try ArrayList(Strides).initCapacity(allocator, block_size),
                 .deps = try ArrayList(i32).initCapacity(allocator, block_size),
                 .attached = try ArrayList(bool).initCapacity(allocator, block_size),
-                .q_map = QuantizeMap.init(allocator),  
             };
         }
     };
@@ -396,7 +404,6 @@ pub const Graph = struct {
         std.debug.assert(0 < N);
 
         const data: SliceUnion = switch (dtype) {
-             .q8 => SliceUnion.init(self.tensor_allocator.alloc(SC.q8,  N, self.stream)),
             .r16 => SliceUnion.init(self.tensor_allocator.alloc(SC.r16, N, self.stream)),
             .r32 => SliceUnion.init(self.tensor_allocator.alloc(SC.r32, N, self.stream)),
             .r64 => SliceUnion.init(self.tensor_allocator.alloc(SC.r64, N, self.stream)),
@@ -425,13 +432,11 @@ pub const Graph = struct {
             sizes: Sizes, 
         },
     ) Tensor {
-
-        if (config.dtype == .q8)
-            @panic("TODO: q8 support is under construction.");
             
-        const allocator = if (config.class == .hid) 
-            self.node_arena.allocator() else
-            self.leaf_arena.allocator();
+        const allocator = switch (config.class) {
+            .hid => self.node_arena.allocator(),
+            else => self.leaf_arena.allocator(),
+        };
         
         return self.construct_tensor(
             config.class,
@@ -447,9 +452,11 @@ pub const Graph = struct {
         comptime data_type: type,
         idx: usize
     ) void {
-        const grad_array = if (class == .hid)
-            &self.node_block.grad else
-            &self.leaf_block.grad;
+
+        const grad_array = switch (class) {
+            .hid => &self.node_block.grad,
+            else => &self.leaf_block.grad,
+        };
 
         if (grad_array.items[idx]) |grad| {
             self.tensor_allocator.free(grad.cast(data_type), self.stream);
@@ -457,9 +464,9 @@ pub const Graph = struct {
         }
     }
 
+    // TODO: Consider moving this logic to the allocator instead
     fn free_raw_gradient(self: *Graph, raw: SliceUnion, class: TensorClass, idx: usize) void {
         switch (raw) {
-             .q8 => self.free_gradient(class, SC.q8,  idx),
             .r16 => self.free_gradient(class, SC.r16, idx),
             .r32 => self.free_gradient(class, SC.r32, idx),
             .r64 => self.free_gradient(class, SC.r64, idx),
@@ -484,9 +491,9 @@ pub const Graph = struct {
         self.free_gradient(class, data_type, idx);
     }
 
+    // TODO: Consider moving this logic to the allocator instead
     fn free_raw_tensor(self: *Graph, raw: SliceUnion, class: TensorClass, idx: usize) void {
         switch (raw) {
-             .q8 => self.free_tensor(class, SC.q8,  idx),
             .r16 => self.free_tensor(class, SC.r16, idx),
             .r32 => self.free_tensor(class, SC.r32, idx),
             .r64 => self.free_tensor(class, SC.r64, idx),
@@ -641,18 +648,6 @@ pub const Graph = struct {
             }
         }
     }
-
-    fn quantized_components(self: *Graph, x: Tensor) ?*QuantizedComponents {
-
-        if (x.dtype() != .q8) return null;
-        
-        const q_map: *QuantizeMap = switch (x.class) {
-            .hid => &self.node_block.q_map,
-            else => &self.leaf_block.q_map,  
-        };
-
-        return q_map.getOrPut(x.idx) catch @panic("Failed to make quantized map value.");        
-    }
 };
 
 ////////////////////////////////
@@ -667,8 +662,7 @@ pub fn enable_gradient(t: Tensor) void {
     const grad = &grad_array.items[t.idx];
     if (grad.* == null) {
         const size = t.len();
-        grad.* = switch (t.type_tag()) {
-             .q8 => SliceUnion.init(self.tensor_allocator.alloc(SC.q8,  size, self.stream)),
+        grad.* = switch (t.dtype()) {
             .r16 => SliceUnion.init(self.tensor_allocator.alloc(SC.r16, size, self.stream)),
             .r32 => SliceUnion.init(self.tensor_allocator.alloc(SC.r32, size, self.stream)),
             .r64 => SliceUnion.init(self.tensor_allocator.alloc(SC.r64, size, self.stream)),
@@ -751,7 +745,7 @@ pub const OpInterface = struct {
     }
 
     pub fn reverse(self: *const OpInterface) void {
-        self.vrt_ptr.reverse(self.args.slice(), self.args.type_id());        
+        self.vrt_ptr.reverse(self.args.slice());        
     }
 
     pub fn derive(
@@ -778,7 +772,7 @@ pub const OpDatum = union(enum) {
 };
 
 const OpVTable = struct {
-    reverse: *const fn([]const OpDatum, usize) void,
+    reverse: *const fn([]const OpDatum) void,
     derive: *const fn([]const OpDatum, Tensor) ?OpDatum,
 };
     
@@ -835,18 +829,6 @@ pub const OpArgs = struct {
         return switch (self.items) {
             .inplace => |*buf| buf.slice(),
             .overage => |ovg| ovg,
-        };
-    }
-
-    pub fn output(self: *const OpArgs) OpDatum {
-        const _slice = self.slice();
-        return _slice[_slice.len - 1];
-    }
-
-    pub fn type_id(self: *const OpArgs) usize {
-        return switch (self.output()) {
-            .tensor => |t| t.type_id(),
-            .scalar => @panic("TODO: Consider scalar output?"),
         };
     }
 };

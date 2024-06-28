@@ -9,7 +9,7 @@
     #define EXTERN_C extern
 #endif
 
-EXTERN_C void initDevice(unsigned int);
+EXTERN_C void mpInitDevice(uint32_t);
 EXTERN_C void* mpMemAlloc(len_t N, StreamCtx);
 EXTERN_C void mpMemcpyHtoD(void* dptr, void const* hptr, len_t N, StreamCtx);
 EXTERN_C void mpMemcpyDtoH(void* hptr, void const* dptr, len_t N, StreamCtx);
@@ -19,5 +19,6 @@ EXTERN_C void mpStreamSynchronize(StreamCtx);
 EXTERN_C StreamCtx mpInitStream();
 EXTERN_C void mpDeinitStream(StreamCtx);
 EXTERN_C void mpCheckLastError();
+EXTERN_C len_t mpDeviceTotalMemory(uint32_t);
 
 #endif

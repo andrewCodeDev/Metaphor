@@ -7,10 +7,20 @@ const Tensor = core.Tensor;
 const Graph = core.Graph;
 const is_one = @import("common.zig").is_one;
 const is_zero = @import("common.zig").is_zero;
+const translate = @import("translate.zig");
+
 
 // default to lhs-graph
 pub fn forward(x: Tensor, y: Tensor) Tensor {
     return forward_impl(x.ptr, x, y);
+}
+
+fn deduce_output(graph: *Graph, x: Tensor) Tensor {
+    return graph.tensor(.{ 
+        .class = .hid, 
+        .dtype = x.dtype(), 
+        .sizes = x.sizes(),
+    });
 }
 
 // enable choice of graph
@@ -19,18 +29,22 @@ pub fn forward_impl(
     x: Tensor, 
     y: Tensor, 
 ) Tensor {
-    std.debug.assert(x.type_id() == y.type_id());
+
+    std.debug.assert(x.dtype() == y.dtype());
+
     std.debug.assert(std.mem.eql(usize, x.sizes(), y.sizes()));
 
-    const z = graph.tensor(.{ .class = .hid, .dtype = x.type_tag(), .sizes = x.sizes() });
+    const z = deduce_output(graph, x);
 
-    core.kernels.addition[z.type_id()](
-        x.data_ptr(),
-        y.data_ptr(),
-        z.data_ptr(),
-        z.len(),
+    const key = core.dkey(z);
+
+    core.kernels.addition[key](
+        x.data_ptr(), 
+        y.data_ptr(), 
+        z.data_ptr(), 
+        z.len(), 
         z.stream(),
-    );
+    );        
 
     if (graph.mode == .train) {
         core.attach_op(@This(), z, &.{ 
@@ -39,36 +53,26 @@ pub fn forward_impl(
             OpDatum{ .tensor = z },
         });        
     }
+
     return z;
 }
 
-//fn forward_quant(
-//    graph: *Graph,
-//    x: Tensor,
-//    y: Tensor,
-//) Tensor {
-//
-//    const q_config = x.get_config();
-//        
-//}
-
-pub fn reverse(
-    args: []const OpDatum,
-    type_id: usize,
-) void {
-    const dispatch = core.kernels.addition[type_id];
+pub fn reverse(args: []const OpDatum) void {
 
     core.enable_gradient(args[0].tensor);
     core.enable_gradient(args[1].tensor);
+
+    const key = core.dkey(args[2].tensor);
     
-    dispatch(
+    core.kernels.addition[key](
         args[2].tensor.grad_ptr(),
         args[0].tensor.grad_ptr(),
         args[0].tensor.grad_ptr(),
         args[0].tensor.len(),
         args[0].tensor.stream(),
     );
-    dispatch(
+
+    core.kernels.addition[key](
         args[2].tensor.grad_ptr(),
         args[1].tensor.grad_ptr(),
         args[1].tensor.grad_ptr(),
@@ -76,8 +80,6 @@ pub fn reverse(
         args[1].tensor.stream(),
     );
 }
-
-const translate = @import("translate.zig");
 
 pub fn derive(
     args: []const OpDatum,

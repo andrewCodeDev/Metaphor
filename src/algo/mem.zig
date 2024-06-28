@@ -22,13 +22,13 @@ const Graph = core.Graph;
 // <>--------------------------------------------------------<>
 
 pub fn fill(x: Tensor, value: f64) void {
-    core.kernels.fill[x.type_id()](x.data_ptr(), value, x.len(), x.stream());
+    core.kernels.fill[core.dkey(x)](x.data_ptr(), value, x.len(), x.stream());
 }
 
 // <>--------------------------------------------------------<>
 
 pub fn sequence(x: Tensor, init: f64, step: f64) void {    
-    core.kernels.sequence[x.type_id()](x.data_ptr(), init, step, x.len(), x.stream());
+    core.kernels.sequence[core.dkey(x)](x.data_ptr(), init, step, x.len(), x.stream());
 }
 
 // <> -------------------------------------------------------------- <>

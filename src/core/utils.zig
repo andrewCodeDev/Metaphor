@@ -81,7 +81,11 @@ pub fn init_stream() Stream {
 }
 
 pub fn init_device(device_number: u32) void {
-    dev.initDevice(device_number);
+    dev.mpInitDevice(device_number);
+}
+
+pub fn total_memory(device_number: u32) usize {
+    return dev.mpDeviceTotalMemory(device_number);
 }
 
 pub fn deinit_stream(stream: Stream) void {

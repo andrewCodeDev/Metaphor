@@ -15,9 +15,16 @@ pub fn forward_impl(
     x: Tensor, 
     value: f64, 
 ) Tensor {
-    const z = graph.tensor(.hid, x.type_tag(), x.sizes());
 
-    core.kernels.dilate[z.type_id()](
+    const z = graph.tensor(.{ 
+        .class = .hid, 
+        .dtype = x.dtype(),
+        .sizes = x.sizes(),
+    });
+
+    const key = core.dkey(z);
+
+    core.kernels.dilate[key](
         x.data_ptr(),
         value,
         z.data_ptr(),
@@ -36,10 +43,12 @@ pub fn forward_impl(
     return z;
 }
 
-pub fn reverse(args: []const OpDatum, type_id: usize) void {
+pub fn reverse(args: []const OpDatum) void {
     core.enable_gradient(args[0].tensor);
+
+    const key = core.dkey(args[0].tensor);
     
-    core.kernels.dilate_reverse[type_id](
+    core.kernels.dilate_reverse[key](
         args[2].tensor.grad_ptr(),
         args[1].scalar,
         args[0].tensor.grad_ptr(),

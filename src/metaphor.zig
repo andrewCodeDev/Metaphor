@@ -14,6 +14,7 @@ pub const device = struct {
     pub const init = core.utils.init_device;
     pub const sync = core.utils.synchronize_device;
     pub const check = core.utils.check_last_error;
+    pub const total_memory = core.utils.total_memory;
 };
 
 pub const stream = struct {

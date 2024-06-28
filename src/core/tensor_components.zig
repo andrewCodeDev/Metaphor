@@ -8,14 +8,12 @@ pub const Sizes = []const SizeType;
 pub const Strides = []const SizeType;
 
 pub const SliceUnion = union(SC.Tag) {
-     q8: []SC.q8,
     r16: []SC.r16,
     r32: []SC.r32,
     r64: []SC.r64,
 
     pub fn init(slice: anytype) SliceUnion {
         return switch (std.meta.Child(@TypeOf(slice))) {
-             SC.q8 => .{  .q8 = slice },
             SC.r16 => .{ .r16 = slice },
             SC.r32 => .{ .r32 = slice },
             SC.r64 => .{ .r64 = slice },
@@ -37,14 +35,13 @@ pub const SliceUnion = union(SC.Tag) {
 
     pub fn bytes(self: anytype) []u8 {
         return switch(self.*) {
-             .q8 => std.mem.sliceAsBytes(self.q8),
             .r16 => std.mem.sliceAsBytes(self.r16),
             .r32 => std.mem.sliceAsBytes(self.r32),
             .r64 => std.mem.sliceAsBytes(self.r64),
         };
     }
 
-    pub fn active(self: SliceUnion) SC.Tag {
+    pub fn dtype(self: SliceUnion) SC.Tag {
         return @as(SC.Tag, self); 
     }
 

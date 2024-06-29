@@ -6,21 +6,20 @@ const OpInterface = core.OpInterface;
 const Tensor = core.Tensor;
 const Graph = core.Graph;
 const StaticStringMap = std.StaticStringMap;
-const broadcast = @import("broadcast.zig");
+const reduce = @import("reduce.zig");
 const commute = @import("common.zig").commute;
-const is_zero = @import("common.zig").is_zero;
 
 // default to lhs-graph
-pub fn forward(x: Tensor, expr: []const u8) Tensor {
-    return forward_impl(x.ptr, x, expr);
+pub fn forward(x: Tensor, sizes: []const usize, expr: []const u8) Tensor {
+    return forward_impl(x.ptr, x, sizes, expr);
 }
 
 // enable choice of graph
-pub fn forward_impl(graph: *Graph, x: Tensor, expr: []const u8) Tensor {
+pub fn forward_impl(graph: *Graph, x: Tensor, sizes: []const usize, expr: []const u8) Tensor {
 
     const op = forward_map.get(expr) orelse @panic("Invalid expression for reduction.");
 
-    const y = op(graph, x);
+    const y = op(graph, x, sizes);
 
     if (graph.mode == .train) {
         core.attach_op(@This(), y, &.{ 
@@ -48,9 +47,6 @@ pub fn derive(args: []const OpDatum, wrt: Tensor) ?OpDatum {
 
     if (dx == .scalar) {
 
-        if (is_zero(dx.scalar))
-            return null;
-
         // if we have scalars, we can't reverse
         // any further than that in the future,
         // and this tensor becomes an input.
@@ -63,56 +59,58 @@ pub fn derive(args: []const OpDatum, wrt: Tensor) ?OpDatum {
 
         const key = core.dkey(u);
 
-        core.kernels.fill[key](u.data_ptr(), dx.scalar, u.len(), u.stream());
+        const factor: f64 = @floatFromInt(args[1].tensor.len() / args[0].tensor.len());
+
+        core.kernels.fill[key](u.data_ptr(), dx.scalar * factor, u.len(), u.stream());
 
         return OpDatum{ .tensor = u };
     }
 
-    // commute reduce to broadcast: ij->j : j->ij
+    // commute broadcast to reduce: i->ij : ij->i
     const expr = commute(args[0].expr, "->", wrt.ptr.node_arena.allocator());
 
-    return OpDatum{ .tensor = broadcast.forward_impl(wrt.ptr, dx.tensor, args[0].tensor.sizes(), expr) };
+    return OpDatum{ .tensor = reduce.forward_impl(wrt.ptr, dx.tensor, expr) };
 }
 
 //////////////////////////////
 // Expression to Kernel Map //
 
-const ForwardOp = *const fn (*Graph, Tensor) Tensor;
+const ForwardOp = *const fn (*Graph, Tensor, []const usize) Tensor;
 
 const forward_map = std.StaticStringMap(ForwardOp).initComptime(.{
-    .{ "ij->i", reduce_ij_i },  
-    .{ "ij->j", reduce_ij_j },  
+    .{ "i->ij", broadcast_i_ij },  
+    .{ "j->ij", broadcast_j_ij },  
 });
 
 const ReverseOp = *const fn (Tensor, Tensor) void;
 
 const reverse_map = std.StaticStringMap(ReverseOp).initComptime(.{
-    .{ "ij->i", reduce_ij_i_reverse },  
-    .{ "ij->j", reduce_ij_j_reverse },  
+    .{ "i->ij", broadcast_i_ij_reverse },  
+    .{ "j->ij", broadcast_j_ij_reverse },  
 });
 
 // <>--------------------------------------------------------<>
 
-fn reduce_ij_i(graph: *Graph, x: Tensor) Tensor {
+fn broadcast_i_ij(graph: *Graph, x: Tensor, sizes: []const usize) Tensor {
 
-    const s = x.sizes();
+    std.debug.assert(x.rank() == 1);
 
-    std.debug.assert(s.len == 2);
+    std.debug.assert(sizes.len == 2);
 
     const y = graph.tensor(.{
         .class = .hid,
         .dtype = x.dtype(),
-        .sizes = s[0..1],
+        .sizes = sizes,
     });
 
     const key = core.dkey(y);
 
-    core.kernels.reduce_ij_i[key](x.data_ptr(), y.data_ptr(), 0.0, s[0], s[1], y.stream());
+    core.kernels.broadcast_i_ij[key](x.data_ptr(), y.data_ptr(), 0.0, sizes[0], sizes[1], y.stream());
 
     return y;
 }
 
-fn reduce_ij_i_reverse(x: Tensor, y: Tensor) void {
+fn broadcast_i_ij_reverse(x: Tensor, y: Tensor) void {
 
     const s = x.sizes();
 
@@ -120,31 +118,31 @@ fn reduce_ij_i_reverse(x: Tensor, y: Tensor) void {
 
     const key = core.dkey(y);
     
-    core.kernels.broadcast_i_ij[key](y.grad_ptr(), x.grad_ptr(), 1.0, s[0], s[1], x.stream());
+    core.kernels.reduce_ij_i[key](y.grad_ptr(), x.grad_ptr(), 1.0, s[0], s[1], x.stream());
 }
 
 // <>--------------------------------------------------------<>
 
-fn reduce_ij_j(graph: *Graph, x: Tensor) Tensor {
+fn broadcast_j_ij(graph: *Graph, x: Tensor, sizes: []const usize) Tensor {
 
-    const s = x.sizes();
+    std.debug.assert(x.rank() == 1);
 
-    std.debug.assert(s.len == 2);
+    std.debug.assert(sizes.len == 2);
 
     const y = graph.tensor(.{
         .class = .hid,
         .dtype = x.dtype(),
-        .sizes = s[1..],
+        .sizes = sizes,
     });
 
     const key = core.dkey(y);
 
-    core.kernels.reduce_ij_j[key](x.data_ptr(), y.data_ptr(), 0.0, s[0], s[1], y.stream());
+    core.kernels.broadcast_i_ij[key](x.data_ptr(), y.data_ptr(), 0.0, sizes[0], sizes[1], y.stream());
 
     return y;
 }
 
-fn reduce_ij_j_reverse(x: Tensor, y: Tensor) void {
+fn broadcast_j_ij_reverse(x: Tensor, y: Tensor) void {
 
     const s = x.sizes();
 
@@ -152,5 +150,5 @@ fn reduce_ij_j_reverse(x: Tensor, y: Tensor) void {
 
     const key = core.dkey(y);
     
-    core.kernels.broadcast_j_ij[key](y.grad_ptr(), x.grad_ptr(), 1.0, s[0], s[1], x.stream());
+    core.kernels.reduce_ij_j[key](y.grad_ptr(), x.grad_ptr(), 1.0, s[0], s[1], x.stream());
 }

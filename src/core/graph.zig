@@ -78,6 +78,9 @@ pub const Tensor = struct {
     pub fn len(self: Tensor) usize {
         return data(self).len();
     }
+    pub fn rank(self: Tensor) usize {
+        return sizes(self).len;
+    }
     pub fn detach(self: Tensor) void {
         if (self.class == .hid) self.ptr.set_attachment(self.idx, false);
     }

@@ -18,31 +18,25 @@ pub fn main() !void {
     const x = G.tensor(.{ 
         .class = .wgt,
         .dtype = .r32,
-        .sizes = &.{ 10, 10 }
+        .sizes = &.{ 10 }
     });
 
-    const y = G.tensor(.{ 
-        .class = .wgt,
-        .dtype = .r32,
-        .sizes = &.{ 10, 10 }
-    });
+    //const y = G.tensor(.{ 
+    //    .class = .wgt,
+    //    .dtype = .r32,
+    //    .sizes = &.{ 10, 10 }
+    //});
 
     mp.algo.fill(x, 1.0);
-    mp.algo.fill(y, 1.0);
+    //mp.algo.fill(y, 1.0);
 
-    var z_cpu: [10]f32 = .{ 0.0 } ** 10;
+    const w = mp.ops.add(x, x);
+    const z = mp.ops.broadcast(w, &.{ 10, 10 }, "i->ij");
 
-    const w = mp.ops.add(x, y);
-    const z = mp.ops.reduce(w, "ij->i");
+    const dx = z.derive(x) orelse unreachable;
 
-    mp.util.from_device(z.data().r32, z_cpu[0..], stream);
-    mp.stream.sync(stream);
-    std.debug.print("\nIt worked.\n{any}\n", .{ z_cpu[0..] });
-
-    z.reverse(.keep);
-
-    var x_cpu: [100]f32 = .{ 0.0 } ** 100;
-    mp.util.from_device(w.data().r32, x_cpu[0..], stream);
+    var x_cpu: [10]f32 = .{ 0.0 } ** 10;
+    mp.util.from_device(dx.data().r32, x_cpu[0..], stream);
     std.debug.print("\nIt worked.\n{any}\n", .{ x_cpu[0..] });
 
     //const ddx = dx.derive(x) orelse {

@@ -47,4 +47,5 @@ pub const ops = struct {
     pub const dilate = @import("ops/dilate.zig").forward;
     pub const relu = @import("ops/relu.zig").forward;
     pub const reduce = @import("ops/reduce.zig").forward;
+    pub const broadcast = @import("ops/broadcast.zig").forward;
 };

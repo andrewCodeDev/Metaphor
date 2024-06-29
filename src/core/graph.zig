@@ -54,10 +54,10 @@ pub const Tensor = struct {
             else => self.ptr.leaf_block.grad.items[self.idx],
         };
     }
-    pub fn data_ptr(self: Tensor) *align(@alignOf(usize)) anyopaque {
+    pub fn data_ptr(self: Tensor) *anyopaque {
         return self.data().opaque_ptr();
     }
-    pub fn grad_ptr(self: Tensor) ?*align(@alignOf(usize)) anyopaque {
+    pub fn grad_ptr(self: Tensor) ?*anyopaque {
         return if (self.grad()) |grd| grd.opaque_ptr() else null;
     }
     pub fn sizes(self: Tensor) Sizes {

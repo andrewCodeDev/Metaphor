@@ -27,9 +27,9 @@ pub const SliceUnion = union(SC.Tag) {
         };
     }
 
-    pub fn opaque_ptr(self: anytype) *align(@alignOf(usize)) anyopaque {
+    pub fn opaque_ptr(self: anytype) *anyopaque {
         return switch (self.*) {
-            inline else => |x| @ptrCast(@alignCast(x.ptr)),
+            inline else => |x| @ptrCast(x.ptr),
         };
     }
 

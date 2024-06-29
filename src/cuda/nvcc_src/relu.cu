@@ -17,9 +17,9 @@ extern "C" void launch_relu_Scalar(
   const void* a,
         void* b, 
   len_t n,
-  StreamCtx stream
+  StreamContext stream
 ) {
-  __kernel_relu<<<DIMPAD(n, 1024), dim3(1024), 0, getCtx(stream)>>>(
+  __kernel_relu<<<DIMPAD(n, 1024), dim3(1024), 0, get_stream(stream)>>>(
     static_cast<const Scalar*>(a),
     static_cast<Scalar*>(b),
     static_cast<unsigned>(n)

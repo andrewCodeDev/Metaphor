@@ -17,9 +17,9 @@ extern "C" void launch_fill_Scalar(
   void* dev_a,
   double value, 
   len_t N,
-  StreamCtx stream
+  StreamContext stream
 ) {
-  __kernel_fill<<<GRID_1D(N), dim3(1024), 0, getCtx(stream)>>>(
+  __kernel_fill<<<GRID_1D(N), dim3(1024), 0, get_stream(stream)>>>(
     static_cast<Scalar*>(dev_a), 
     static_cast<Scalar>(value), 
     static_cast<unsigned>(N)

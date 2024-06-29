@@ -10,7 +10,7 @@ pub const SC = @import("scalar.zig");
 pub const TC = @import("tensor_components.zig");
 const LaneAllocator = @import("lane_allocator.zig").LaneAllocator;
 const Stream = UT.Stream;
-const StreamCtx = UT.StreamCtx;
+const StreamContext = UT.StreamContext;
 const CG = @This();
 
 const Child = UT.Child;
@@ -72,14 +72,14 @@ pub const Tensor = struct {
             else => self.ptr.leaf_block.strides.items[self.idx],
         };
     }
-    pub fn stream(self: Tensor) StreamCtx {
+    pub fn stream(self: Tensor) StreamContext {
         return self.ptr.stream.context;
     }
     pub fn len(self: Tensor) usize {
-        return data(self).len();
+        return self.data().len();
     }
     pub fn rank(self: Tensor) usize {
-        return sizes(self).len;
+        return self.sizes().len;
     }
     pub fn detach(self: Tensor) void {
         if (self.class == .hid) self.ptr.set_attachment(self.idx, false);

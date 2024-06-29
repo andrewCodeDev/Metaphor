@@ -18,9 +18,9 @@ extern "C" void launch_subtraction_Scalar(
   const void* b, 
   void* c, 
   len_t N,
-  StreamCtx stream
+  StreamContext stream
 ) {
-  __kernel_subtraction<<<GRID_1D(N), dim3(1024), 0, getCtx(stream)>>>(
+  __kernel_subtraction<<<GRID_1D(N), dim3(1024), 0, get_stream(stream)>>>(
     static_cast<const Scalar*>(a), 
     static_cast<const Scalar*>(b), 
     static_cast<Scalar*>(c),

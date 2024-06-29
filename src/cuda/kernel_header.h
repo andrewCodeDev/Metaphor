@@ -7,8 +7,9 @@
 // CUstream before using it to
 // launch cuda kernels
 typedef struct {
-  void* ptr;
-} StreamCtx;
+  void* cuda_stream;
+  void* blas_handle;
+} StreamContext;
 
 // generator types
 #define Scalar float
@@ -27,19 +28,7 @@ typedef struct {
 #include "../../deps/cuda/include/cuda.h"
 #include "../../deps/cuda/include/cuda_runtime.h"
 #include "../../deps/cuda/include/cooperative_groups.h"
-
-// guarentee cleanup reguardles of exit
-// acts like a defer statement for malloc
-template<class T>
-struct ScopedHostPtr {
-    T* ptr = nullptr;
-    ScopedHostPtr(len_t n) {
-      this->ptr = static_cast<T*>(std::malloc(n * sizeof(T)));
-    }
-    ~ScopedHostPtr() { 
-      std::free(ptr); 
-    }
-};
+#include "../../deps/cuda/include/cublas_v2.h"
 
 // TODO: may not be portable
 inline uint32_t nextPow2(uint32_t n) {
@@ -53,24 +42,12 @@ inline uint64_t nextPow2(uint64_t n) {
 
 #if defined(__CUDACC__)
 
-inline CUstream getCtx(StreamCtx context) {
-  return static_cast<CUstream>(context.ptr);
+inline CUstream get_stream(StreamContext context) {
+  return static_cast<CUstream>(context.cuda_stream);
 }
-
-template<class T>
-struct ScopedCudaPtr {
-    T* ptr;
-    StreamCtx stream;
-    ScopedCudaPtr(len_t n, StreamCtx _stream) {
-      CUdeviceptr dptr = 0;
-      cuMemAllocAsync(&dptr, n * sizeof(T), getCtx(_stream));
-      this->ptr = reinterpret_cast<T*>(dptr);
-      this->stream = _stream;
-    }
-    ~ScopedCudaPtr() { 
-      cuMemFreeAsync(reinterpret_cast<CUdeviceptr>(ptr), getCtx(stream)); 
-    }
-};
+inline cublasHandle_t get_handle(StreamContext context) {
+  return static_cast<cublasHandle_t>(context.blas_handle);
+}
 
 namespace cg = cooperative_groups;
 
@@ -99,22 +76,23 @@ inline void handleCUResultError(CUresult err, const char *file, int line)
     exit(EXIT_FAILURE);
   }
 }
+
+#define CUBLAS_ASSERT(err) (handleCUResultError( err, __FILE__, __LINE__ ))
+inline void handleCUResultError(cublasStatus_t err, const char *file, int line)
+{
+  // TODO: Report better cublas errors
+  if (err != CUBLAS_STATUS_SUCCESS) {
+      printf("Cublas failure in %s at line %d\n", file, line);
+    exit(EXIT_FAILURE);
+  }
+}
+
 #define GRID_1D(N) (((N) / 32) + 1)
 
 #define DIVISIBLE_BY_FOUR(N) ((N & 3) == 0)
 
 ///////////////////////////////////////////////////
 // TODO: Move this math stuff to a different header
-__device__ __inline__ r16 conjmul(c16 x) { return x.r * x.r + x.i * x.i; }
-__device__ __inline__ r32 conjmul(c32 x) { return x.r * x.r + x.i * x.i; }
-__device__ __inline__ r64 conjmul(c64 x) { return x.r * x.r + x.i * x.i; }
-
-template<class T>
-__device__ T ctanh(T x) { 
-  auto a = rtanh(x.r);
-  auto b = rtan(x.i);
-  return cdiv(T{ .r = a, .i = b }, T{ .r = decltype(a){1.0}, .i = a * b });
-}
 
 __device__ __inline__ r16 rtanh(r16 x) { return r16(std::tanh(static_cast<r32>(x))); }
 __device__ __inline__ r32 rtanh(r32 x) { return std::tanh(x); }

@@ -71,22 +71,6 @@ template <> struct precision<r64>{
 #else
 #endif
 
-
-typedef struct {
-  r16 r;
-  r16 i;
-} c16;
-
-typedef struct {
-  r32 r;
-  r32 i;
-} c32;
-
-typedef struct {
-  r64 r;
-  r64 i;
-} c64;
-
 /////////////////////////
 // used for key sorting
 

@@ -20,9 +20,9 @@ extern "C" void launch_relu_reverse_Scalar(
         void *a_grads,
   const void *b_grads,
   len_t N,
-  StreamCtx stream
+  StreamContext stream
 ) {
-  __kernel_relu_reverse<<<GRID_1D(N), dim3(1024), 0, getCtx(stream)>>>(
+  __kernel_relu_reverse<<<GRID_1D(N), dim3(1024), 0, get_stream(stream)>>>(
     static_cast<const Scalar*>(a_value),
           static_cast<Scalar*>(a_grads),
     static_cast<const Scalar*>(b_grads), 

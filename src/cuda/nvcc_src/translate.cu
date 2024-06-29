@@ -18,9 +18,9 @@ extern "C" void launch_translate_Scalar(
   double value, 
         void* c, 
   len_t N,
-  StreamCtx stream
+  StreamContext stream
 ) {
-  __kernel_translate<<<GRID_1D(N), dim3(1024), 0, getCtx(stream)>>>(
+  __kernel_translate<<<GRID_1D(N), dim3(1024), 0, get_stream(stream)>>>(
     static_cast<const Scalar*>(a), 
     static_cast<Scalar>(value), 
     static_cast<Scalar*>(c),

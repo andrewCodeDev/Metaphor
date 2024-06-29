@@ -1,11 +1,11 @@
 const std = @import("std");
 pub const dev = @import("cimport.zig").C;
 
-pub const StreamCtx = dev.StreamCtx;
+pub const StreamContext = dev.StreamContext;
 
 const StreamEntry = struct {
     ID: usize,
-    context: StreamCtx,
+    context: StreamContext,
     scratch: struct {
         head: usize = 0,
         tail: usize = 0,

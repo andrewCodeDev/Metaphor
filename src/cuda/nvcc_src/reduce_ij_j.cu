@@ -51,12 +51,12 @@ extern "C" void launch_reduce_ij_j_Scalar(
     double alpha,
     len_t m,
     len_t n,
-    StreamCtx stream
+    StreamContext stream
 ) {
     const dim3 grid(DIMPAD(m, WARP_SIZE));
     const dim3 block(WARP_SIZE, WARP_SIZE);
 
-    __kernel_reduce_ij_j<<<grid, block, 0, getCtx(stream)>>>(
+    __kernel_reduce_ij_j<<<grid, block, 0, get_stream(stream)>>>(
         static_cast<const Scalar*>(src), 
         static_cast<Scalar*>(dst),
         static_cast<Scalar>(alpha),

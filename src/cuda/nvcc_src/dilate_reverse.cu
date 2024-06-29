@@ -18,9 +18,9 @@ extern "C" void launch_dilate_reverse_Scalar(
   double value, 
         void* b, 
   len_t N,
-  StreamCtx stream
+  StreamContext stream
 ) {
-  __kernel_dilate_reverse<<<GRID_1D(N), dim3(1024), 0, getCtx(stream)>>>(
+  __kernel_dilate_reverse<<<GRID_1D(N), dim3(1024), 0, get_stream(stream)>>>(
     static_cast<const Scalar*>(a), 
     static_cast<Scalar>(value), 
     static_cast<Scalar*>(b),

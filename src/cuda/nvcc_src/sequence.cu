@@ -20,9 +20,9 @@ extern "C" void launch_sequence_Scalar(
   double init,
   double step,
   len_t N,
-  StreamCtx stream
+  StreamContext stream
 ) {
-  __kernel_sequence<<<GRID_1D(N), dim3(1024), 0, getCtx(stream)>>>(
+  __kernel_sequence<<<GRID_1D(N), dim3(1024), 0, get_stream(stream)>>>(
     static_cast<Scalar*>(dev_a),
     static_cast<Scalar>(init),
     static_cast<Scalar>(step),

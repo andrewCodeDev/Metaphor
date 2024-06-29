@@ -34,12 +34,12 @@ extern "C" void launch_copy_Scalar(
   const Scalar* src, 
         Scalar* dst, 
   len_t n,
-  StreamCtx stream
+  StreamContext stream
 ) {
   // TODO: search for hyper parameters
   dim3 grid_block(DIMPAD(n, (1024 * 4)), 1);
   dim3 thread_block(1024);
-  __kernel_copy_Scalar<<<grid_block, thread_block, 0, getCtx(stream)>>>(
+  __kernel_copy_Scalar<<<grid_block, thread_block, 0, get_stream(stream)>>>(
     static_cast<const Scalar*>(src), 
     static_cast<Scalar*>(dst), 
     static_cast<unsigned>(n)

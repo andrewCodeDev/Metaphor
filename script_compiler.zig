@@ -91,6 +91,7 @@ pub fn shared_library_argv(
         config.cuda_library_path,
         "-lcudart",
         "-lcuda",
+        "-lcublas",
     };
 
     var argv = try std.ArrayListUnmanaged([]const u8).initCapacity(
@@ -168,6 +169,7 @@ pub fn object_files_argv(
         config.cuda_library_path,
         "-lcudart",
         "-lcuda",
+        "-lcublas",
     };
     var argv = try std.ArrayListUnmanaged([]const u8).initCapacity(
         allocator,
@@ -294,6 +296,7 @@ pub fn compile_shared_file(
         config.cuda_library_path,
         "-lcudart",
         "-lcuda",
+        "-lcublas",
     };
 
     const result = ChildProcess.run(.{ .allocator = allocator, .argv = libgen_utils_argv }) catch |e| {

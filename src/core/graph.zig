@@ -547,7 +547,7 @@ pub const Graph = struct {
 
             while (itr.next()) |*arg| {
 
-                if (arg.* == .scalar)
+                if (arg.* != .tensor)
                     continue;
 
                 if (arg.tensor.class != .hid or arg.tensor.idx == last)
@@ -691,7 +691,7 @@ pub fn attach_op(
 
     for (args, 0..) |*arg, i| {
 
-        if (arg.* == .scalar)
+        if (arg.* != .tensor)
             continue;
 
         if (arg.tensor.class != .hid)
@@ -769,6 +769,7 @@ pub const OpInterface = struct {
 pub const OpDatum = union(enum) {
     tensor: Tensor,
     scalar: f64,
+    expr: []const u8,
 };
 
 const OpVTable = struct {

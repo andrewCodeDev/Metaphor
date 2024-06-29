@@ -8,6 +8,78 @@
     #define EXTERN_C extern
 #endif
 
+EXTERN_C void launch_reduce_ij_i_r16(
+    const void* src,
+          void* dst,
+    double alpha,
+    len_t m,
+    len_t n,
+    StreamCtx stream
+);
+EXTERN_C void launch_reduce_ij_i_r32(
+    const void* src,
+          void* dst,
+    double alpha,
+    len_t m,
+    len_t n,
+    StreamCtx stream
+);
+EXTERN_C void launch_reduce_ij_i_r64(
+    const void* src,
+          void* dst,
+    double alpha,
+    len_t m,
+    len_t n,
+    StreamCtx stream
+);
+EXTERN_C void launch_reduce_ij_j_r16(
+    const void* src,
+          void* dst,
+    double alpha,
+    len_t m,
+    len_t n,
+    StreamCtx stream
+);
+EXTERN_C void launch_reduce_ij_j_r32(
+    const void* src,
+          void* dst,
+    double alpha,
+    len_t m,
+    len_t n,
+    StreamCtx stream
+);
+EXTERN_C void launch_reduce_ij_j_r64(
+    const void* src,
+          void* dst,
+    double alpha,
+    len_t m,
+    len_t n,
+    StreamCtx stream
+);
+EXTERN_C void launch_broadcast_i_ij_r16(
+    const void* src,
+          void* dst,
+    double alpha,
+    len_t m,
+    len_t n,
+    StreamCtx stream
+);
+EXTERN_C void launch_broadcast_i_ij_r32(
+    const void* src,
+          void* dst,
+    double alpha,
+    len_t m,
+    len_t n,
+    StreamCtx stream
+);
+EXTERN_C void launch_broadcast_i_ij_r64(
+    const void* src,
+          void* dst,
+    double alpha,
+    len_t m,
+    len_t n,
+    StreamCtx stream
+);
 EXTERN_C void launch_dilate_reverse_r16(
   const void* a,
   double value, 
@@ -228,6 +300,48 @@ EXTERN_C void launch_addition_r64(
   const void* b, 
   void* c, 
   len_t N,
+  StreamCtx stream
+);
+EXTERN_C void launch_broadcast_j_ij_r16(
+  const void* src, 
+        void* dst, 
+  double alpha,
+  len_t m,
+  len_t n,
+  StreamCtx stream
+);
+EXTERN_C void launch_broadcast_j_ij_r32(
+  const void* src, 
+        void* dst, 
+  double alpha,
+  len_t m,
+  len_t n,
+  StreamCtx stream
+);
+EXTERN_C void launch_broadcast_j_ij_r64(
+  const void* src, 
+        void* dst, 
+  double alpha,
+  len_t m,
+  len_t n,
+  StreamCtx stream
+);
+EXTERN_C void launch_copy_r16(
+  const r16* src, 
+        r16* dst, 
+  len_t n,
+  StreamCtx stream
+);
+EXTERN_C void launch_copy_r32(
+  const r32* src, 
+        r32* dst, 
+  len_t n,
+  StreamCtx stream
+);
+EXTERN_C void launch_copy_r64(
+  const r64* src, 
+        r64* dst, 
+  len_t n,
   StreamCtx stream
 );
 EXTERN_C void launch_sequence_r16(

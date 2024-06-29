@@ -3,8 +3,6 @@
 
 #include "tensor_types.h"
 
-#include <stdint.h>
-
 // This must be cast back to a
 // CUstream before using it to
 // launch cuda kernels

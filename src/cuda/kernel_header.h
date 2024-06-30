@@ -3,13 +3,23 @@
 
 #include "tensor_types.h"
 
-// This must be cast back to a
-// CUstream before using it to
-// launch cuda kernels
+// This prevents a weird stack related
+// bug. I assume this is because it prevents
+// the compiler from loading these into
+// 64-bit registers. 
 typedef struct {
-  void* cuda_stream;
-  void* blas_handle;
+  void* ptr;
+  char pad;
+} PaddedPtr;
+
+typedef struct {
+  PaddedPtr cuda_stream;
+  PaddedPtr blas_handle;
 } StreamContext;
+
+// Use context pointers to prevent slicing
+// the StreamContext between registers and
+// the stack. Corrupts Cuda context otherwise.
 
 // generator types
 #define Scalar float
@@ -43,10 +53,11 @@ inline uint64_t nextPow2(uint64_t n) {
 #if defined(__CUDACC__)
 
 inline CUstream get_stream(StreamContext context) {
-  return static_cast<CUstream>(context.cuda_stream);
+  return static_cast<CUstream>(context.cuda_stream.ptr);
 }
+
 inline cublasHandle_t get_handle(StreamContext context) {
-  return static_cast<cublasHandle_t>(context.blas_handle);
+  return static_cast<cublasHandle_t>(context.blas_handle.ptr);
 }
 
 namespace cg = cooperative_groups;

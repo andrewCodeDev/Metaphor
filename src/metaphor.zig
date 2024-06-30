@@ -48,4 +48,7 @@ pub const ops = struct {
     pub const relu = @import("ops/relu.zig").forward;
     pub const reduce = @import("ops/reduce.zig").forward;
     pub const broadcast = @import("ops/broadcast.zig").forward;
+    pub const inner_product = @import("ops/inner_product.zig").forward;
+    pub const inner_product_scaled = @import("ops/inner_product.zig").forward_scaled;
+    pub const permutate = @import("ops/permutate.zig").forward;
 };

@@ -167,9 +167,12 @@ pub fn object_files_argv(
         "--compiler-options",
         config.cuda_include_path,
         config.cuda_library_path,
-        "-lcudart",
         "-lcuda",
-        "-lcublas",
+        "-lcublas_static",
+        "-lculibos",
+        "-lcudart_static",
+        "-lpthread",
+        "-ldl",
     };
     var argv = try std.ArrayListUnmanaged([]const u8).initCapacity(
         allocator,

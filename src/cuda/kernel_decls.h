@@ -185,6 +185,30 @@ EXTERN_C void launch_translate_r64(
   len_t N,
   StreamContext stream
 );
+EXTERN_C void launch_permutate_ij_ji_r16(
+    const void* src,
+          void* dst,
+    double alpha,
+    len_t row,
+    len_t col,
+    StreamContext ctx
+);
+EXTERN_C void launch_permutate_ij_ji_r32(
+    const void* src,
+          void* dst,
+    double alpha,
+    len_t row,
+    len_t col,
+    StreamContext ctx
+);
+EXTERN_C void launch_permutate_ij_ji_r64(
+    const void* src,
+          void* dst,
+    double alpha,
+    len_t row,
+    len_t col,
+    StreamContext ctx
+);
 EXTERN_C void launch_negate_r16(
   const void* a,
         void* b, 
@@ -222,6 +246,33 @@ EXTERN_C void launch_hadamard_reverse_r64(
   const void* b, 
   void* c, 
   len_t N,
+  StreamContext stream
+);
+EXTERN_C void launch_inner_product_ij_jk_ik_r16(
+  const void* a_data,
+  const void* b_data,
+  const double alpha,
+        void* c_data,
+  const double beta,
+  len_t m, len_t n, len_t k,
+  StreamContext stream
+);
+EXTERN_C void launch_inner_product_ij_jk_ik_r32(
+  const void* a_data,
+  const void* b_data,
+  const double alpha,
+        void* c_data,
+  const double beta,
+  len_t m, len_t n, len_t k,
+  StreamContext stream
+);
+EXTERN_C void launch_inner_product_ij_jk_ik_r64(
+  const void* a_data,
+  const void* b_data,
+  const double alpha,
+        void* c_data,
+  const double beta,
+  len_t m, len_t n, len_t k,
   StreamContext stream
 );
 EXTERN_C void launch_hadamard_r16(

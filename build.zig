@@ -138,6 +138,7 @@ fn link_libraries(
     step.linkSystemLibrary("cudart");
     step.linkSystemLibrary("nvrtc");
     step.linkSystemLibrary("dev_utils");
+    step.linkSystemLibrary("cublas");
 
     step.addObjectFile(b.path(mp_kernels));
 

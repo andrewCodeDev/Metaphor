@@ -29,10 +29,6 @@ extern "C" void mpStreamSynchronize(StreamContext stream) {
 extern "C" void mpDeviceSynchronize() {
   CUDA_ASSERT(cudaDeviceSynchronize());
 }
-extern "C" void mpDeinitStream(StreamContext stream) {
-  CUstream _stream = get_stream(stream);
-  CURESULT_ASSERT(cuStreamDestroy(_stream));
-}
 extern "C" void mpInitDevice(uint32_t device_number) {
 
     CURESULT_ASSERT(cuInit(device_number));
@@ -75,6 +71,10 @@ extern "C" StreamContext mpInitStream() {
   cudaStream_t cuda_stream = nullptr;
   cublasHandle_t blas_handle = nullptr;
 
+  // TODO: Add device parameter? This can set devices for creating
+  //       the streams before initializing them.
+  //          ex: cudaSetDevice()
+
   CURESULT_ASSERT(cuStreamCreate(&cuda_stream, CU_STREAM_DEFAULT));
 
   CUBLAS_ASSERT(cublasCreate(&blas_handle));
@@ -82,7 +82,18 @@ extern "C" StreamContext mpInitStream() {
   CUBLAS_ASSERT(cublasSetStream(blas_handle, cuda_stream));
 
   return { 
-    .cuda_stream = reinterpret_cast<void*>(cuda_stream),
-    .blas_handle = reinterpret_cast<void*>(blas_handle)
+    .cuda_stream = { .ptr = reinterpret_cast<void*>(cuda_stream), .pad = 0 },
+    .blas_handle = { .ptr = reinterpret_cast<void*>(blas_handle), .pad = 0 }
   };
+}
+
+extern "C" void mpDeinitStream(StreamContext stream) {
+
+  // TODO: If devices get set, it's probably a good idea to capture
+  //       which device a stream was created on and put that in the
+  //       StreamContext object. Research if it's required to deinit
+  //       streams on the correct device.
+  
+  CUBLAS_ASSERT(cublasDestroy(get_handle(stream)));
+  CURESULT_ASSERT(cuStreamDestroy(get_stream(stream)));
 }

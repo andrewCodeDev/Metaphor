@@ -111,16 +111,16 @@ pub fn copyAndPrintMatrix(name: []const u8, src: anytype, row: usize, col: usize
     const dst = try std.heap.c_allocator.alloc(std.meta.Child(@TypeOf(src)), src.len);
     defer std.heap.c_allocator.free(dst);
 
-    mp.stream.synchronize(stream);
+    mp.stream.sync(stream);
 
-    mp.mem.copyFromDevice(src, dst, stream);
+    mp.util.from_device(src, dst, stream);
 
-    mp.stream.synchronize(stream);
+    mp.stream.sync(stream);
 
     cpuPrintMatrix(name, dst, row, col);
 }
 
-pub fn cpuMatmul(x: anytype, y: @TypeOf(x), z: @TypeOf(x), M: usize, N: usize, K: usize) void {
+pub fn cpuMatmul(x: anytype, y: anytype, z: anytype, M: usize, N: usize, K: usize) void {
     std.debug.assert(x.len == M * N);
     std.debug.assert(y.len == N * K);
     std.debug.assert(z.len == M * K);

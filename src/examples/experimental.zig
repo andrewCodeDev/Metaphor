@@ -1,5 +1,6 @@
 const mp = @import("metaphor");
 const std = @import("std");
+const eu = @import("example_utils.zig");
 
 pub fn main() !void {
 
@@ -18,26 +19,34 @@ pub fn main() !void {
     const x = G.tensor(.{ 
         .class = .wgt,
         .dtype = .r32,
-        .sizes = &.{ 10 }
+        .sizes = &.{ 2, 2 }
     });
 
-    //const y = G.tensor(.{ 
-    //    .class = .wgt,
-    //    .dtype = .r32,
-    //    .sizes = &.{ 10, 10 }
-    //});
+    const y = G.tensor(.{ 
+        .class = .wgt,
+        .dtype = .r32,
+        .sizes = &.{ 3, 2 }
+    });
 
-    mp.algo.fill(x, 1.0);
-    //mp.algo.fill(y, 1.0);
+    mp.algo.sequence(x, 1.0, 1.0);
+    mp.algo.sequence(y, 1.0, 1.0);
 
-    const w = mp.ops.add(x, x);
-    const z = mp.ops.broadcast(w, &.{ 10, 10 }, "i->ij");
+    //const z = mp.ops.permutate(y, "ij->ji");
+    const z = mp.ops.inner_product(x, y, "ij,kj->ik");
 
-    const dx = z.derive(x) orelse unreachable;
+    //std.log.info("sizes - {any}", .{ z.sizes() });
 
-    var x_cpu: [10]f32 = .{ 0.0 } ** 10;
-    mp.util.from_device(dx.data().r32, x_cpu[0..], stream);
-    std.debug.print("\nIt worked.\n{any}\n", .{ x_cpu[0..] });
+    try eu.copyAndPrintMatrix("z", z.data().r32, 2, 3, stream);
+
+    mp.device.check();
+
+    //var xc: [4]f32 = .{ 1, 2, 3, 4 };
+    //var yc: [6]f32 = .{ 1, 3, 5, 2, 4, 6 };
+    //var zc: [6]f32 = undefined;
+
+    //eu.cpuMatmul(xc[0..], yc[0..], zc[0..], 2, 2, 3);
+
+    //eu.cpuPrintMatrix("cpu", zc[0..], 2, 3);
 
     //const ddx = dx.derive(x) orelse {
     //    return std.debug.print("\no derivative\n", .{});

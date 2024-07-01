@@ -62,14 +62,14 @@ fn ij_ji(graph: *Graph, x: Tensor) Tensor {
 
     const key = core.dkey(y);
 
-    core.kernels.permutate_ij_ji[key](
+    core.invoke(core.kernels.permutate_ij_ji, key, .{
         x.data_ptr(),
         y.data_ptr(),
         1.0, // alpha
         xs[0], xs[1],
         y.stream(),
-    );
-    
+    });
+
     return y;
 }
 

@@ -24,13 +24,13 @@ pub fn forward_impl(
 
     const key = core.dkey(z);
 
-    core.kernels.translate[key](
+    core.invoke(core.kernels.translate, key, .{
         x.data_ptr(),
         value,
         z.data_ptr(),
         z.len(),
-        z.stream()
-    );
+        z.stream(),
+    });
 
     if (graph.mode == .train) {
         core.attach_op(@This(), z, &.{ 
@@ -48,13 +48,13 @@ pub fn reverse(args: []const OpDatum) void {
 
     const key = core.dkey(args[0].tensor);
     
-    core.kernels.addition[key](
+    core.invoke(core.kernels.addition, key, .{
         args[2].tensor.grad_ptr(),
         args[0].tensor.grad_ptr(),
         args[0].tensor.grad_ptr(),
         args[0].tensor.len(),
         args[0].tensor.stream(),
-    );
+    });
 }
 
 pub fn derive(args: []const OpDatum, wrt: Tensor) ?OpDatum {

@@ -84,7 +84,7 @@ fn ij_jk_ik(graph: *Graph, x: Tensor, y: Tensor, scale: f64) Tensor {
 
     const key = core.dkey(z);
 
-    core.kernels.inner_product_ij_jk_ik[key](
+    core.invoke(core.kernels.inner_product_ij_jk_ik, key, .{
         x.data_ptr(),
         y.data_ptr(),
         scale, // alpha
@@ -92,7 +92,7 @@ fn ij_jk_ik(graph: *Graph, x: Tensor, y: Tensor, scale: f64) Tensor {
         0.0, // beta
         xs[0], xs[1], ys[1],
         z.stream(),
-    );
+    });
     
     return z;
 }

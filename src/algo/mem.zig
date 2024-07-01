@@ -22,20 +22,20 @@ const Graph = core.Graph;
 // <>--------------------------------------------------------<>
 
 pub fn fill(x: Tensor, value: f64) void {
-    core.kernels.fill[core.dkey(x)](x.data_ptr(), value, x.len(), x.stream());
+    core.invoke(core.kernels.fill, core.dkey(x), .{ x.data_ptr(), value, x.len(), x.stream() });
 }
 
 // <>--------------------------------------------------------<>
 
 pub fn sequence(x: Tensor, init: f64, step: f64) void {    
-    core.kernels.sequence[core.dkey(x)](x.data_ptr(), init, step, x.len(), x.stream());
+    core.invoke(core.kernels.sequence, core.dkey(x), .{ x.data_ptr(), init, step, x.len(), x.stream() });
 }
 
 // <>--------------------------------------------------------<>
 
 pub fn copy(src: Tensor, dst: Tensor) void {
     std.debug.assert(src.dtype() == dst.dtype());
-    core.kernels.copy[core.dkey(dst)](src.data_ptr(), dst.data_ptr(), dst.stream());
+    core.invoke(core.kernels.copy, core.dkey(dst), .{ src.data_ptr(), dst.data_ptr(), src.len(), dst.stream() });
 }
 
 // <>--------------------------------------------------------<>

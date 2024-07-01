@@ -82,8 +82,8 @@ extern "C" StreamContext mpInitStream() {
   CUBLAS_ASSERT(cublasSetStream(blas_handle, cuda_stream));
 
   return { 
-    .cuda_stream = { .ptr = reinterpret_cast<void*>(cuda_stream), .pad = 0 },
-    .blas_handle = { .ptr = reinterpret_cast<void*>(blas_handle), .pad = 0 }
+    .cuda_stream = { .ptr = reinterpret_cast<void*>(cuda_stream) },
+    .blas_handle = { .ptr = reinterpret_cast<void*>(blas_handle) }
   };
 }
 

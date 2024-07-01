@@ -137,7 +137,7 @@ pub const Tensor = struct {
 // to get their dispatch keys
 pub fn dkey(self: Tensor) usize {
     const key: usize = @intFromEnum(self.dtype());
-    std.debug.assert(key < 4);
+    std.debug.assert(key < 3);
     return key;
 }
 

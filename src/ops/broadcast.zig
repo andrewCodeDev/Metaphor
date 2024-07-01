@@ -105,7 +105,15 @@ fn broadcast_i_ij(graph: *Graph, x: Tensor, sizes: []const usize) Tensor {
 
     const key = core.dkey(y);
 
-    core.kernels.broadcast_i_ij[key](x.data_ptr(), y.data_ptr(), 0.0, sizes[0], sizes[1], y.stream());
+    core.invoke(core.kernels.broadcast_i_ij, key, .{
+        x.data_ptr(), 
+        y.data_ptr(), 
+        0.0, // alpha
+        sizes[0],
+        sizes[1], 
+        y.stream()
+    });
+
 
     return y;
 }
@@ -118,7 +126,13 @@ fn broadcast_i_ij_reverse(x: Tensor, y: Tensor) void {
 
     const key = core.dkey(y);
     
-    core.kernels.reduce_ij_i[key](y.grad_ptr(), x.grad_ptr(), 1.0, s[0], s[1], x.stream());
+    core.invoke(core.kernels.reduce_ij_i, key, .{
+        y.grad_ptr(),
+        x.grad_ptr(),
+        1.0, // alpha,
+        s[0], s[1],
+        x.stream()
+    });
 }
 
 // <>--------------------------------------------------------<>
@@ -137,7 +151,14 @@ fn broadcast_j_ij(graph: *Graph, x: Tensor, sizes: []const usize) Tensor {
 
     const key = core.dkey(y);
 
-    core.kernels.broadcast_i_ij[key](x.data_ptr(), y.data_ptr(), 0.0, sizes[0], sizes[1], y.stream());
+    core.invoke(core.kernels.broadcast_i_ij, key, .{
+        x.data_ptr(), 
+        y.data_ptr(), 
+        0.0, // alpha
+        sizes[0],
+        sizes[1], 
+        y.stream()
+    });
 
     return y;
 }
@@ -150,5 +171,11 @@ fn broadcast_j_ij_reverse(x: Tensor, y: Tensor) void {
 
     const key = core.dkey(y);
     
-    core.kernels.reduce_ij_j[key](y.grad_ptr(), x.grad_ptr(), 1.0, s[0], s[1], x.stream());
+    core.invoke(core.kernels.reduce_ij_j, key, .{
+        y.grad_ptr(), 
+        x.grad_ptr(), 
+        1.0, // alpha
+        s[0], s[1],
+        x.stream()
+    });
 }

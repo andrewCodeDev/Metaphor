@@ -16,23 +16,23 @@ pub fn main() !void {
     const G = mp.Graph.init(.{ .stream = stream, .mode = .train });
         defer G.deinit();
 
-    const x = G.tensor(.{ 
-        .class = .wgt,
-        .dtype = .r32,
-        .sizes = &.{ 2, 2 }
-    });
+    //const x = G.tensor(.{ 
+    //    .class = .wgt,
+    //    .dtype = .r32,
+    //    .sizes = &.{ 2, 2 }
+    //});
 
     const y = G.tensor(.{ 
         .class = .wgt,
         .dtype = .r32,
-        .sizes = &.{ 3, 2 }
+        .sizes = &.{ 2, 3 }
     });
 
-    mp.algo.sequence(x, 1.0, 1.0);
     mp.algo.sequence(y, 1.0, 1.0);
+    //mp.algo.sequence(y, 1.0, 1.0);
 
-    //const z = mp.ops.permutate(y, "ij->ji");
-    const z = mp.ops.inner_product(x, y, "ij,kj->ik");
+    const z = mp.ops.permutate(y, "ij->ji");
+    //mp.algo.copy(x, y);
 
     //std.log.info("sizes - {any}", .{ z.sizes() });
 

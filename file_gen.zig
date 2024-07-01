@@ -29,7 +29,7 @@ const OVERLOAD_IMPORT: []const u8 =
     \\
     \\const decls = @import("cimport.zig").C;
     \\
-    \\fn dispatch_array(tuple: anytype) [tuple.len]*const @TypeOf(tuple[0]) { return tuple; }
+    \\fn dispatch_array(comptime _: anytype, comptime tuple: anytype) [tuple.len]@TypeOf(tuple[0]) { return tuple; }
     \\
     \\
 ;
@@ -315,7 +315,7 @@ fn make_kernel_overloads(self: *Self) !void {
         const name_stop = Fluent.init(name).find(.scalar, '.') orelse @panic("Target file does not have extension.");
 
         overloadset_decls = try std.mem.join(self.string_allocator, "", &.{
-            overloadset_decls, "pub const ", name[0..name_stop], " = dispatch_array(.{\n", overloadset_args, "});\n\n"
+            overloadset_decls, "pub const ", name[0..name_stop], " = dispatch_array(opaque{}, .{\n", overloadset_args, "});\n\n"
         });
     }
 

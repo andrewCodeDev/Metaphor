@@ -9,7 +9,6 @@
 // 64-bit registers. 
 typedef struct {
   void* ptr;
-  char pad;
 } PaddedPtr;
 
 typedef struct {

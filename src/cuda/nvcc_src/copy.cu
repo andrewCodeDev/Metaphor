@@ -31,8 +31,8 @@ __global__ void __kernel_copy_Scalar(
 }
 
 extern "C" void launch_copy_Scalar(
-  const Scalar* src, 
-        Scalar* dst, 
+  const void* src, 
+        void* dst, 
   len_t n,
   StreamContext stream
 ) {

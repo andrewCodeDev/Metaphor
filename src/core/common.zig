@@ -39,6 +39,6 @@ pub inline fn invoke(comptime kernels: anytype, key: usize, args: anytype) void 
         0 => @call(.auto, kernels[0], args),
         1 => @call(.auto, kernels[1], args),
         2 => @call(.auto, kernels[2], args),
-        else => unreachable,
+        else => @panic("Invalid runtime key."),
     }
 }

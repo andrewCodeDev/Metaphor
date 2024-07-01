@@ -5,6 +5,8 @@
 // groups and to the primary metaphor.zig file
 //
 
+pub const C = @import("cimport.zig");
+
 // imports non-public graph API
 pub const cg = @import("graph.zig");
 pub const Graph = cg.Graph;
@@ -27,7 +29,7 @@ pub const ArgIterator = cg.ArgIterator;
 pub const OpInterface = cg.OpInterface;
 
 pub const scalar = @import("scalar.zig");
-
 pub const utils = @import("utils.zig");
-
 pub const kernels = @import("kernels.zig");
+
+pub const invoke = @import("common.zig").invoke;

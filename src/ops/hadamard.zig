@@ -36,13 +36,13 @@ pub fn forward_impl(
 
     const key = core.dkey(z);
 
-    core.kernels.hadamard[key](
+    core.invoke(core.kernels.hadamard, key, .{
         x.data_ptr(), 
         y.data_ptr(), 
         z.data_ptr(), 
         z.len(), 
         z.stream(),
-    );        
+    });        
 
     if (graph.mode == .train) {
         core.attach_op(@This(), z, &.{ 
@@ -62,21 +62,21 @@ pub fn reverse(args: []const OpDatum) void {
 
     const key = core.dkey(args[2].tensor);
 
-    core.kernels.hadamard_reverse[key](
+    core.invoke(core.kernels.hadamard_reverse, key, .{
         args[2].tensor.grad_ptr(),
         args[1].tensor.data_ptr(),
         args[0].tensor.grad_ptr(),
         args[0].tensor.len(),
         args[0].tensor.stream(),
-    );
+    });
 
-    core.kernels.hadamard_reverse[key](
+    core.invoke(core.kernels.hadamard_reverse, key, .{
         args[2].tensor.grad_ptr(),
         args[0].tensor.data_ptr(),
         args[1].tensor.grad_ptr(),
         args[1].tensor.len(),
         args[1].tensor.stream(),
-    );
+    });
 }
 
 const dilate = @import("dilate.zig");

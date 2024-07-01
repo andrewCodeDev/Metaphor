@@ -159,10 +159,10 @@ pub fn object_files_argv(
     const comp_tail: []const []const u8 = &.{
         "-O3",
         "-std=c++20",
-        "--allow-unsupported-compiler",
+        //"--allow-unsupported-compiler",
         "--expt-relaxed-constexpr",
-        "-ccbin",
-        config.gcc_bin_path,
+        //"-ccbin",
+        //config.gcc_bin_path,
         config.gpu_architecture,
         "--compiler-options",
         config.cuda_include_path,

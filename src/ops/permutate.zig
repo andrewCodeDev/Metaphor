@@ -16,22 +16,22 @@ pub fn deduce_output(graph: *Graph, x: Tensor, expr: []const u8) Tensor {
     const arrow = com.arrow_position(expr);
 
     const lhs = expr[0..arrow.head];
-    const out = expr[arrow.tail+1..];
+    const rhs = expr[arrow.tail+1..];
     
     std.debug.assert(x.rank() == lhs.len);
     // TODO: this number was picked arbitrarily
-    std.debug.assert(out.len <= 8);
+    std.debug.assert(rhs.len <= 8);
 
     var sizes: [8]usize = undefined;
 
-    for (out, 0..) |o, i| {   
-        for (x.sizes(), lhs) |n, c| { if (o == c) sizes[i] = n; }
+    for (rhs, 0..) |r, i| {   
+        for (x.sizes(), lhs) |n, c| { if (r == c) sizes[i] = n; }
     }
 
     return graph.tensor(.{
         .class = .hid,
         .dtype = x.dtype(),
-        .sizes = sizes[0..out.len],
+        .sizes = sizes[0..rhs.len],
     });
 }
 

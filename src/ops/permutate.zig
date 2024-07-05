@@ -5,17 +5,44 @@ const OpDatum = core.OpDatum;
 const OpInterface = core.OpInterface;
 const Tensor = core.Tensor;
 const Graph = core.Graph;
+const com = @import("common.zig");
 
 pub fn forward(x: Tensor, expr: []const u8) Tensor {
     return forward_impl(x.ptr, x, expr);
 }
 
+pub fn deduce_output(graph: *Graph, x: Tensor, expr: []const u8) Tensor {
+
+    const arrow = com.arrow_position(expr);
+
+    const lhs = expr[0..arrow.head];
+    const out = expr[arrow.tail+1..];
+    
+    std.debug.assert(x.rank() == lhs.len);
+    // TODO: this number was picked arbitrarily
+    std.debug.assert(out.len <= 8);
+
+    var sizes: [8]usize = undefined;
+
+    for (out, 0..) |o, i| {   
+        for (x.sizes(), lhs) |n, c| { if (o == c) sizes[i] = n; }
+    }
+
+    return graph.tensor(.{
+        .class = .hid,
+        .dtype = x.dtype(),
+        .sizes = sizes[0..out.len],
+    });
+}
+
 // enable choice of graph
 pub fn forward_impl(graph: *Graph, x: Tensor, expr: []const u8) Tensor {
 
-    const op = forward_map.get(expr) orelse @panic("Invalid expression for permutate.");
+    const op = permutate_map.get(expr) orelse @panic("Invalid expression for permutate.");
 
-    const y = op(graph, x);
+    const y = deduce_output(graph, x, expr);
+
+    op(graph, core.dkey(x), x.data_ptr(), x.sizes(), 0.0, y.data_ptr());
 
     if (graph.mode == .train) {
         core.attach_op(@This(), y, &.{ 
@@ -28,8 +55,17 @@ pub fn forward_impl(graph: *Graph, x: Tensor, expr: []const u8) Tensor {
     return y;
 }
 
-pub fn reverse(_: []const OpDatum) void {
-    @panic("TODO");
+// the reverse of a permutation is the same perumtation
+pub fn reverse(args: []const OpDatum) void {
+
+    const x = args[0].tensor;
+    const y = args[1].tensor;
+
+    core.enable_gradient(x);
+
+    const op = permutate_map.get(args[2].expr) orelse @panic("Invalid expression for permutate.");
+
+    op(y.ptr, core.dkey(x), y.grad_ptr(), y.sizes(), 1.0, x.grad_ptr());
 }
 
 pub fn derive(_: []const OpDatum, _: Tensor) ?OpDatum {
@@ -39,38 +75,32 @@ pub fn derive(_: []const OpDatum, _: Tensor) ?OpDatum {
 //////////////////////////////
 // Expression to Kernel Map //
 
-const ForwardOp = *const fn (*Graph, Tensor) Tensor;
+const ForwardOp = *const fn (
+    *Graph, 
+    usize, // key
+    ?*anyopaque, []const usize, // x tensor
+    f64, // alpha
+    ?*anyopaque, // output
+) void;
 
-const forward_map = std.StaticStringMap(ForwardOp).initComptime(.{
+const permutate_map = std.StaticStringMap(ForwardOp).initComptime(.{
     .{ "ij->ji", ij_ji },  
 });
 
-
 // <>--------------------------------------------------------<>
 
-fn ij_ji(graph: *Graph, x: Tensor) Tensor {
-
-    const xs = x.sizes();
-
+fn ij_ji(
+    graph: *Graph, 
+    key: usize,
+    xd: ?*anyopaque, xs: []const usize,
+    alpha: f64,
+    yd: ?*anyopaque,
+) void {
     std.debug.assert(xs.len == 2);
 
-    const y = graph.tensor(.{
-        .class = .hid,
-        .dtype = x.dtype(),
-        .sizes = &.{ xs[1], xs[0] },
-    });
-
-    const key = core.dkey(y);
-
     core.invoke(core.kernels.permutate_ij_ji, key, .{
-        x.data_ptr(),
-        y.data_ptr(),
-        1.0, // alpha
-        xs[0], xs[1],
-        y.stream(),
+        xd, yd, alpha, xs[0], xs[1], graph.stream.context,
     });
-
-    return y;
 }
 
 // <>--------------------------------------------------------<>

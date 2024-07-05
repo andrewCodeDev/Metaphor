@@ -16,29 +16,30 @@ pub fn main() !void {
     const G = mp.Graph.init(.{ .stream = stream, .mode = .train });
         defer G.deinit();
 
-    const x = G.tensor(.{ 
+    //const x = G.tensor(.{ 
+    //    .class = .wgt,
+    //    .dtype = .r32,
+    //    .sizes = &.{ 2, 3 }
+    //});
+
+    const y = G.tensor(.{ 
         .class = .wgt,
         .dtype = .r32,
         .sizes = &.{ 2, 3 }
     });
 
-    const y = G.tensor(.{ 
-        .class = .wgt,
-        .dtype = .r32,
-        .sizes = &.{ 2, 2 }
-    });
-
-    mp.algo.sequence(x, 1.0, 1.0);
+    //mp.algo.sequence(x, 1.0, 1.0);
     mp.algo.sequence(y, 1.0, 1.0);
 
-    const z = mp.ops.inner_product(x, y, "ji,jk->ik");
+    //const z = mp.ops.inner_product(x, y, "ji,jk->ik");
+    const z = mp.ops.permutate(y, "ij->ji");
 
     z.reverse(.keep);
 
     //std.log.info("sizes - {any}", .{ z.sizes() });
 
-    eu.copy_and_print_matrix("x", x.grad().?.r32, x.sizes(), stream);
     eu.copy_and_print_matrix("y", y.grad().?.r32, y.sizes(), stream);
+    eu.copy_and_print_matrix("z", z.grad().?.r32, z.sizes(), stream);
 
     mp.device.check();
 

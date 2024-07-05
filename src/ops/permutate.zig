@@ -13,7 +13,7 @@ pub fn forward(x: Tensor, expr: []const u8) Tensor {
 // enable choice of graph
 pub fn forward_impl(graph: *Graph, x: Tensor, expr: []const u8) Tensor {
 
-    const op = forward_map.get(expr) orelse @panic("Invalid expression for reduction.");
+    const op = forward_map.get(expr) orelse @panic("Invalid expression for permutate.");
 
     const y = op(graph, x);
 

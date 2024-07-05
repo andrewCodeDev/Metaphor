@@ -5,7 +5,7 @@ const OpDatum = core.OpDatum;
 const OpInterface = core.OpInterface;
 const Tensor = core.Tensor;
 const Graph = core.Graph;
-const permutate = @import("permutate.zig");
+const com = @import("common.zig");
 
 pub fn forward(x: Tensor, y: Tensor, expr: []const u8) Tensor {
     return forward_scaled(x, y, 1.0, expr);
@@ -14,6 +14,39 @@ pub fn forward(x: Tensor, y: Tensor, expr: []const u8) Tensor {
 // default to lhs-graph
 pub fn forward_scaled(x: Tensor, y: Tensor, scale: f64, expr: []const u8) Tensor {
     return forward_impl(x.ptr, x, y, scale, expr);
+}
+
+pub fn deduce_output(graph: *Graph, x: Tensor, y: Tensor, expr: []const u8) Tensor {
+
+    std.debug.assert(x.dtype() == y.dtype());
+
+    const comma = std.mem.indexOfScalar(u8, expr, ',') orelse unreachable;
+    const arrow = com.arrow_position(expr);
+
+    const lhs = expr[0..comma];
+    const rhs = expr[comma+1..arrow.head];
+    const out = expr[arrow.tail+1..];
+    
+    std.debug.assert(x.rank() == lhs.len);
+    std.debug.assert(y.rank() == rhs.len);
+    // TODO: this number was picked arbitrarily
+    std.debug.assert(out.len <= 8);
+
+    var sizes: [8]usize = undefined;
+
+    for (out, 0..) |o, i| {   
+        for (x.sizes(), lhs) |n, c| { if (o == c) sizes[i] = n; }
+    }
+    
+    for (out, 0..) |o, i| {   
+        for (y.sizes(), rhs) |n, c| { if (o == c) sizes[i] = n; }
+    }
+
+    return graph.tensor(.{
+        .class = .hid,
+        .dtype = x.dtype(),
+        .sizes = sizes[0..out.len],
+    });
 }
 
 // enable choice of graph
@@ -25,27 +58,32 @@ pub fn forward_impl(
     expr: []const u8,
 ) Tensor {
 
-    std.debug.assert(x.dtype() == y.dtype());
+    const z = deduce_output(graph, x, y, expr);
 
-    const op = forward_map.get(expr) orelse @panic("Invalid expression for reduction.");
-
-    const z = op(graph, x, y, scale);
+    get_forward(expr)(
+        graph, core.dkey(x), 
+        x.data_ptr(), x.sizes(), x.len(),
+        y.data_ptr(), y.sizes(), y.len(),
+        scale,
+        z.data_ptr(),
+        0.0,
+    );
 
     if (graph.mode == .train) {
         core.attach_op(@This(), z, &.{ 
             OpDatum{ .tensor = x },
             OpDatum{ .tensor = y },
+            OpDatum{ .tensor = z },
             OpDatum{ .scalar = scale },
             OpDatum{ .expr = expr },
-            OpDatum{ .tensor = z },
         });        
     }
 
     return z;
 }
 
-pub fn reverse(_: []const OpDatum) void {
-    @panic("TODO");
+pub fn reverse(args: []const OpDatum) void {
+    get_reverse(args[4].expr)(args[0].tensor, args[1].tensor, args[2].tensor, args[3].scalar);
 }
 
 pub fn derive(_: []const OpDatum, _: Tensor) ?OpDatum {
@@ -55,66 +93,202 @@ pub fn derive(_: []const OpDatum, _: Tensor) ?OpDatum {
 //////////////////////////////
 // Expression to Kernel Map //
 
-const ForwardOp = *const fn (*Graph, Tensor, Tensor, f64) Tensor;
+// forward ops need to be very generic because we
+// will pass the gradient pointer at different times
+// instead of the data pointer circumstantially
 
-const forward_map = std.StaticStringMap(ForwardOp).initComptime(.{
-    .{ "ij,jk->ik", ij_jk_ik },  
-    .{ "ij,kj->ik", ij_kj_ik },  
+const ForwardOp = *const fn (
+    *Graph, 
+    usize, // key
+    ?*anyopaque, []const usize, usize, // x tensor
+    ?*anyopaque, []const usize, usize, // y tensor
+    f64, // alpha
+    ?*anyopaque, // output
+    f64, // beta
+) void;
+
+const ReverseOp = *const fn (Tensor, Tensor, Tensor, f64) void;
+
+const Pair = struct {
+    fwd: ForwardOp,
+    rev: ReverseOp,
+};
+
+const product_map = std.StaticStringMap(Pair).initComptime(.{
+    .{ "ij,jk->ik", Pair{ .fwd = ij_jk_ik, .rev = ij_jk_ik_reverse } },  
+    .{ "ij,kj->ik", Pair{ .fwd = ij_kj_ik, .rev = ij_kj_ik_reverse } },  
+    .{ "ji,jk->ik", Pair{ .fwd = ji_jk_ik, .rev = ji_jk_ik_reverse } },  
 });
 
+inline fn get_forward(expr: []const u8) ForwardOp {
+    const pair = product_map.get(expr) orelse @panic("Invalid expression for inner product.");
+    return pair.fwd;
+}
+
+inline fn get_reverse(expr: []const u8) ReverseOp {
+    const pair = product_map.get(expr) orelse @panic("Invalid expression for inner product.");
+    return pair.rev;
+}
 
 // <>--------------------------------------------------------<>
 
-fn ij_jk_ik(graph: *Graph, x: Tensor, y: Tensor, scale: f64) Tensor {
-
-    const xs = x.sizes();
-    const ys = y.sizes();
-
-    std.log.info("sizes - {any}", .{ ys });
+fn ij_jk_ik(
+    graph: *Graph, 
+    key: usize,
+    xd: ?*anyopaque, xs: []const usize, _: usize,
+    yd: ?*anyopaque, ys: []const usize, _: usize,
+    alpha: f64,
+    zd: ?*anyopaque,
+    beta: f64,
+) void {
 
     std.debug.assert(xs.len == 2);
     std.debug.assert(ys.len == 2);
     std.debug.assert(xs[1] == ys[0]);
 
-    const z = graph.tensor(.{
-        .class = .hid,
-        .dtype = x.dtype(),
-        .sizes = &.{ xs[0], ys[1] },
+    core.invoke(core.kernels.inner_product_ij_jk_ik, key, .{
+        xd, yd, alpha, zd, beta, xs[0], xs[1], ys[1], graph.stream.context,
     });
+}
 
-    const key = core.dkey(z);
+fn ij_jk_ik_reverse(x: Tensor, y: Tensor, z: Tensor, scale: f64) void {
+
+    core.enable_gradient(x);
+    core.enable_gradient(y);
+
+    // ex: (2,3)(3,4)->(2,4)
+
+    ij_kj_ik( // dx: (2,4)(4,3)->(2,3): G(z).T(y)
+        x.ptr, core.dkey(x),
+        z.grad_ptr().?, z.sizes(), z.len(),
+        y.data_ptr(), y.sizes(), y.len(),
+        scale,
+        x.grad_ptr().?,
+        1.0,
+    );
+
+    ji_jk_ik( // dy: (3,2)(2,4)->(3,4): T(x).G(z)
+        y.ptr, core.dkey(y),
+        x.data_ptr(), x.sizes(), x.len(),
+        z.grad_ptr().?, z.sizes(), z.len(),
+        scale,
+        y.grad_ptr().?,
+        1.0,
+    );
+}
+
+// <>--------------------------------------------------------<>
+    
+fn ij_kj_ik(
+    graph: *Graph,
+    key: usize,
+    xd: ?*anyopaque, xs: []const usize, _: usize,
+    yd: ?*anyopaque, ys: []const usize, yl: usize,
+    alpha: f64,
+    zd: ?*anyopaque,
+    beta: f64,
+) void {
+
+    std.debug.assert(xs.len == 2);
+    std.debug.assert(ys.len == 2);
+    std.debug.assert(xs[1] == ys[1]);
+
+    // get scratch to perform transposition on y
+    const td = graph.stream.get_scratch(@enumFromInt(key), yl);
+
+    // transpose to the scratch memory
+    core.invoke(core.kernels.permutate_ij_ji, key, .{
+        yd, td, 0.0, ys[0], ys[1], graph.stream.context,
+    });
 
     core.invoke(core.kernels.inner_product_ij_jk_ik, key, .{
-        x.data_ptr(),
-        y.data_ptr(),
-        scale, // alpha
-        z.data_ptr(),
-        0.0, // beta
-        xs[0], xs[1], ys[1],
-        z.stream(),
+        xd, td, alpha, zd, beta, xs[0], xs[1], ys[0], graph.stream.context,
     });
+}
+
+fn ij_kj_ik_reverse(x: Tensor, y: Tensor, z: Tensor, scale: f64) void {
+
+    core.enable_gradient(x);
+    core.enable_gradient(y);
+
+    // ex: (2,3)(4,3)->(2,4), 
+
+    // dx: (2,4)(4,3)->(2,3), G(z).y
+    ij_jk_ik(
+        x.ptr, core.dkey(x),
+        z.grad_ptr(), z.sizes(), z.len(),
+        y.data_ptr(), y.sizes(), y.len(),
+        scale,
+        x.grad_ptr(),
+        1.0,
+    );
     
-    return z;
+    // dy: (4,2)(2,3)->(4,3), G(z).y
+    ji_jk_ik(
+        y.ptr, core.dkey(y),
+        z.grad_ptr(), z.sizes(), z.len(),
+        x.data_ptr(), x.sizes(), x.len(),
+        scale,
+        y.grad_ptr(),
+        1.0,
+    );
 }
 
 // <>--------------------------------------------------------<>
-    
-fn ij_kj_ik(graph: *Graph, x: Tensor, y: Tensor, scale: f64) Tensor {
 
-    // TODO: consider making this in situ
-    const t = permutate.forward_impl(graph, y, "ij->ji");
+fn ji_jk_ik(
+    graph: *Graph,
+    key: usize,
+    xd: ?*anyopaque, xs: []const usize, xl: usize,
+    yd: ?*anyopaque, ys: []const usize,  _: usize,
+    alpha: f64,
+    zd: ?*anyopaque,
+    beta: f64,
+) void {
 
-    return ij_jk_ik(graph, x, t, scale);
+    std.debug.assert(xs.len == 2);
+    std.debug.assert(ys.len == 2);
+    std.debug.assert(xs[0] == ys[0]);
+
+    // get scratch to perform transposition
+    const tx = graph.stream.get_scratch(@enumFromInt(key), xl);
+
+    // transpose to the scratch memory
+    core.invoke(core.kernels.permutate_ij_ji, key, .{
+        xd, tx, 0.0, xs[0], xs[1], graph.stream.context,
+    });
+
+    core.invoke(core.kernels.inner_product_ij_jk_ik, key, .{
+        tx, yd, alpha, zd, beta, xs[1], xs[0], ys[1], graph.stream.context,
+    });    
 }
 
-// <>--------------------------------------------------------<>
-    
-fn ji_jk_ik(graph: *Graph, x: Tensor, y: Tensor, scale: f64) Tensor {
+fn ji_jk_ik_reverse(x: Tensor, y: Tensor, z: Tensor, scale: f64) void {
 
-    // TODO: consider making this in situ
-    const t = permutate.forward_impl(graph, x, "ij->ji");
+    core.enable_gradient(x);
+    core.enable_gradient(y);
 
-    return ij_jk_ik(graph, t, y, scale);
+    // ex: (3,2)(3,4)->(2,4)
+
+    // dx: (3,4)(4,2)->(3,2), y.T(G(z))
+    ij_kj_ik(
+        x.ptr, core.dkey(x),
+        y.data_ptr(), y.sizes(), y.len(),
+        z.grad_ptr(), z.sizes(), z.len(),
+        scale,
+        x.grad_ptr(),
+        1.0,
+    );
+
+    // dy: (3,2)(2,4)->(3,4), y.G(x)
+    ij_jk_ik(
+        y.ptr, core.dkey(y),
+        x.data_ptr(), x.sizes(), x.len(),
+        z.grad_ptr(), z.sizes(), z.len(),
+        scale,
+        y.grad_ptr(),
+        1.0,
+    );
 }
 
 // <>--------------------------------------------------------<>

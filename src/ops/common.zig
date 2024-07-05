@@ -34,6 +34,16 @@ pub fn commute(expr: []const u8, infix: []const u8, allocator: std.mem.Allocator
     return dupe;
 }
 
+// assumes expressions as "...->..."
+pub fn arrow_position(expr: []const u8) struct { head: usize, tail: usize }{
+
+    const head: usize = std.mem.indexOfScalar(u8, expr, '-') orelse unreachable;
+
+    std.debug.assert(expr[head + 1] == '>');
+
+    return .{ .head = head, .tail = head + 1 };
+}
+
 pub inline fn invoke(comptime kernels: anytype, key: usize, args: anytype) void {
     switch (key) {
         0 => @call(.auto, kernels[0], args),

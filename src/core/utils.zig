@@ -1,4 +1,5 @@
 const std = @import("std");
+const SC = @import("scalar.zig");
 pub const dev = @import("cimport.zig").C;
 
 pub const StreamContext = dev.StreamContext;
@@ -15,20 +16,26 @@ const StreamEntry = struct {
     // like queues. It's safe if the same queue tries to access its
     // own memory, but dangerous if streams can use other scratch.
 
-    pub fn scratch(self: *StreamEntry, comptime T: type, n: usize) []T {
-        const offset: usize = @sizeOf(T) * n;
+    pub fn get_scratch(self: *StreamEntry, dtype: SC.Tag, n: usize) *anyopaque {
+
+        const byte_size: usize = switch (dtype) {
+            .r16 => @sizeOf(f16),
+            .r32 => @sizeOf(f32),  
+            .r64 => @sizeOf(f64),
+        };
+        
+        const offset: usize = byte_size * n;
 
         // check if we have enough scratch to provide a payload
         if (self.scratch.tail < (self.scratch.head + offset)) {
             if (self.scratch.head != 0)
                 free(@as(*anyopaque, @ptrFromInt(self.scratch.head)), self);
 
-            const slice = alloc(T, n, self);
-            self.scratch.head = @intFromPtr(slice.ptr);
+            const ptr = alloc_raw(byte_size * n, self);
+            self.scratch.head = @intFromPtr(ptr);
             self.scratch.tail = self.scratch.head + offset;
         }
-        const ptr: [*]T = @ptrFromInt(self.scratch.head);
-        return ptr[0..n];
+        return @ptrFromInt(self.scratch.head);
     }
 };
 
@@ -114,9 +121,12 @@ pub fn check_last_error() void {
     dev.mpCheckLastError(); // calls device sync
 }
 
+pub fn alloc_raw(bytes: usize, stream: Stream) *anyopaque {
+    return dev.mpMemAlloc(bytes, stream.context) orelse unreachable;
+}
+
 pub fn alloc(comptime T: type, N: usize, stream: Stream) []T {
-    // std.debug.assert(stream != null);
-    const ptr: *anyopaque = dev.mpMemAlloc(@sizeOf(T) * N, stream.context) orelse unreachable;
+    const ptr: *anyopaque = alloc_raw(@sizeOf(T) * N, stream);
     const out: [*]T = @ptrCast(@alignCast(ptr));
     return out[0..N];
 }

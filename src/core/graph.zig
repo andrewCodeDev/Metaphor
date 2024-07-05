@@ -4,6 +4,7 @@ const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
 const assert = std.debug.assert;
 const kernels = @import("kernels.zig");
+const invoke = @import("root.zig").invoke;
 
 pub const UT = @import("utils.zig");
 pub const SC = @import("scalar.zig");
@@ -92,7 +93,7 @@ pub const Tensor = struct {
             // if a loss hasn't been applied, this will be null
             enable_gradient(self);
             // derivative with respect to self is 1
-            kernels.fill[dkey(self)](self.grad_ptr(), 1.0, self.len(), self.stream());
+            invoke(kernels.fill, dkey(self), .{ self.grad_ptr(), 1.0, self.len(), self.stream() });
         }
         if (self.class != .hid) return;
         
@@ -110,7 +111,7 @@ pub const Tensor = struct {
 
         if (self.same(wrt)) {
             const dx = wrt.ptr.tensor(.{ .class = .hid, .dtype = self.dtype(), .sizes = self.sizes() });
-            kernels.fill[dkey(self)](dx.data_ptr(), 1.0, dx.len(), dx.stream());
+            invoke(kernels.fill, dkey(self), .{ dx.data_ptr(), 1.0, dx.len(), dx.stream() });
             return dx;
         }
 
@@ -122,7 +123,7 @@ pub const Tensor = struct {
 
             if (datum == .scalar) { // constant valued tensor
                 const dx = wrt.ptr.tensor(.{ .class = .hid, .dtype = self.dtype(), .sizes = self.sizes() });
-                kernels.fill[dkey(self)](dx.data_ptr(), datum.scalar, dx.len(), dx.stream());
+                invoke(kernels.fill, dkey(self), .{ dx.data_ptr(), datum.scalar, dx.len(), dx.stream() });
                 return dx;
             }
 

@@ -123,6 +123,29 @@ pub fn copy_and_print_matrix(name: []const u8, src: anytype, sizes: []const usiz
     cpuPrintMatrix(name, dst, sizes[0], sizes[1]);
 }
 
+pub fn copy_and_print_vector(
+    name: []const u8, 
+    src: anytype, 
+    sizes: []const usize,
+    stream: anytype
+) void {
+    std.debug.assert(src.len == sizes[0]);
+    std.debug.assert(sizes.len == 1);
+
+    const dst = std.heap.c_allocator.alloc(std.meta.Child(@TypeOf(src)), src.len) catch
+        @panic("Failed to copy and print the matrix");
+
+    defer std.heap.c_allocator.free(dst);
+
+    mp.stream.sync(stream);
+
+    mp.util.from_device(src, dst, stream);
+
+    mp.stream.sync(stream);
+
+    cpuPrintMatrix(name, dst, sizes[0], 1);
+}
+
 pub fn cpuMatmul(x: anytype, y: anytype, z: anytype, M: usize, N: usize, K: usize) void {
     std.debug.assert(x.len == M * N);
     std.debug.assert(y.len == N * K);

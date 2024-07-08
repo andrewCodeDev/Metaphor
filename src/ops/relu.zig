@@ -14,11 +14,11 @@ pub fn forward_impl(graph: *Graph, x: Tensor) Tensor {
 
     const z = graph.tensor(.{ 
         .class = .hid,
-        .dtype = x.type_tag(),
+        .dtype = x.dtype(),
         .sizes = x.sizes(),
     });
 
-    const key = core.dekey(z);
+    const key = core.dkey(z);
 
     core.invoke(core.kernels.relu, key, .{
         x.data_ptr(),
@@ -40,7 +40,7 @@ pub fn forward_impl(graph: *Graph, x: Tensor) Tensor {
 pub fn reverse(args: []const OpDatum) void {
     core.enable_gradient(args[0].tensor);
 
-    const key = core.dekey(args[1].tensor);
+    const key = core.dkey(args[1].tensor);
     
     core.invoke(core.kernels.relu_reverse, key, .{
         args[0].tensor.data_ptr(),

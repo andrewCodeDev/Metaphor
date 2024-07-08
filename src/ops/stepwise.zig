@@ -12,14 +12,18 @@ pub fn forward(x: Tensor) Tensor {
 
 pub fn forward_impl(graph: *Graph, x: Tensor) Tensor {
 
-    const z = graph.tensor(.{ .class = .hid, .dtype = x.type_tag(), .sizes = x.sizes() });
+    const z = graph.tensor(.{ 
+        .class = .hid, 
+        .dtype = x.dtype(), 
+        .sizes = x.sizes(),
+    });
 
-    core.kernels.stepwise[z.type_id()](
+    core.invoke(core.kernels.stepwise, core.dkey(z), .{
         x.data_ptr(),
         z.data_ptr(),
         z.len(),
-        z.stream()
-    );
+        z.stream(),
+    });
 
     if (graph.mode == .train) {
         core.attach_op(@This(), z, &.{ 
@@ -31,7 +35,7 @@ pub fn forward_impl(graph: *Graph, x: Tensor) Tensor {
     return z;
 }
 
-pub fn reverse(args: []const OpDatum, _: usize) void {
+pub fn reverse(args: []const OpDatum) void {
     core.enable_gradient(args[0].tensor);    
     // TODO: this function only adds zero
 }

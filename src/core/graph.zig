@@ -1,6 +1,6 @@
 const std = @import("std");
 const mem = std.mem;
-const ArrayList = std.ArrayList;
+const ArrayListUnmanaged = std.ArrayListUnmanaged;
 const Allocator = std.mem.Allocator;
 const assert = std.debug.assert;
 const kernels = @import("kernels.zig");
@@ -9,7 +9,7 @@ const invoke = @import("root.zig").invoke;
 pub const UT = @import("utils.zig");
 pub const SC = @import("scalar.zig");
 pub const TC = @import("tensor_components.zig");
-const LaneAllocator = @import("lane_allocator.zig").LaneAllocator;
+const TensorAllocator = @import("tensor_allocator.zig");
 const Stream = UT.Stream;
 const StreamContext = UT.StreamContext;
 const CG = @This();
@@ -17,11 +17,11 @@ const CG = @This();
 const Child = UT.Child;
 
 // for graph save and load functions
-const loadTensorToGraph = @import("tensor_file.zig").loadTensorToGraph;
-const saveTensorFromGraph = @import("tensor_file.zig").saveTensorFromGraph;
+// const loadTensorToGraph = @import("tensor_file.zig").loadTensorToGraph;
+// const saveTensorFromGraph = @import("tensor_file.zig").saveTensorFromGraph;
 
 // implementation declarations
-const SliceUnion = TC.SliceUnion;
+const TensorData = TC.TensorData;
 const Strides = TC.Strides;
 const Sizes = TC.Sizes;
 
@@ -43,65 +43,81 @@ pub const Tensor = struct {
     pub fn same(self: Tensor, other: Tensor) bool {
         return std.meta.eql(self, other);
     }
-    pub fn data(self: Tensor) SliceUnion {
+
+    pub fn data(self: Tensor) TensorData {
         return switch (self.class) {
             .hid => self.ptr.node_block.data.items[self.idx],
             else => self.ptr.leaf_block.data.items[self.idx],
         };
     }
-    pub fn grad(self: Tensor) ?SliceUnion {
+
+    pub fn grad(self: Tensor) ?TensorData {
         return switch (self.class) {
             .hid => self.ptr.node_block.grad.items[self.idx],
             else => self.ptr.leaf_block.grad.items[self.idx],
         };
     }
+
     pub fn data_ptr(self: Tensor) *anyopaque {
-        return self.data().opaque_ptr();
+        return self.data().ptr.raw();
     }
+
     pub fn grad_ptr(self: Tensor) ?*anyopaque {
-        return if (self.grad()) |grd| grd.opaque_ptr() else null;
+        return if (self.grad()) |grd| grd.ptr.raw() else null;
     }
+
+    pub fn dtype(self: Tensor) SC.Tag {
+        return self.data().dtype();
+    }
+
     pub fn sizes(self: Tensor) Sizes {
         return switch (self.class) {
             .hid => self.ptr.node_block.sizes.items[self.idx],
             else => self.ptr.leaf_block.sizes.items[self.idx],
         };
     }
+
     pub fn strides(self: Tensor) Strides {
         return switch (self.class) {
             .hid => self.ptr.node_block.strides.items[self.idx],
             else => self.ptr.leaf_block.strides.items[self.idx],
         };
     }
-    pub fn stream(self: Tensor) StreamContext {
+
+    pub fn stream(self: Tensor) Stream {
+        return self.ptr.stream;
+    }
+
+    pub fn context(self: Tensor) StreamContext {
         return self.ptr.stream.context;
     }
+
     pub fn len(self: Tensor) usize {
-        return self.data().len();
+        return self.data().len;
     }
+
     pub fn rank(self: Tensor) usize {
         return self.sizes().len;
     }
+
     pub fn detach(self: Tensor) void {
         if (self.class == .hid) self.ptr.set_attachment(self.idx, false);
     }
+
     pub fn free(self: Tensor) void {
-        self.ptr.free_raw_tensor(self.data(), self.class, self.idx);
+        self.ptr.free_tensor(self);
     }
+
     pub fn reverse(self: Tensor, cleanup: ReverseCleanup) void {
         if (self.grad() == null) {
             // if a loss hasn't been applied, this will be null
             enable_gradient(self);
             // derivative with respect to self is 1
-            invoke(kernels.fill, dkey(self), .{ self.grad_ptr(), 1.0, self.len(), self.stream() });
+            invoke(kernels.fill, dkey(self), .{ self.grad_ptr(), 1.0, self.len(), self.context() });
         }
         if (self.class != .hid) return;
         
         self.ptr.reverse(self.idx, cleanup);
-    }
-
-    pub fn dtype(self: Tensor) SC.Tag {
-        return self.data().dtype();
     }
 
     pub fn derive(self: Tensor, wrt: Tensor) ?Tensor {
@@ -111,7 +127,7 @@ pub const Tensor = struct {
 
         if (self.same(wrt)) {
             const dx = wrt.ptr.tensor(.{ .class = .hid, .dtype = self.dtype(), .sizes = self.sizes() });
-            invoke(kernels.fill, dkey(self), .{ dx.data_ptr(), 1.0, dx.len(), dx.stream() });
+            invoke(kernels.fill, dkey(self), .{ dx.data_ptr(), 1.0, dx.len(), dx.context() });
             return dx;
         }
 
@@ -123,7 +139,7 @@ pub const Tensor = struct {
 
             if (datum == .scalar) { // constant valued tensor
                 const dx = wrt.ptr.tensor(.{ .class = .hid, .dtype = self.dtype(), .sizes = self.sizes() });
-                invoke(kernels.fill, dkey(self), .{ dx.data_ptr(), datum.scalar, dx.len(), dx.stream() });
+                invoke(kernels.fill, dkey(self), .{ dx.data_ptr(), datum.scalar, dx.len(), dx.context() });
                 return dx;
             }
 
@@ -132,7 +148,55 @@ pub const Tensor = struct {
 
         return null;
     }
+
+    /// returns a tensor to the host that is easy to work with
+    pub fn native(self: Self, comptime T: type, allocator: std.mem.Allocator) NativeTensor(T) {
+
+        const data_slice: []T = allocator.alloc(T, self.len()) 
+            catch @panic("Failed to allocate native data.");
+
+        UT.copy_from_device(self, data_slice, self.stream());
+        
+        const grad_slice: ?[]T = blk: {
+
+            if (self.grad()) |grd| {
+                const grad_slice: []T = allocator.alloc(T, self.len()) 
+                    catch @panic("Failed to allocate native data.");
+
+                UT.copy_from_device_raw(self.dtype(), grd.ptr.raw(), grad_slice, self.len(), self.stream());
+
+                break :blk grad_slice;
+            }
+
+            break :blk null;
+        };
+
+        return NativeTensor(T) {
+            .data = data_slice,
+            .grad = grad_slice,
+            .sizes = self.sizes(),
+            .strides = self.strides(),
+            .class = self.class,
+        };
+    }
 };
+
+pub fn NativeTensor(comptime T: type) type {
+    return struct {
+        const Self = @This();
+        data: []T,
+        grad: ?[]T,
+        sizes: Sizes,
+        strides: Strides,
+        class: TensorClass,
+        pub fn free(self: Self, allocator: std.mem.Allocator) void {
+            // only the tensor values are anchored to this struct
+            allocator.free(self.data);
+
+            if (self.grad) |grd| allocator.free(grd);
+        }
+    };
+}
 
 // non-public api for tensors
 // to get their dispatch keys
@@ -190,44 +254,46 @@ pub const ReverseCleanup = enum { keep, free };
 pub const GraphConfig = struct {
     stream: Stream,
     mode: Mode,
+    // default to c_allocator in graph init
+    allocator: ?std.mem.Allocator = null,
 };
 
 pub const Graph = struct {
 
     const LeafBlock = struct {
-        data: ArrayList(SliceUnion),
-        grad: ArrayList(?SliceUnion),
-        sizes: ArrayList(Sizes),
-        strides: ArrayList(Strides),
-        classes: ArrayList(TensorClass),
+        data: ArrayListUnmanaged(TensorData),
+        grad: ArrayListUnmanaged(?TensorData),
+        sizes: ArrayListUnmanaged(Sizes),
+        strides: ArrayListUnmanaged(Strides),
+        classes: ArrayListUnmanaged(TensorClass),
         pub fn init(allocator: std.mem.Allocator, block_size: usize) !LeafBlock {
             return .{
-                .data = try ArrayList(SliceUnion).initCapacity(allocator, block_size),
-                .grad = try ArrayList(?SliceUnion).initCapacity(allocator, block_size),
-                .sizes = try ArrayList(Sizes).initCapacity(allocator, block_size),
-                .strides = try ArrayList(Strides).initCapacity(allocator, block_size),
-                .classes = try ArrayList(TensorClass).initCapacity(allocator, block_size),
+                .data = try ArrayListUnmanaged(TensorData).initCapacity(allocator, block_size),
+                .grad = try ArrayListUnmanaged(?TensorData).initCapacity(allocator, block_size),
+                .sizes = try ArrayListUnmanaged(Sizes).initCapacity(allocator, block_size),
+                .strides = try ArrayListUnmanaged(Strides).initCapacity(allocator, block_size),
+                .classes = try ArrayListUnmanaged(TensorClass).initCapacity(allocator, block_size),
             };
         }
     };
 
     const NodeBlock = struct {
-        ops: ArrayList(?OpInterface),
-        data: ArrayList(SliceUnion),
-        grad: ArrayList(?SliceUnion),
-        sizes: ArrayList(Sizes),
-        strides: ArrayList(Strides),
-        deps: ArrayList(i32),
-        attached: ArrayList(bool),
+        ops: ArrayListUnmanaged(?OpInterface),
+        data: ArrayListUnmanaged(TensorData),
+        grad: ArrayListUnmanaged(?TensorData),
+        sizes: ArrayListUnmanaged(Sizes),
+        strides: ArrayListUnmanaged(Strides),
+        deps: ArrayListUnmanaged(i32),
+        attached: ArrayListUnmanaged(bool),
         pub fn init(allocator: std.mem.Allocator, block_size: usize) !NodeBlock {
             return .{
-                .ops = try ArrayList(?OpInterface).initCapacity(allocator, block_size),
-                .data = try ArrayList(SliceUnion).initCapacity(allocator, block_size),
-                .grad = try ArrayList(?SliceUnion).initCapacity(allocator, block_size),
-                .sizes = try ArrayList(Sizes).initCapacity(allocator, block_size),
-                .strides = try ArrayList(Strides).initCapacity(allocator, block_size),
-                .deps = try ArrayList(i32).initCapacity(allocator, block_size),
-                .attached = try ArrayList(bool).initCapacity(allocator, block_size),
+                .ops = try ArrayListUnmanaged(?OpInterface).initCapacity(allocator, block_size),
+                .data = try ArrayListUnmanaged(TensorData).initCapacity(allocator, block_size),
+                .grad = try ArrayListUnmanaged(?TensorData).initCapacity(allocator, block_size),
+                .sizes = try ArrayListUnmanaged(Sizes).initCapacity(allocator, block_size),
+                .strides = try ArrayListUnmanaged(Strides).initCapacity(allocator, block_size),
+                .deps = try ArrayListUnmanaged(i32).initCapacity(allocator, block_size),
+                .attached = try ArrayListUnmanaged(bool).initCapacity(allocator, block_size),
             };
         }
     };
@@ -236,7 +302,7 @@ pub const Graph = struct {
     leaf_max: usize,
     leaf_arena: std.heap.ArenaAllocator,
     node_arena: std.heap.ArenaAllocator,
-    tensor_allocator: LaneAllocator,
+    tensor_allocator: TensorAllocator,
     leaf_block: LeafBlock,
     node_block: NodeBlock,
     mode: Mode,
@@ -261,13 +327,17 @@ pub const Graph = struct {
     }
 
     pub fn init(config: GraphConfig) *Graph {
-        const self = std.heap.c_allocator.create(Graph) 
-            catch @panic("Graph.init: Out of Memory");
+
+        // default to c_allocator if user doesn't provide one
+        const allocator = config.allocator orelse std.heap.c_allocator;
+            
+        const self = allocator.create(Graph) catch @panic("Failed to initialize graph.");
+
         self.stream = config.stream;
         self.leaf_max = 0;
         self.node_max = 0;
-        self.leaf_arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
-        self.node_arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
+        self.leaf_arena = std.heap.ArenaAllocator.init(allocator);
+        self.node_arena = std.heap.ArenaAllocator.init(allocator);
         self.leaf_block = self.init_leaf_block();
         self.node_block = self.init_node_block();
         self.tensor_allocator.setup();
@@ -287,7 +357,7 @@ pub const Graph = struct {
         self.leaf_arena.deinit();
 
         // this must always be last
-        std.heap.c_allocator.destroy(self);
+        self.leaf_arena.child_allocator.destroy(self);
     }
 
     const ResetGroup = enum { node, leaf };
@@ -300,13 +370,13 @@ pub const Graph = struct {
         if (group == .leaf) {
             if (component == .grd) {
                 for (self.leaf_block.grad.items, 0..) |opt, i| {
-                    if (opt) |raw| self.free_raw_gradient(raw, .inp, i);
+                    if (opt != null) self.free_gradient(.{ .ptr = self, .idx = i, .class = .inp });
                 }
             }
             if (component == .all) {
                 // frees both data and grad
                 for (self.leaf_block.data.items, 0..) |raw, i| {
-                    if (0 < raw.len()) self.free_raw_tensor(raw, .inp, i);
+                    if (0 < raw.len) self.free_tensor(.{ .ptr = self, .idx = i, .class = .inp });
                 }
                 // keep the max number of leaf_block created
                 self.leaf_max = @max(self.leaf_max, self.leaf_block.data.items.len);
@@ -320,13 +390,13 @@ pub const Graph = struct {
         } else {
             if (component == .grd) {
                 for (self.node_block.grad.items, 0..) |opt, i| {
-                    if (opt) |raw| self.free_raw_gradient(raw, .hid, i);
+                    if (opt != null) self.free_gradient(.{ .ptr = self, .idx = i, .class = .hid });
                     self.node_block.deps.items[i] = 0;
                 }
             }
             if (component == .all) {
                 for (self.node_block.data.items, 0..) |raw, i| {
-                    if (0 < raw.len()) self.free_raw_tensor(raw, .hid, i);
+                    if (0 < raw.len) self.free_tensor(.{ .ptr = self, .idx = i, .class = .hid });
                 }
                 // keep the max number of leaf_block created
                 self.node_max = @max(self.node_max, self.node_block.data.items.len);
@@ -356,27 +426,28 @@ pub const Graph = struct {
     fn tensor_from_components(
         self: *Graph,
         class: TensorClass,
-        data: SliceUnion,
+        data: TensorData,
         sizes: Sizes,
         strides: Sizes,
+        allocator: std.mem.Allocator,
     ) !Tensor {
         std.debug.assert(0 < sizes.len);
         std.debug.assert(0 < strides.len);
 
         if (class == .hid) {
-            try self.node_block.data.append(data);
-            try self.node_block.sizes.append(sizes);
-            try self.node_block.strides.append(strides);
-            try self.node_block.grad.append(null);
-            try self.node_block.deps.append(0);
-            try self.node_block.attached.append(true);
-            try self.node_block.ops.append(null);
+            try self.node_block.data.append(allocator, data);
+            try self.node_block.sizes.append(allocator, sizes);
+            try self.node_block.strides.append(allocator, strides);
+            try self.node_block.grad.append(allocator, null);
+            try self.node_block.deps.append(allocator, 0);
+            try self.node_block.attached.append(allocator, true);
+            try self.node_block.ops.append(allocator, null);
         } else {
-            try self.leaf_block.data.append(data);
-            try self.leaf_block.sizes.append(sizes);
-            try self.leaf_block.strides.append(strides);
-            try self.leaf_block.grad.append(null);
-            try self.leaf_block.classes.append(class);
+            try self.leaf_block.data.append(allocator, data);
+            try self.leaf_block.sizes.append(allocator, sizes);
+            try self.leaf_block.strides.append(allocator, strides);
+            try self.leaf_block.grad.append(allocator, null);
+            try self.leaf_block.classes.append(allocator, class);
         }
 
         const idx = if (class == .hid) 
@@ -407,11 +478,7 @@ pub const Graph = struct {
 
         std.debug.assert(0 < N);
 
-        const data: SliceUnion = switch (dtype) {
-            .r16 => SliceUnion.init(self.tensor_allocator.alloc(SC.r16, N, self.stream)),
-            .r32 => SliceUnion.init(self.tensor_allocator.alloc(SC.r32, N, self.stream)),
-            .r64 => SliceUnion.init(self.tensor_allocator.alloc(SC.r64, N, self.stream)),
-        };
+        const data: TensorData = self.tensor_allocator.alloc(dtype, N, self.stream);
 
         const _sizes = allocator.dupe(usize, sizes) 
             catch @panic("failed to duplicate sizes");
@@ -421,7 +488,7 @@ pub const Graph = struct {
 
         TC.compute_strides(_sizes, strides);
 
-        return self.tensor_from_components(class, data, _sizes, strides) 
+        return self.tensor_from_components(class, data, _sizes, strides, allocator) 
             catch @panic("Failed to add tensor from components.");
     }
 
@@ -450,59 +517,35 @@ pub const Graph = struct {
         );
     }
 
-    fn free_gradient(
-        self: *Graph,
-        class: TensorClass,
-        comptime data_type: type,
-        idx: usize
-    ) void {
+    fn free_gradient(self: *Graph, t: Tensor) void {
 
-        const grad_array = switch (class) {
-            .hid => &self.node_block.grad,
-            else => &self.leaf_block.grad,
+        const grad_slice = switch (t.class) {
+            .hid => self.node_block.grad.items,
+            else => self.leaf_block.grad.items,
         };
 
-        if (grad_array.items[idx]) |grad| {
-            self.tensor_allocator.free(grad.cast(data_type), self.stream);
-            grad_array.items[idx] = null;
+        if (grad_slice[t.idx]) |grd| {
+            self.tensor_allocator.free(grd, self.stream);
+            grad_slice[t.idx] = null;
         }
     }
 
-    // TODO: Consider moving this logic to the allocator instead
-    fn free_raw_gradient(self: *Graph, raw: SliceUnion, class: TensorClass, idx: usize) void {
-        switch (raw) {
-            .r16 => self.free_gradient(class, SC.r16, idx),
-            .r32 => self.free_gradient(class, SC.r32, idx),
-            .r64 => self.free_gradient(class, SC.r64, idx),
-        }
-    }
+    fn free_tensor(self: *Graph, t: Tensor) void {
 
-    fn free_tensor(self: *Graph, class: TensorClass, comptime data_type: type, idx: usize) void {
+        const data = if (t.class == .hid) 
+            &self.node_block.data.items[t.idx] else
+            &self.leaf_block.data.items[t.idx];
 
-        const data = if (class == .hid) 
-            &self.node_block.data.items[idx] else
-            &self.leaf_block.data.items[idx];
-
-        if (data.len() == 0)
+        if (data.len == 0)
             return;
 
-        const field = comptime SC.name(data_type);
+        self.tensor_allocator.free(data.*, self.stream);
 
-        self.tensor_allocator.free(@field(data.*, field), self.stream);
+        data.len = 0;
 
-        @field(data.*, field).len = 0;
-
-        self.free_gradient(class, data_type, idx);
+        self.free_gradient(t);
     }
 
-    // TODO: Consider moving this logic to the allocator instead
-    fn free_raw_tensor(self: *Graph, raw: SliceUnion, class: TensorClass, idx: usize) void {
-        switch (raw) {
-            .r16 => self.free_tensor(class, SC.r16, idx),
-            .r32 => self.free_tensor(class, SC.r32, idx),
-            .r64 => self.free_tensor(class, SC.r64, idx),
-        }
-    }
 
     fn reverse(self: *Graph, idx: usize, cleanup: ReverseCleanup) void {
 
@@ -518,20 +561,24 @@ pub const Graph = struct {
         // for that child, the child is a .hid type (it was computed),
         // and it's attached, then we add it the node stack to be reverse.
 
-        var node_stack = std.ArrayList(usize).initCapacity(self.node_arena.allocator(), idx + 1) 
+        const allocator = self.node_arena.allocator();
+
+        // node stack for tracking which nodes we haven't visited
+        var node_stack = std.ArrayListUnmanaged(usize).initCapacity(allocator, idx + 1) 
             catch @panic("Graph.reverse: Out of Memory.");
 
-        var free_stack: std.ArrayList(usize) = undefined;
+        // track which nodes to free after reversal
+        var free_stack: std.ArrayListUnmanaged(usize) = undefined;
 
         if (cleanup == .free) {
-            free_stack = std.ArrayList(usize).initCapacity(self.node_arena.allocator(), idx + 1) 
+            free_stack = std.ArrayListUnmanaged(usize).initCapacity(allocator, idx + 1) 
                 catch @panic("Graph.reverse: Out of Memory.");
         }
 
         defer {
-            node_stack.deinit();
+            node_stack.deinit(allocator);
             if (cleanup == .free) {
-                free_stack.deinit();
+                free_stack.deinit(allocator);
             }
         }
 
@@ -543,7 +590,7 @@ pub const Graph = struct {
             const op: *OpInterface = &(self.node_block.ops.items[last] orelse continue);
 
             if (cleanup == .free)
-                free_stack.append(last) catch @panic("Failed to append to free stack.");
+                free_stack.append(allocator, last) catch @panic("Failed to append to free stack.");
 
             op.reverse();
 
@@ -561,7 +608,7 @@ pub const Graph = struct {
                     continue;
 
                 if (adjust_deps(arg.tensor, -1) == 0)
-                    node_stack.append(arg.tensor.idx) catch @panic("Failed to append to node stack.");
+                    node_stack.append(allocator, arg.tensor.idx) catch @panic("Failed to append to node stack.");
             }
 
             op.deinit();
@@ -576,82 +623,82 @@ pub const Graph = struct {
             UT.synchronize_stream(self.stream);
 
             for (free_stack.items) |node| {
-                self.free_raw_tensor(self.node_block.data.items[node], .hid, node);
+                self.free_tensor(.{ .ptr = self, .idx = node, .class = .hid });
             }
         }
     }
 
-    pub fn load(self: *Graph, dir: []const u8, prefix: []const u8) void {
+    //pub fn load(self: *Graph, dir: []const u8, prefix: []const u8) void {
 
-        std.debug.assert(self.leaf_block.data.items.len != 0);
+    //    std.debug.assert(self.leaf_block.data.items.len != 0);
 
-        var max_len: usize = 0;
+    //    var max_len: usize = 0;
 
-        for (self.leaf_block.data.items) |u| {
-            max_len = @max(max_len, u.bytes().len);
-        }
+    //    for (self.leaf_block.data.items) |u| {
+    //        max_len = @max(max_len, u.bytes().len);
+    //    }
 
-        const buf = std.heap.c_allocator.alloc(u8, max_len) catch @panic("Failed to allocate cpu buffer");
-        defer std.heap.c_allocator.free(buf);
+    //    const buf = std.heap.c_allocator.alloc(u8, max_len) catch @panic("Failed to allocate cpu buffer");
+    //    defer std.heap.c_allocator.free(buf);
 
-        std.debug.assert(max_len != 0);
+    //    std.debug.assert(max_len != 0);
 
-        // this is more stable than using the direct index
-        // because inputs can come before or after, but
-        // weights usually have fixed positions
-        var wgt_idx: usize = 0;
+    //    // this is more stable than using the direct index
+    //    // because inputs can come before or after, but
+    //    // weights usually have fixed positions
+    //    var wgt_idx: usize = 0;
 
-        for (0..self.leaf_block.data.items.len) |i| {
-            if (self.leaf_block.classes.items[i] == .wgt) {                
+    //    for (0..self.leaf_block.data.items.len) |i| {
+    //        if (self.leaf_block.classes.items[i] == .wgt) {                
 
-                const bytes = self.leaf_block.data.items[i].bytes();
-                
-                // we have uninitialized weights
-                std.debug.assert(bytes.len != 0);
-                
-                loadTensorToGraph(dir, prefix, wgt_idx, bytes, buf[0..bytes.len], self.stream)
-                    catch @panic("Failed to load tensor data.");
+    //            const bytes = self.leaf_block.data.items[i].bytes();
+    //            
+    //            // we have uninitialized weights
+    //            std.debug.assert(bytes.len != 0);
+    //            
+    //            loadTensorToGraph(dir, prefix, wgt_idx, bytes, buf[0..bytes.len], self.stream)
+    //                catch @panic("Failed to load tensor data.");
 
-                wgt_idx += 1;
-            }
-        }
-    }
+    //            wgt_idx += 1;
+    //        }
+    //    }
+    //}
 
-    pub fn save(self: *Graph, dir: []const u8, prefix: []const u8) void {
+    //pub fn save(self: *Graph, dir: []const u8, prefix: []const u8) void {
 
-        std.debug.assert(self.leaf_block.data.items.len != 0);
+    //    std.debug.assert(self.leaf_block.data.items.len != 0);
 
-        var max_len: usize = 0;
+    //    var max_len: usize = 0;
 
-        for (self.leaf_block.data.items) |u| {
-            max_len = @max(max_len, u.bytes().len);
-        }
+    //    for (self.leaf_block.data.items) |u| {
+    //        max_len = @max(max_len, u.bytes().len);
+    //    }
 
-        std.debug.assert(max_len != 0);
+    //    std.debug.assert(max_len != 0);
 
-        // this is more stable than using the direct index
-        // because inputs can come before or after, but
-        // weights usually have fixed positions
-        var wgt_idx: usize = 0;
+    //    // this is more stable than using the direct index
+    //    // because inputs can come before or after, but
+    //    // weights usually have fixed positions
+    //    var wgt_idx: usize = 0;
 
-        const buf = std.heap.c_allocator.alloc(u8, max_len) catch @panic("Failed to allocate cpu buffer");
-        defer std.heap.c_allocator.free(buf);
+    //    const buf = std.heap.c_allocator.alloc(u8, max_len) catch @panic("Failed to allocate cpu buffer");
+    //    defer std.heap.c_allocator.free(buf);
 
-        for (0..self.leaf_block.data.items.len) |i| {
-            if (self.leaf_block.classes.items[i] == .wgt) {                
+    //    for (0..self.leaf_block.data.items.len) |i| {
+    //        if (self.leaf_block.classes.items[i] == .wgt) {                
 
-                const bytes = self.leaf_block.data.items[i].bytes();
-                
-                // we have uninitialized weights
-                std.debug.assert(bytes.len != 0);
-                
-                saveTensorFromGraph(dir, prefix, wgt_idx, bytes, buf[0..bytes.len], self.stream)
-                    catch @panic("Failed to save tensor data.");
+    //            const bytes = self.leaf_block.data.items[i].bytes();
+    //            
+    //            // we have uninitialized weights
+    //            std.debug.assert(bytes.len != 0);
+    //            
+    //            saveTensorFromGraph(dir, prefix, wgt_idx, bytes, buf[0..bytes.len], self.stream)
+    //                catch @panic("Failed to save tensor data.");
 
-                wgt_idx += 1;
-            }
-        }
-    }
+    //            wgt_idx += 1;
+    //        }
+    //    }
+    //}
 };
 
 ////////////////////////////////
@@ -660,17 +707,15 @@ pub const Graph = struct {
 
 pub fn enable_gradient(t: Tensor) void {
     const self = t.ptr;
+
     const grad_array = if (t.class == .hid) 
         &self.node_block.grad else 
         &self.leaf_block.grad;
-    const grad = &grad_array.items[t.idx];
-    if (grad.* == null) {
-        const size = t.len();
-        grad.* = switch (t.dtype()) {
-            .r16 => SliceUnion.init(self.tensor_allocator.alloc(SC.r16, size, self.stream)),
-            .r32 => SliceUnion.init(self.tensor_allocator.alloc(SC.r32, size, self.stream)),
-            .r64 => SliceUnion.init(self.tensor_allocator.alloc(SC.r64, size, self.stream)),
-        };
+
+    const grd = &grad_array.items[t.idx];
+
+    if (grd.* == null) {
+        grd.* = self.tensor_allocator.alloc(t.dtype(), t.len(), self.stream);
     } 
 }
 

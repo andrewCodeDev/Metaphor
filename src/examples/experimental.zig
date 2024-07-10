@@ -35,10 +35,18 @@ pub fn main() !void {
 
     z.reverse(.keep);
 
-    eu.copy_and_print_vector("z", z.data().r32, z.sizes(), stream);
+    const xn = x.native(f32, std.heap.c_allocator);
+        defer xn.free(std.heap.c_allocator);
 
-    eu.copy_and_print_matrix("x", x.grad().?.r32, x.sizes(), stream);
-    eu.copy_and_print_vector("y", y.grad().?.r32, y.sizes(), stream);
+    const yn = y.native(f32, std.heap.c_allocator);
+        defer yn.free(std.heap.c_allocator);
+
+    const zn = z.native(f32, std.heap.c_allocator);
+        defer zn.free(std.heap.c_allocator);
+
+    eu.print_vector("z", zn.data, zn.sizes);
+    eu.print_matrix("x", xn.grad.?, xn.sizes);
+    eu.print_vector("y", yn.grad.?, yn.sizes);
 
     mp.device.check();
 

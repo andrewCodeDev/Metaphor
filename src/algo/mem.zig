@@ -22,20 +22,20 @@ const Graph = core.Graph;
 // <>--------------------------------------------------------<>
 
 pub fn fill(x: Tensor, value: f64) void {
-    core.invoke(core.kernels.fill, core.dkey(x), .{ x.data_ptr(), value, x.len(), x.stream() });
+    core.invoke(core.kernels.fill, core.dkey(x), .{ x.data_ptr(), value, x.len(), x.context() });
 }
 
 // <>--------------------------------------------------------<>
 
 pub fn sequence(x: Tensor, init: f64, step: f64) void {    
-    core.invoke(core.kernels.sequence, core.dkey(x), .{ x.data_ptr(), init, step, x.len(), x.stream() });
+    core.invoke(core.kernels.sequence, core.dkey(x), .{ x.data_ptr(), init, step, x.len(), x.context() });
 }
 
 // <>--------------------------------------------------------<>
 
 pub fn copy(src: Tensor, dst: Tensor) void {
     std.debug.assert(src.dtype() == dst.dtype());
-    core.invoke(core.kernels.copy, core.dkey(dst), .{ src.data_ptr(), dst.data_ptr(), src.len(), dst.stream() });
+    core.invoke(core.kernels.copy, core.dkey(dst), .{ src.data_ptr(), dst.data_ptr(), src.len(), dst.context() });
 }
 
 // <>--------------------------------------------------------<>
@@ -70,7 +70,7 @@ pub fn copy(src: Tensor, dst: Tensor) void {
 //}
 //
 //pub fn randomize(dst: anytype, mode: RandomizeMode) void {
-//    randomizeSlice(Child(@TypeOf(dst)), dst.values(), mode, dst.stream());
+//    randomizeSlice(Child(@TypeOf(dst)), dst.values(), mode, dst.context());
 //}
 
 // <> -------------------------------------------------------------- <>

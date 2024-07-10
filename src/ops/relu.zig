@@ -24,7 +24,7 @@ pub fn forward_impl(graph: *Graph, x: Tensor) Tensor {
         x.data_ptr(),
         z.data_ptr(),
         z.len(),
-        z.stream(),
+        z.context(),
     });
 
     if (graph.mode == .train) {
@@ -47,7 +47,7 @@ pub fn reverse(args: []const OpDatum) void {
         args[0].tensor.grad_ptr(),
         args[1].tensor.grad_ptr(),
         args[0].tensor.len(),
-        args[0].tensor.stream(),
+        args[0].tensor.context(),
     });
 }
 

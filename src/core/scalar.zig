@@ -48,10 +48,19 @@ pub const Tag = enum(u2) {
     }
     pub fn as_tag(comptime T: type) Tag {
         return switch (T) {
+               f16 => .r16,
             SC.r16 => .r16,
             SC.r32 => .r32,
             SC.r64 => .r64,
             else => @compileError("Invalid type for asTag: " ++ @typeName(T)),
+        };
+    }
+
+    pub inline fn size(self: Tag) usize {
+        return switch (self) {
+            .r16 => @sizeOf(f16),
+            .r32 => @sizeOf(f32),
+            .r64 => @sizeOf(f64),            
         };
     }
 };

@@ -63,7 +63,7 @@ pub fn derive(args: []const OpDatum, wrt: Tensor) ?OpDatum {
 
         const key = core.dkey(u);
 
-        core.kernels.fill[key](u.data_ptr(), dx.scalar, u.len(), u.stream());
+        core.kernels.fill[key](u.data_ptr(), dx.scalar, u.len(), u.context());
 
         return OpDatum{ .tensor = u };
     }
@@ -112,7 +112,7 @@ fn reduce_ij_i(graph: *Graph, x: Tensor) Tensor {
         y.data_ptr(), 
         0.0, // alpha,
         s[0], s[1],
-        y.stream(),
+        y.context(),
     });
 
     return y;
@@ -131,7 +131,7 @@ fn reduce_ij_i_reverse(x: Tensor, y: Tensor) void {
         x.grad_ptr(), 
         1.0, // alpha,
         s[0], s[1],
-        x.stream(),
+        x.context(),
     });
 }
 
@@ -156,7 +156,7 @@ fn reduce_ij_j(graph: *Graph, x: Tensor) Tensor {
         y.data_ptr(), 
         0.0, // alpha,
         s[0], s[1],
-        y.stream()
+        y.context()
     });
 
     return y;
@@ -175,6 +175,6 @@ fn reduce_ij_j_reverse(x: Tensor, y: Tensor) void {
         x.grad_ptr(),
         1.0, // alpha,
         s[0], s[1],
-        x.stream(),
+        x.context(),
     });
 }

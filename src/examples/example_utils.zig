@@ -1,100 +1,100 @@
 const std = @import("std");
 const mp = @import("metaphor");
 
-pub fn copyAndPrintFlat(name: []const u8, src: anytype, stream: anytype) !void {
-    const dst = try std.heap.c_allocator.alloc(std.meta.Child(@TypeOf(src)), src.len);
-    defer std.heap.c_allocator.free(dst);
+//pub fn copyAndPrintFlat(name: []const u8, src: anytype, stream: anytype) !void {
+//    const dst = try std.heap.c_allocator.alloc(std.meta.Child(@TypeOf(src)), src.len);
+//    defer std.heap.c_allocator.free(dst);
+//
+//    mp.stream.synchronize(stream);
+//
+//    mp.mem.copyFromDevice(src, dst, stream);
+//
+//    mp.stream.synchronize(stream);
+//
+//    std.debug.print("\n{s}: {any} ", .{ name, dst });
+//}
+//
+//pub fn copyAndPrintKeyValues(src: anytype, keys: []mp.types.Key, stream: anytype) !void {
+//    std.debug.assert(src.len == keys.len);
+//    
+//    const cpu_src = try std.heap.c_allocator.alloc(std.meta.Child(@TypeOf(src)), keys.len);
+//    defer std.heap.c_allocator.free(cpu_src);
+//
+//    const cpu_keys = try std.heap.c_allocator.alloc(mp.types.Key, keys.len);
+//    defer std.heap.c_allocator.free(cpu_keys);
+//
+//    mp.stream.synchronize(stream);
+//
+//    mp.mem.copyFromDevice(keys, cpu_keys, stream);
+//    mp.mem.copyFromDevice(src, cpu_src, stream);
+//
+//    mp.stream.synchronize(stream);
+//
+//    for (cpu_keys) |k| {
+//        std.debug.print("{}: {d:.4}\n", .{ k, mp.scalar.as(f32, cpu_src[k]) });
+//    }
+//}
+//
+//pub fn copyAndPrintKey(keys: []mp.types.Key, stream: anytype) !void {
+//    
+//    const cpu_keys = try std.heap.c_allocator.alloc(mp.types.Key, keys.len);
+//    defer std.heap.c_allocator.free(cpu_keys);
+//
+//    mp.stream.synchronize(stream);
+//
+//    mp.mem.copyFromDevice(keys, cpu_keys, stream);
+//
+//    mp.stream.synchronize(stream);
+//
+//    for (cpu_keys) |k| {
+//        std.debug.print("{}\n", .{ k });
+//    }
+//}
+//
+//pub fn copyAndValidateKeys(src: anytype, keys: []mp.types.Key, stream: anytype) !void {
+//    std.debug.assert(src.len == keys.len);
+//    
+//    const cpu_src = try std.heap.c_allocator.alloc(std.meta.Child(@TypeOf(src)), keys.len);
+//    defer std.heap.c_allocator.free(cpu_src);
+//
+//    const cpu_keys = try std.heap.c_allocator.alloc(mp.types.Key, keys.len);
+//    defer std.heap.c_allocator.free(cpu_keys);
+//
+//    mp.stream.synchronize(stream);
+//
+//    mp.mem.copyFromDevice(keys, cpu_keys, stream);
+//    mp.mem.copyFromDevice(src, cpu_src, stream);
+//
+//    mp.stream.synchronize(stream);
+//
+//    var last: f32 = -std.math.inf(f32);
+//    for (cpu_keys) |k| {
+//        std.debug.assert(cpu_src[k] >= last);
+//        last = cpu_src[k];
+//    }
+//}
+//
+//pub fn copyToCPU(src: anytype, stream: anytype) ![]std.meta.Child(@TypeOf(src)) {
+//    const dst = try std.heap.c_allocator.alloc(std.meta.Child(@TypeOf(src)), src.len);
+//
+//    mp.stream.synchronize(stream);
+//
+//    mp.mem.copyFromDevice(src, dst, stream);
+//
+//    mp.stream.synchronize(stream);
+//
+//    return dst;
+//}
+//
+//pub fn freeCPU(src: anytype) void {
+//    std.heap.c_allocator.free(src);
+//}
+//
+//pub fn allocCPU(comptime T: type, N: usize) ![]T {
+//    return try std.heap.c_allocator.alloc(T, N);
+//}
 
-    mp.stream.synchronize(stream);
-
-    mp.mem.copyFromDevice(src, dst, stream);
-
-    mp.stream.synchronize(stream);
-
-    std.debug.print("\n{s}: {any} ", .{ name, dst });
-}
-
-pub fn copyAndPrintKeyValues(src: anytype, keys: []mp.types.Key, stream: anytype) !void {
-    std.debug.assert(src.len == keys.len);
-    
-    const cpu_src = try std.heap.c_allocator.alloc(std.meta.Child(@TypeOf(src)), keys.len);
-    defer std.heap.c_allocator.free(cpu_src);
-
-    const cpu_keys = try std.heap.c_allocator.alloc(mp.types.Key, keys.len);
-    defer std.heap.c_allocator.free(cpu_keys);
-
-    mp.stream.synchronize(stream);
-
-    mp.mem.copyFromDevice(keys, cpu_keys, stream);
-    mp.mem.copyFromDevice(src, cpu_src, stream);
-
-    mp.stream.synchronize(stream);
-
-    for (cpu_keys) |k| {
-        std.debug.print("{}: {d:.4}\n", .{ k, mp.scalar.as(f32, cpu_src[k]) });
-    }
-}
-
-pub fn copyAndPrintKey(keys: []mp.types.Key, stream: anytype) !void {
-    
-    const cpu_keys = try std.heap.c_allocator.alloc(mp.types.Key, keys.len);
-    defer std.heap.c_allocator.free(cpu_keys);
-
-    mp.stream.synchronize(stream);
-
-    mp.mem.copyFromDevice(keys, cpu_keys, stream);
-
-    mp.stream.synchronize(stream);
-
-    for (cpu_keys) |k| {
-        std.debug.print("{}\n", .{ k });
-    }
-}
-
-pub fn copyAndValidateKeys(src: anytype, keys: []mp.types.Key, stream: anytype) !void {
-    std.debug.assert(src.len == keys.len);
-    
-    const cpu_src = try std.heap.c_allocator.alloc(std.meta.Child(@TypeOf(src)), keys.len);
-    defer std.heap.c_allocator.free(cpu_src);
-
-    const cpu_keys = try std.heap.c_allocator.alloc(mp.types.Key, keys.len);
-    defer std.heap.c_allocator.free(cpu_keys);
-
-    mp.stream.synchronize(stream);
-
-    mp.mem.copyFromDevice(keys, cpu_keys, stream);
-    mp.mem.copyFromDevice(src, cpu_src, stream);
-
-    mp.stream.synchronize(stream);
-
-    var last: f32 = -std.math.inf(f32);
-    for (cpu_keys) |k| {
-        std.debug.assert(cpu_src[k] >= last);
-        last = cpu_src[k];
-    }
-}
-
-pub fn copyToCPU(src: anytype, stream: anytype) ![]std.meta.Child(@TypeOf(src)) {
-    const dst = try std.heap.c_allocator.alloc(std.meta.Child(@TypeOf(src)), src.len);
-
-    mp.stream.synchronize(stream);
-
-    mp.mem.copyFromDevice(src, dst, stream);
-
-    mp.stream.synchronize(stream);
-
-    return dst;
-}
-
-pub fn freeCPU(src: anytype) void {
-    std.heap.c_allocator.free(src);
-}
-
-pub fn allocCPU(comptime T: type, N: usize) ![]T {
-    return try std.heap.c_allocator.alloc(T, N);
-}
-
-pub fn cpuPrintMatrix(name: []const u8, src: anytype, row: usize, col: usize) void {
+fn cpu_print_matrix(name: []const u8, src: anytype, row: usize, col: usize) void {
     std.debug.print("\nName: {s}:\n", .{name});
 
     for (0..row) |i| {
@@ -105,45 +105,20 @@ pub fn cpuPrintMatrix(name: []const u8, src: anytype, row: usize, col: usize) vo
     }
 }
 
-pub fn copy_and_print_matrix(name: []const u8, src: anytype, sizes: []const usize, stream: anytype) void {
+pub fn print_matrix(name: []const u8, src: anytype, sizes: []const usize) void {
     std.debug.assert(src.len == sizes[0] * sizes[1]);
     std.debug.assert(sizes.len == 2);
-
-    const dst = std.heap.c_allocator.alloc(std.meta.Child(@TypeOf(src)), src.len) catch
-        @panic("Failed to copy and print the matrix");
-
-    defer std.heap.c_allocator.free(dst);
-
-    mp.stream.sync(stream);
-
-    mp.util.from_device(src, dst, stream);
-
-    mp.stream.sync(stream);
-
-    cpuPrintMatrix(name, dst, sizes[0], sizes[1]);
+    cpu_print_matrix(name, src, sizes[0], sizes[1]);
 }
 
-pub fn copy_and_print_vector(
+pub fn print_vector(
     name: []const u8, 
     src: anytype, 
     sizes: []const usize,
-    stream: anytype
 ) void {
     std.debug.assert(src.len == sizes[0]);
     std.debug.assert(sizes.len == 1);
-
-    const dst = std.heap.c_allocator.alloc(std.meta.Child(@TypeOf(src)), src.len) catch
-        @panic("Failed to copy and print the matrix");
-
-    defer std.heap.c_allocator.free(dst);
-
-    mp.stream.sync(stream);
-
-    mp.util.from_device(src, dst, stream);
-
-    mp.stream.sync(stream);
-
-    cpuPrintMatrix(name, dst, sizes[0], 1);
+    cpu_print_matrix(name, src, sizes[0], 1);
 }
 
 pub fn cpuMatmul(x: anytype, y: anytype, z: anytype, M: usize, N: usize, K: usize) void {

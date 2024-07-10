@@ -7,49 +7,45 @@ pub const IndexType = usize;
 pub const Sizes = []const SizeType;
 pub const Strides = []const SizeType;
 
-pub const SliceUnion = union(SC.Tag) {
-    r16: []SC.r16,
-    r32: []SC.r32,
-    r64: []SC.r64,
+// Tensor pointer is opaque until casted to the
+// correct type by the calling kernel. These
+// are not meant to be accessed by the user
+// as device memory space will cause segfaults
+// if access is attempted on the host side
+pub const TensorPtr = union(SC.Tag) {
+    r16: *anyopaque,
+    r32: *anyopaque,
+    r64: *anyopaque,
 
-    pub fn init(slice: anytype) SliceUnion {
-        return switch (std.meta.Child(@TypeOf(slice))) {
-            SC.r16 => .{ .r16 = slice },
-            SC.r32 => .{ .r32 = slice },
-            SC.r64 => .{ .r64 = slice },
-            else => @compileError("Invalid Type for SliceUnion."),
-        };
-    }
-
-    pub fn len(self: SliceUnion) SizeType {
+    // useful for freeing data
+    pub fn raw(self: TensorPtr) *anyopaque {
         return switch (self) {
-            inline else => |x| x.len,
+            inline else => |p| p,  
         };
-    }
-
-    pub fn opaque_ptr(self: anytype) *anyopaque {
-        return switch (self.*) {
-            inline else => |x| @ptrCast(x.ptr),
-        };
-    }
-
-    pub fn bytes(self: anytype) []u8 {
-        return switch(self.*) {
-            .r16 => std.mem.sliceAsBytes(self.r16),
-            .r32 => std.mem.sliceAsBytes(self.r32),
-            .r64 => std.mem.sliceAsBytes(self.r64),
-        };
-    }
-
-    pub fn dtype(self: SliceUnion) SC.Tag {
-        return @as(SC.Tag, self); 
-    }
-
-    pub inline fn cast(self: SliceUnion, comptime T: type) []T {
-        return @field(self, SC.name(T));
     }
 };
 
+// Similar to a slice with opaque data and
+// runtime type information.
+pub const TensorData = struct {
+    ptr: TensorPtr,
+    len: SizeType,
+
+    pub fn init(tag: SC.Tag, raw: *anyopaque, len: SizeType) TensorData {
+        return .{
+            .ptr = switch (tag) {
+                .r16 => TensorPtr{ .r16 = raw }, 
+                .r32 => TensorPtr{ .r32 = raw }, 
+                .r64 => TensorPtr{ .r64 = raw }, 
+            },
+            .len = len,
+        };
+    }
+
+    pub inline fn dtype(self: TensorData) SC.Tag {
+        return @as(SC.Tag, self.ptr);
+    }
+};
 
 pub fn compute_strides(sizes: Sizes, strides: []SizeType) void {
     std.debug.assert(sizes.len == strides.len);

@@ -61,7 +61,7 @@ pub fn derive(args: []const OpDatum, wrt: Tensor) ?OpDatum {
 
         const factor: f64 = @floatFromInt(args[1].tensor.len() / args[0].tensor.len());
 
-        core.kernels.fill[key](u.data_ptr(), dx.scalar * factor, u.len(), u.stream());
+        core.kernels.fill[key](u.data_ptr(), dx.scalar * factor, u.len(), u.context());
 
         return OpDatum{ .tensor = u };
     }
@@ -111,7 +111,7 @@ fn broadcast_i_ij(graph: *Graph, x: Tensor, sizes: []const usize) Tensor {
         0.0, // alpha
         sizes[0],
         sizes[1], 
-        y.stream()
+        y.context()
     });
 
 
@@ -131,7 +131,7 @@ fn broadcast_i_ij_reverse(x: Tensor, y: Tensor) void {
         x.grad_ptr(),
         1.0, // alpha,
         s[0], s[1],
-        x.stream()
+        x.context()
     });
 }
 
@@ -157,7 +157,7 @@ fn broadcast_j_ij(graph: *Graph, x: Tensor, sizes: []const usize) Tensor {
         0.0, // alpha
         sizes[0],
         sizes[1], 
-        y.stream()
+        y.context()
     });
 
     return y;
@@ -176,6 +176,6 @@ fn broadcast_j_ij_reverse(x: Tensor, y: Tensor) void {
         x.grad_ptr(), 
         1.0, // alpha
         s[0], s[1],
-        x.stream()
+        x.context()
     });
 }

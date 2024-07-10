@@ -22,7 +22,7 @@ pub fn forward_impl(graph: *Graph, x: Tensor) Tensor {
         x.data_ptr(),
         z.data_ptr(),
         z.len(),
-        z.stream(),
+        z.context(),
     });
 
     if (graph.mode == .train) {

@@ -1,5 +1,6 @@
 const std = @import("std");
 const SC = @import("scalar.zig");
+const Tensor = @import("graph.zig").Tensor;
 pub const dev = @import("cimport.zig").C;
 
 pub const StreamContext = dev.StreamContext;
@@ -18,11 +19,7 @@ const StreamEntry = struct {
 
     pub fn get_scratch(self: *StreamEntry, dtype: SC.Tag, n: usize) *anyopaque {
 
-        const byte_size: usize = switch (dtype) {
-            .r16 => @sizeOf(f16),
-            .r32 => @sizeOf(f32),  
-            .r64 => @sizeOf(f64),
-        };
+        const byte_size = dtype.size();
         
         const offset: usize = byte_size * n;
 
@@ -79,7 +76,11 @@ pub fn init_stream() Stream {
 
     for (0..16) |i| {
         if (stream_array[i] == null) {
-            stream_array[i] = .{ .ID = i, .context = dev.mpInitStream(), .scratch = .{ .head = 0, .tail = 0 } };
+            stream_array[i] = .{ 
+                .ID = i,
+                .context = dev.mpInitStream(),
+                .scratch = .{ .head = 0, .tail = 0 },
+            };
             return &(stream_array[i].?);
         }
     }
@@ -122,7 +123,10 @@ pub fn check_last_error() void {
 }
 
 pub fn alloc_raw(bytes: usize, stream: Stream) *anyopaque {
-    return dev.mpMemAlloc(bytes, stream.context) orelse unreachable;
+    return dev.mpMemAlloc(bytes, stream.context) orelse {
+        check_last_error();
+        @panic("Failed to allocate memory.");
+    };
 }
 
 pub fn alloc(comptime T: type, N: usize, stream: Stream) []T {
@@ -133,40 +137,84 @@ pub fn alloc(comptime T: type, N: usize, stream: Stream) []T {
 
 pub fn create(comptime T: type, stream: Stream) [*]T {
     //std.debug.assert(stream != null);
-    const ptr: *anyopaque = dev.mpMemAlloc(@sizeOf(T), stream.context) orelse unreachable;
+    const ptr: *anyopaque = dev.mpMemAlloc(@sizeOf(T), stream.context) orelse {
+        check_last_error();
+        @panic("Failed to create memory.");
+    };
     return @ptrCast(@alignCast(ptr));
 }
 
-pub fn copy_to_device(src: anytype, dst: NonConstPtr(@TypeOf(src)), stream: Stream) void {
+pub fn copy_to_device_raw(
+    dtype: SC.Tag,
+    src: anytype, 
+    dst: *anyopaque,
+    len: usize,
+    stream: Stream
+) void {
     // std.debug.assert(stream != null);
     switch (@typeInfo(@TypeOf(src))) {
         .Pointer => |p| {
             const T = p.child;
+
+            if (dtype != SC.Tag.as_tag(T)) {
+                @panic("Mismatched types for copying to the device.");
+            }
             if (p.size == .Slice) {
-                std.debug.assert(src.len == dst.len);
-                dev.mpMemcpyHtoD(dst.ptr, src.ptr, src.len * @sizeOf(T), stream.context);
+                std.debug.assert(len == src.len);
+                dev.mpMemcpyHtoD(dst, src.ptr, len * @sizeOf(T), stream.context);
             } else {
+                std.debug.assert(len == 1);
                 dev.mpMemcpyHtoD(dst, src, @sizeOf(T), stream.context);
             }
         },
-        else => @compileError("Invalid type for CopyTo: " ++ @typeName(@TypeOf(src))),
+        else => @compileError("Invalid type: " ++ @typeName(@TypeOf(src))),
     }
 }
 
-pub fn copy_from_device(src: anytype, dst: NonConstPtr(@TypeOf(src)), stream: Stream) void {
+pub fn copy_to_device(
+    src: anytype,
+    dst: Tensor,
+    stream: Stream,
+) void {
+    return copy_to_device_raw(dst.dtype(), src, dst.data_ptr(), dst.len(), stream);        
+}
+
+pub fn copy_from_device_raw(
+    dtype: SC.Tag,
+    src: *anyopaque,
+    dst: anytype, // slice 
+    len: usize,
+    stream: Stream
+) void {
+
+    std.debug.assert(len > 0);
+        
     // std.debug.assert(stream != null);
-    switch (@typeInfo(@TypeOf(src))) {
+    switch (@typeInfo(@TypeOf(dst))) {
         .Pointer => |p| {
             const T = p.child;
+
+            if (dtype != SC.Tag.as_tag(T)) {
+                @panic("Mismatched types for copying from the device.");
+            }
             if (p.size == .Slice) {
-                std.debug.assert(src.len == dst.len);
-                dev.mpMemcpyDtoH(dst.ptr, src.ptr, src.len * @sizeOf(T), stream.context);
+                std.debug.assert(len == dst.len);
+                dev.mpMemcpyDtoH(dst.ptr, src, len * @sizeOf(T), stream.context);
             } else {
+                std.debug.assert(len == 1);
                 dev.mpMemcpyDtoH(dst, src, @sizeOf(T), stream.context);
             }
         },
-        else => @compileError("Invalid type for CopyFrom: " ++ @typeName(@TypeOf(src))),
+        else => @compileError("Invalid type: " ++ @typeName(@TypeOf(src))),
     }
+}
+
+pub fn copy_from_device(
+    src: Tensor,
+    dst: anytype,
+    stream: Stream,
+) void {
+    return copy_from_device_raw(src.dtype(), src.data_ptr(), dst, src.len(), stream);        
 }
 
 pub fn free(dev_mem: anytype, stream: Stream) void {
@@ -183,6 +231,9 @@ pub fn free(dev_mem: anytype, stream: Stream) void {
     }
 }
 
+pub fn free_raw(dev_mem: *anyopaque, stream: Stream) void {
+    dev.mpMemFree(dev_mem, stream.context);
+}
 
 /////////////////////////////////////
 // Contracts for function call sites.
@@ -269,28 +320,6 @@ pub fn DeepChild(comptime T: type) type {
         .Array => |a| a.child,
         else => C,
     };
-}
-
-pub fn NonConstPtr(comptime Parent: type) type {
-
-    if (comptime !is_pointer(Parent)) {
-        @compileError("Non-pointer type passed to pointer deduction.");
-    }
-
-    const info = @typeInfo(Parent).Pointer;
-
-    return @Type(.{
-        .Pointer = .{
-            .size = info.size,
-            .is_const = false,
-            .is_volatile = info.is_volatile,
-            .alignment = info.alignment,
-            .address_space = info.address_space,
-            .child = info.child,
-            .is_allowzero = info.is_allowzero,
-            .sentinel = info.sentinel,
-        }
-    });
 }
 
 pub inline fn ceil(n: anytype, m: @TypeOf(n)) @TypeOf(n) {

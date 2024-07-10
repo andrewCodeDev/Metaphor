@@ -228,7 +228,8 @@ fn i_ij_j_reverse(x: Tensor, y: Tensor, z: Tensor, scale: f64) void {
     // ex: (1,3)(3,2)->(1,2)
 
     ij_kj_ik( // dx: (1,2)(2,3)->(1,3): G(z).T(y)
-        x.ptr, core.dkey(x),
+        x.ptr,
+        core.dkey(x),
         z.grad_ptr(), z.sizes(), z.len(),
         y.data_ptr(), y.sizes(), y.len(),
         scale,
@@ -240,7 +241,8 @@ fn i_ij_j_reverse(x: Tensor, y: Tensor, z: Tensor, scale: f64) void {
     const x_colwise: []const usize = &.{ x.sizes()[0], 1 };
 
     ij_jk_ik( // dy: (3,1)(1,2)->(3,2): T(x).G(z)
-        y.ptr, core.dkey(y),
+        y.ptr,
+        core.dkey(y),
         x.data_ptr(), x_colwise, x.len(),
         z.grad_ptr(), z.sizes(), z.len(),
         scale,
@@ -279,7 +281,8 @@ fn ij_jk_ik_reverse(x: Tensor, y: Tensor, z: Tensor, scale: f64) void {
     // ex: (2,3)(3,4)->(2,4)
 
     ij_kj_ik( // dx: (2,4)(4,3)->(2,3): G(z).T(y)
-        x.ptr, core.dkey(x),
+        x.ptr,
+        core.dkey(x),
         z.grad_ptr(), z.sizes(), z.len(),
         y.data_ptr(), y.sizes(), y.len(),
         scale,
@@ -288,7 +291,8 @@ fn ij_jk_ik_reverse(x: Tensor, y: Tensor, z: Tensor, scale: f64) void {
     );
 
     ji_jk_ik( // dy: (3,2)(2,4)->(3,4): T(x).G(z)
-        y.ptr, core.dkey(y),
+        y.ptr,
+        core.dkey(y),
         x.data_ptr(), x.sizes(), x.len(),
         z.grad_ptr().?, z.sizes(), z.len(),
         scale,
@@ -335,7 +339,8 @@ fn ij_kj_ik_reverse(x: Tensor, y: Tensor, z: Tensor, scale: f64) void {
 
     // dx: (2,4)(4,3)->(2,3), G(z).y
     ij_jk_ik(
-        x.ptr, core.dkey(x),
+        x.ptr,
+        core.dkey(x),
         z.grad_ptr(), z.sizes(), z.len(),
         y.data_ptr(), y.sizes(), y.len(),
         scale,
@@ -345,7 +350,8 @@ fn ij_kj_ik_reverse(x: Tensor, y: Tensor, z: Tensor, scale: f64) void {
     
     // dy: (4,2)(2,3)->(4,3), G(z).y
     ji_jk_ik(
-        y.ptr, core.dkey(y),
+        y.ptr,
+        core.dkey(y),
         z.grad_ptr(), z.sizes(), z.len(),
         x.data_ptr(), x.sizes(), x.len(),
         scale,
@@ -392,7 +398,8 @@ fn ji_jk_ik_reverse(x: Tensor, y: Tensor, z: Tensor, scale: f64) void {
 
     // dx: (3,4)(4,2)->(3,2), y.T(G(z))
     ij_kj_ik(
-        x.ptr, core.dkey(x),
+        x.ptr,
+        core.dkey(x),
         y.data_ptr(), y.sizes(), y.len(),
         z.grad_ptr(), z.sizes(), z.len(),
         scale,
@@ -402,7 +409,8 @@ fn ji_jk_ik_reverse(x: Tensor, y: Tensor, z: Tensor, scale: f64) void {
 
     // dy: (3,2)(2,4)->(3,4), y.G(x)
     ij_jk_ik(
-        y.ptr, core.dkey(y),
+        y.ptr,
+        core.dkey(y),
         x.data_ptr(), x.sizes(), x.len(),
         z.grad_ptr(), z.sizes(), z.len(),
         scale,

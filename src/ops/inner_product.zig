@@ -87,7 +87,6 @@ pub fn reverse(args: []const OpDatum) void {
 }
 
 pub fn derive(_: []const OpDatum, _: Tensor) ?OpDatum {
-    @panic("TODO");
 }
 
 //////////////////////////////

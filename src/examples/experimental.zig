@@ -19,34 +19,54 @@ pub fn main() !void {
     const x = G.tensor(.{ 
         .class = .wgt,
         .dtype = .r32,
-        .sizes = &.{ 2, 3 }
+        .sizes = &.{ 3, 2 }
     });
 
     const y = G.tensor(.{ 
         .class = .wgt,
         .dtype = .r32,
-        .sizes = &.{ 3 }
+        .sizes = &.{ 2, 2 }
     });
 
     mp.algo.sequence(x, 1.0, 1.0);
     mp.algo.sequence(y, 1.0, 1.0);
 
-    const z = mp.ops.inner_product(x, y, "ij,j->i");
+    const z = mp.ops.inner_product(x, y, "ij,jk->ik");
+    
+    // lhs derivative
+    const a = mp.ops.reduce(y, "ij->i");
+    const b = mp.ops.broadcast(a, x.sizes(), "j->ij");
 
+    const bn = b.native(f32, std.heap.c_allocator);
+        defer bn.free();
+    
+    eu.print_matrix("bn", bn.data, bn.sizes);  
+
+    ////////////////////////
+    // forward mode gradient
+
+    // rhs derivative
+    const c = mp.ops.reduce(x, "ij->j");
+    const d = mp.ops.broadcast(c, y.sizes(), "i->ij");
+
+    const dn = d.native(f32, std.heap.c_allocator);
+        defer dn.free();
+
+    eu.print_matrix("dn", dn.data, dn.sizes);  
+
+    ////////////////////////
+    // reverse mode gradient
+    
     z.reverse(.keep);
 
     const xn = x.native(f32, std.heap.c_allocator);
-        defer xn.free(std.heap.c_allocator);
+        defer xn.free();
 
     const yn = y.native(f32, std.heap.c_allocator);
-        defer yn.free(std.heap.c_allocator);
+        defer yn.free();
 
-    const zn = z.native(f32, std.heap.c_allocator);
-        defer zn.free(std.heap.c_allocator);
-
-    eu.print_vector("z", zn.data, zn.sizes);
     eu.print_matrix("x", xn.grad.?, xn.sizes);
-    eu.print_vector("y", yn.grad.?, yn.sizes);
+    eu.print_matrix("x", yn.grad.?, yn.sizes);
 
     mp.device.check();
 

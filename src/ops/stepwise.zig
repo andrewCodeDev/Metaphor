@@ -35,9 +35,8 @@ pub fn forward_impl(graph: *Graph, x: Tensor) Tensor {
     return z;
 }
 
-pub fn reverse(args: []const OpDatum) void {
-    core.enable_gradient(args[0].tensor);    
-    // TODO: this function only adds zero
+pub fn reverse(_: []const OpDatum) void {
+    // TODO: this function has no derivative
 }
 
 pub fn derive(_: []const OpDatum, _: Tensor) ?OpDatum {

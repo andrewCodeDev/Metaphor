@@ -61,7 +61,9 @@ pub fn derive(args: []const OpDatum, wrt: Tensor) ?OpDatum {
 
         const factor: f64 = @floatFromInt(args[1].tensor.len() / args[0].tensor.len());
 
-        core.kernels.fill[key](u.data_ptr(), dx.scalar * factor, u.len(), u.context());
+        core.invoke(core.kernels.fill, key, .{
+            u.data_ptr(), dx.scalar * factor, u.len(), u.context()
+        });
 
         return OpDatum{ .tensor = u };
     }
@@ -151,7 +153,7 @@ fn broadcast_j_ij(graph: *Graph, x: Tensor, sizes: []const usize) Tensor {
 
     const key = core.dkey(y);
 
-    core.invoke(core.kernels.broadcast_i_ij, key, .{
+    core.invoke(core.kernels.broadcast_j_ij, key, .{
         x.data_ptr(), 
         y.data_ptr(), 
         0.0, // alpha

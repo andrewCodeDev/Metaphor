@@ -63,7 +63,9 @@ pub fn derive(args: []const OpDatum, wrt: Tensor) ?OpDatum {
 
         const key = core.dkey(u);
 
-        core.kernels.fill[key](u.data_ptr(), dx.scalar, u.len(), u.context());
+        core.invoke(core.kernels.fill, key, .{
+            u.data_ptr(), dx.scalar, u.len(), u.context()
+        });
 
         return OpDatum{ .tensor = u };
     }

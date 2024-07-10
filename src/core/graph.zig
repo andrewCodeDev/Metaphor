@@ -177,6 +177,7 @@ pub const Tensor = struct {
             .sizes = self.sizes(),
             .strides = self.strides(),
             .class = self.class,
+            .allocator = allocator,
         };
     }
 };
@@ -189,11 +190,12 @@ pub fn NativeTensor(comptime T: type) type {
         sizes: Sizes,
         strides: Strides,
         class: TensorClass,
-        pub fn free(self: Self, allocator: std.mem.Allocator) void {
+        allocator: std.mem.Allocator,
+        pub fn free(self: Self) void {
             // only the tensor values are anchored to this struct
-            allocator.free(self.data);
+            self.allocator.free(self.data);
 
-            if (self.grad) |grd| allocator.free(grd);
+            if (self.grad) |grd| self.allocator.free(grd);
         }
     };
 }
